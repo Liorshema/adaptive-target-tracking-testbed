@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"
+           schematypens="http://www.w3.org/2001/XMLSchema"?>
+
+<package format="3">
+  <name>robot_prediction</name>
+  <version>0.1.0</version>
+
+  <description>
+    Target-motion prediction package for the Adaptive Target Tracking Testbed.
+    Provides baseline predictors, online adaptation, residual analysis,
+    confidence estimation, prediction fusion, and trajectory history management.
+  </description>
+
+  <maintainer email="liorshema@gmail.com">user</maintainer>
+
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>python3-numpy</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

@@ -1,0 +1,37 @@
+prediction:
+  dt: 0.1
+  horizon: 20
+
+history:
+  window_duration: 1.0
+
+confidence:
+  residual_scale: 0.5
+
+imm:
+  model_probabilities:
+    - 0.333333
+    - 0.333333
+    - 0.333334
+
+  transition_matrix:
+    - [0.90, 0.05, 0.05]
+    - [0.05, 0.90, 0.05]
+    - [0.05, 0.05, 0.90]
+
+  likelihood_variance: 1.0
+
+coordinated_turn:
+  turn_rate_epsilon: 1.0e-6
+
+fusion:
+  default_weights:
+    - 1.0
+
+adaptation:
+  residual:
+    correction_gain: 1.0
+
+  rls:
+    forgetting_factor: 0.99
+    initial_covariance: 100.0
