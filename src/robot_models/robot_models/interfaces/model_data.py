@@ -22,7 +22,6 @@ class ModelData:
     velocity_constraint_residual: Optional[np.ndarray] = None
     acceleration_constraint_residual: Optional[np.ndarray] = None
     actuator_constraint_residual: Optional[np.ndarray] = None
-    visibility_constraint_residual: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
         self.end_effector_transform_world = np.asarray(
@@ -91,8 +90,6 @@ class ModelData:
                 self.acceleration_constraint_residual,
             'actuator_constraint_residual':
                 self.actuator_constraint_residual,
-            'visibility_constraint_residual':
-                self.visibility_constraint_residual,
         }
 
         for name, vector in optional_vectors.items():

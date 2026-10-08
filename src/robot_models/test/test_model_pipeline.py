@@ -5,13 +5,8 @@ import numpy as np
 from robot_models.base.differential_drive.kinematics import (
     DifferentialDriveKinematics,
 )
-from robot_models.camera.fov import CameraFOV
-from robot_models.camera.projection import CameraProjection
 from robot_models.common.rotations import rotation_z
 from robot_models.common.transforms import make_transform
-from robot_models.constraints.visibility import (
-    VisibilityConstraint,
-)
 from robot_models.interfaces.model_data import ModelData
 from robot_models.manipulator.serial_arm.model import (
     SerialArmModel,
@@ -140,28 +135,6 @@ def test_model_pipeline() -> None:
         desired_transform_world_end_effector,
     )
 
-    projection = CameraProjection(
-        fx=600.0,
-        fy=600.0,
-        cx=320.0,
-        cy=240.0,
-    )
-
-    fov = CameraFOV(
-        image_width=640,
-        image_height=480,
-    )
-
-    visibility = VisibilityConstraint(
-        projection=projection,
-        fov=fov,
-    )
-
-    visibility_residual = visibility.residual(
-        desired_transform_world_end_effector,
-        target_position_world,
-    )
-
     model_data = ModelData(
         end_effector_transform_world=(
             transform_world_end_effector
@@ -172,7 +145,6 @@ def test_model_pipeline() -> None:
         ),
         desired_end_effector_twist_world=np.zeros(6),
         whole_body_jacobian_world=whole_body_jacobian,
-        visibility_constraint_residual=visibility_residual,
     )
 
     assert robot.base.velocity_dimension == 2
@@ -184,13 +156,8 @@ def test_model_pipeline() -> None:
     assert generalized_velocity.shape == (6,)
     assert end_effector_twist.shape == (6,)
     assert pose_error.shape == (6,)
-    assert visibility_residual.shape == (4,)
 
     assert model_data.whole_body_jacobian_world.shape == (
         6,
         6,
-    )
-
-    assert np.all(
-        visibility_residual >= 0.0
     )
