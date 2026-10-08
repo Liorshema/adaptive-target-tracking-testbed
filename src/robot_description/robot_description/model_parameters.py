@@ -31,6 +31,15 @@ class SerialArmParameters:
 
 
 @dataclass(frozen=True)
+class TrackingFrameParameters:
+    """Fixed tracking-frame transform relative to its parent link."""
+
+    parent: str
+    translation: np.ndarray
+    rotation_rpy: np.ndarray
+
+
+@dataclass(frozen=True)
 class JointLimitParameters:
     """Manipulator joint limits and actuator-related bounds."""
 
@@ -48,6 +57,7 @@ class RobotModelParameters:
     base: DifferentialDriveParameters
     manipulator: SerialArmParameters
     joint_limits: JointLimitParameters
+    tracking_frame: TrackingFrameParameters
 
 
 def load_robot_model_parameters(
@@ -74,19 +84,20 @@ def load_robot_model_parameters(
     robot = _require_mapping(data, 'robot')
     body = _require_mapping(robot, 'body')
     wheels = _require_mapping(robot, 'wheels')
-    arm = _require_mapping(robot, 'arm')
-    arm_base = _require_mapping(arm, 'base')
-    link_1 = _require_mapping(arm, 'link1')
-    link_2 = _require_mapping(arm, 'link2')
-    wrist = _require_mapping(arm, 'wrist')
-    joints = _require_mapping(arm, 'joints')
+    manipulator = _require_mapping(robot, 'manipulator')
+    arm_base = _require_mapping(manipulator, 'base')
+    link_1 = _require_mapping(manipulator, 'link1')
+    link_2 = _require_mapping(manipulator, 'link2')
+    wrist = _require_mapping(manipulator, 'wrist')
+    joints = _require_mapping(manipulator, 'joints')
+    tracking_frame = _require_mapping(robot, 'tracking_frame')
 
-    joint_names = (
-        'base_yaw',
-        'shoulder',
-        'elbow',
-        'wrist',
-    )
+    joint_names = tuple(joints.keys())
+
+    if not joint_names:
+        raise ValueError(
+            'Manipulator must define at least one joint.'
+        )
 
     joint_configs = [
         _require_mapping(joints, name)
@@ -101,9 +112,12 @@ def load_robot_model_parameters(
         dtype=float,
     )
 
-    if joint_axes.shape != (4, 3):
+    joint_count = len(joint_names)
+
+    if joint_axes.shape != (joint_count, 3):
         raise ValueError(
-            'Manipulator joint axes must have shape (4, 3).'
+            'Manipulator joint axes must have shape '
+            f'({joint_count}, 3).'
         )
 
     axis_norms = np.linalg.norm(
@@ -167,22 +181,27 @@ def load_robot_model_parameters(
         lower=_joint_vector(
             joint_configs,
             'lower',
+            size=joint_count,
         ),
         upper=_joint_vector(
             joint_configs,
             'upper',
+            size=joint_count,
         ),
         velocity=_joint_vector(
             joint_configs,
             'velocity',
+            size=joint_count,
         ),
         effort=_joint_vector(
             joint_configs,
             'effort',
+            size=joint_count,
         ),
         damping=_joint_vector(
             joint_configs,
             'damping',
+            size=joint_count,
         ),
     )
 
@@ -194,10 +213,25 @@ def load_robot_model_parameters(
             'Joint lower limits cannot exceed upper limits.'
         )
 
+    tracking_frame_parameters = TrackingFrameParameters(
+        parent=str(tracking_frame['parent']),
+        translation=_vector(
+            tracking_frame,
+            'translation',
+            size=3,
+        ),
+        rotation_rpy=_vector(
+            tracking_frame,
+            'rotation_rpy',
+            size=3,
+        ),
+    )
+
     return RobotModelParameters(
         base=base_parameters,
         manipulator=manipulator_parameters,
         joint_limits=joint_limit_parameters,
+        tracking_frame=tracking_frame_parameters,
     )
 
 
@@ -255,6 +289,7 @@ def _positive_float(
 def _joint_vector(
     joint_configs: list[dict[str, Any]],
     key: str,
+    size: int,
 ) -> np.ndarray:
     """Collect one joint parameter into a vector."""
     try:
@@ -270,9 +305,32 @@ def _joint_vector(
             f'Missing joint parameter: {key}'
         ) from error
 
-    if vector.shape != (4,):
+    if vector.shape != (size,):
         raise ValueError(
-            f'Joint parameter {key} must have shape (4,).'
+            f'Joint parameter {key} must have shape ({size},).'
+        )
+
+    return vector
+
+def _vector(
+    mapping: dict[str, Any],
+    key: str,
+    size: int,
+) -> np.ndarray:
+    """Return a required fixed-size vector parameter."""
+    if key not in mapping:
+        raise ValueError(
+            f'Missing vector parameter: {key}'
+        )
+
+    vector = np.asarray(
+        mapping[key],
+        dtype=float,
+    )
+
+    if vector.shape != (size,):
+        raise ValueError(
+            f'Parameter {key} must have shape ({size},).'
         )
 
     return vector

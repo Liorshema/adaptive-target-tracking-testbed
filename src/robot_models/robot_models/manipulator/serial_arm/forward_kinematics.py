@@ -4,8 +4,6 @@ import numpy as np
 
 from robot_models.common.rotations import (
     axis_angle_rotation,
-    rotation_x,
-    rotation_z,
 )
 from robot_models.common.transforms import (
     make_transform,
@@ -13,7 +11,7 @@ from robot_models.common.transforms import (
 
 
 class ArmForwardKinematics:
-    """Compute the camera optical-frame pose in the robot base frame."""
+    """Compute the wrist/end-effector pose in the robot base frame."""
 
     DOF = 4
 
@@ -78,13 +76,13 @@ class ArmForwardKinematics:
         joint_positions: np.ndarray,
     ) -> np.ndarray:
         """
-        Return T_B_O for the camera optical frame.
+        Return T_B_E for the manipulator end-effector.
 
         B:
             Robot base frame.
 
-        O:
-            Camera optical frame.
+        E:
+            Wrist/end-effector frame.
         """
         joint_positions = np.asarray(
             joint_positions,
@@ -135,39 +133,4 @@ class ArmForwardKinematics:
                 @ joint_transform
             )
 
-        # wrist_link -> camera_link
-        transform_wrist_camera = make_transform(
-            rotation=np.eye(3),
-            position=np.array(
-                [
-                    self.wrist_length,
-                    0.0,
-                    0.0,
-                ]
-            ),
-        )
-
-        transform_base_camera = (
-            transform_base_current
-            @ transform_wrist_camera
-        )
-
-        # camera_link -> camera_optical_frame
-        #
-        # Matches URDF:
-        # rpy='-pi/2 0 -pi/2'
-        #
-        # URDF RPY convention:
-        # R = Rz(yaw) @ Ry(pitch) @ Rx(roll)
-        transform_camera_optical = make_transform(
-            rotation=(
-                rotation_z(-np.pi / 2.0)
-                @ rotation_x(-np.pi / 2.0)
-            ),
-            position=np.zeros(3),
-        )
-
-        return (
-            transform_base_camera
-            @ transform_camera_optical
-        )
+        return transform_base_current

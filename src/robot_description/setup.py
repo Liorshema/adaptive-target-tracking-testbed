@@ -48,9 +48,4 @@ setup(
             'pytest',
         ],
     },
-    entry_points={
-        'console_scripts': [
-            'simulated_imu_publisher = robot_description.simulated_imu_publisher:main',
-        ],
-    },
 )

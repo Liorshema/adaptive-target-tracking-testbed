@@ -52,7 +52,7 @@ class SerialArmModel(ManipulatorModel):
         self,
         joint_positions: np.ndarray,
     ) -> np.ndarray:
-        """Return the optical-frame transform relative to the base."""
+        """Return the end-effector transform relative to the base."""
         return self._forward_kinematics.compute(
             joint_positions
         )

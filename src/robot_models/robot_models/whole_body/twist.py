@@ -1,17 +1,17 @@
-"""Whole-body camera twist computation."""
+"""Whole-body end-effector twist computation."""
 
 import numpy as np
 
 
 class WholeBodyTwist:
-    """Compute camera twist from whole-body generalized velocity."""
+    """Compute end-effector twist from whole-body generalized velocity."""
 
     @staticmethod
     def compute(
         whole_body_jacobian: np.ndarray,
         generalized_velocity: np.ndarray,
     ) -> np.ndarray:
-        """Compute camera twist V_E = J_WB @ nu."""
+        """Compute end-effector twist V_E = J_WB @ nu."""
         whole_body_jacobian = np.asarray(
             whole_body_jacobian,
             dtype=float,

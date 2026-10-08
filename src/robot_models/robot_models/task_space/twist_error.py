@@ -4,7 +4,7 @@ import numpy as np
 
 
 class TwistError:
-    """Compute desired-minus-current camera twist error."""
+    """Compute desired-minus-current frame twist error."""
 
     @staticmethod
     def compute(

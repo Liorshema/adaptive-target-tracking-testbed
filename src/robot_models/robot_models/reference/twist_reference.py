@@ -1,4 +1,4 @@
-"""Camera twist-reference utilities."""
+"""Frame twist-reference utilities."""
 
 import numpy as np
 
@@ -8,33 +8,33 @@ from robot_models.common.rotations import (
 
 
 class TwistReference:
-    """Compute desired camera twist from consecutive poses."""
+    """Compute desired frame twist from consecutive poses."""
 
     @staticmethod
     def compute(
-        transform_world_camera_current: np.ndarray,
-        transform_world_camera_next: np.ndarray,
+        transform_world_frame_current: np.ndarray,
+        transform_world_frame_next: np.ndarray,
         dt: float,
     ) -> np.ndarray:
-        """Return desired 6D camera twist in the world frame."""
-        transform_world_camera_current = np.asarray(
-            transform_world_camera_current,
+        """Return desired 6D frame twist in the world frame."""
+        transform_world_frame_current = np.asarray(
+            transform_world_frame_current,
             dtype=float,
         )
 
-        transform_world_camera_next = np.asarray(
-            transform_world_camera_next,
+        transform_world_frame_next = np.asarray(
+            transform_world_frame_next,
             dtype=float,
         )
 
-        if transform_world_camera_current.shape != (4, 4):
+        if transform_world_frame_current.shape != (4, 4):
             raise ValueError(
-                'transform_world_camera_current must have shape (4, 4)'
+                'transform_world_frame_current must have shape (4, 4)'
             )
 
-        if transform_world_camera_next.shape != (4, 4):
+        if transform_world_frame_next.shape != (4, 4):
             raise ValueError(
-                'transform_world_camera_next must have shape (4, 4)'
+                'transform_world_frame_next must have shape (4, 4)'
             )
 
         if dt <= 0.0:
@@ -43,11 +43,11 @@ class TwistReference:
             )
 
         position_current = (
-            transform_world_camera_current[:3, 3]
+            transform_world_frame_current[:3, 3]
         )
 
         position_next = (
-            transform_world_camera_next[:3, 3]
+            transform_world_frame_next[:3, 3]
         )
 
         linear_velocity_world = (
@@ -55,11 +55,11 @@ class TwistReference:
         ) / dt
 
         rotation_world_current = (
-            transform_world_camera_current[:3, :3]
+            transform_world_frame_current[:3, :3]
         )
 
         rotation_world_next = (
-            transform_world_camera_next[:3, :3]
+            transform_world_frame_next[:3, :3]
         )
 
         rotation_current_next = (

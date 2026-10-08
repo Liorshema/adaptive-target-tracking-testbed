@@ -1,4 +1,4 @@
-"""Differential inverse kinematics for the camera arm."""
+"""Differential inverse kinematics for the serial manipulator."""
 
 import numpy as np
 

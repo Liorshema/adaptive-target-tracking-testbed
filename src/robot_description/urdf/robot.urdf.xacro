@@ -25,9 +25,9 @@
   <!-- =============================================== -->
 
   <xacro:include filename="inertial_macros.xacro"/>
-  <xacro:include filename="robot_base.xacro"/>
-  <xacro:include filename="robot_arm.xacro"/>
-  <xacro:include filename="gazebo_plugins.xacro"/>
+  <xacro:include filename="base.xacro"/>
+  <xacro:include filename="manipulator.xacro"/>
+  <xacro:include filename="tracking_frame.xacro"/>
   <xacro:include filename="materials.xacro"/>
 
 
@@ -37,9 +37,10 @@
 
   <xacro:robot_base robot="${robot}"/>
 
-  <xacro:robot_arm robot="${robot}"/>
+  <xacro:manipulator robot="${robot}"/>
 
-  <xacro:gazebo_plugins robot="${robot}"/>
+  <xacro:tracking_frame robot="${robot}"/>
+
 
 
 </robot>

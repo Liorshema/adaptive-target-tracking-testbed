@@ -7,6 +7,9 @@ from robot_models.base.differential_drive.kinematics import (
 )
 from robot_models.common.rotations import rotation_z
 from robot_models.common.transforms import make_transform
+from robot_models.manipulator.fixed_mount.model import (
+    FixedMountModel,
+)
 from robot_models.manipulator.serial_arm.model import (
     SerialArmModel,
 )
@@ -30,13 +33,23 @@ def make_robot() -> WholeBodyComposer:
         [0.0, -1.0, 0.0],
     ])
 
-    manipulator = SerialArmModel(
+    arm = SerialArmModel(
         joint_axes=joint_axes,
         body_height=0.20,
         arm_base_height=0.08,
         link_1_length=0.40,
         link_2_length=0.36,
         wrist_length=0.12,
+    )
+
+    manipulator = FixedMountModel(
+        parent=arm,
+        translation=np.array([
+            0.12,
+            0.0,
+            0.0,
+        ]),
+        rotation_rpy=np.zeros(3),
     )
 
     return WholeBodyComposer(
@@ -55,7 +68,7 @@ def test_whole_body_dimensions() -> None:
 
 
 def test_whole_body_forward_kinematics() -> None:
-    """Verify world-frame forward kinematics."""
+    """Verify world-frame tracking-frame kinematics."""
     robot = make_robot()
 
     transform_world_base = make_transform(
@@ -67,9 +80,11 @@ def test_whole_body_forward_kinematics() -> None:
         ]),
     )
 
-    joint_positions = np.zeros(4)
+    joint_positions = np.zeros(
+        robot.manipulator.dof
+    )
 
-    transform_world_end_effector = (
+    transform_world_tracking = (
         WholeBodyKinematics.compute(
             robot_model=robot,
             transform_world_base=transform_world_base,
@@ -77,19 +92,23 @@ def test_whole_body_forward_kinematics() -> None:
         )
     )
 
-    assert transform_world_end_effector.shape == (
+    assert transform_world_tracking.shape == (
         4,
         4,
     )
 
     expected_position_world = (
         transform_world_base[:3, :3]
-        @ np.array([0.88, 0.0, 0.18])
+        @ np.array([
+            0.88,
+            0.0,
+            0.18,
+        ])
         + transform_world_base[:3, 3]
     )
 
     assert np.allclose(
-        transform_world_end_effector[:3, 3],
+        transform_world_tracking[:3, 3],
         expected_position_world,
     )
 
@@ -127,7 +146,7 @@ def test_whole_body_jacobian_shape() -> None:
 
 
 def test_whole_body_twist_mapping() -> None:
-    """Verify generalized velocity maps to end-effector twist."""
+    """Verify generalized velocity maps to tracking-frame twist."""
     robot = make_robot()
 
     transform_world_base = make_transform(

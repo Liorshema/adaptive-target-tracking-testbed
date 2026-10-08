@@ -7,7 +7,7 @@
   <!-- 4-DOF camera arm                                -->
   <!-- =============================================== -->
 
-  <xacro:macro name="robot_arm" params="robot">
+  <xacro:macro name="manipulator" params="robot">
 
     <!-- Body height needed for mounting -->
     <xacro:property
@@ -19,110 +19,110 @@
 
     <xacro:property
       name="arm_base_radius"
-      value="${robot['arm']['base']['radius']}"/>
+      value="${robot['manipulator']['base']['radius']}"/>
 
     <xacro:property
       name="arm_base_height"
-      value="${robot['arm']['base']['height']}"/>
+      value="${robot['manipulator']['base']['height']}"/>
 
     <xacro:property
       name="arm_base_mass"
-      value="${robot['arm']['base']['mass']}"/>
+      value="${robot['manipulator']['base']['mass']}"/>
 
 
     <!-- Link 1 -->
 
     <xacro:property
       name="arm_link_1_length"
-      value="${robot['arm']['link1']['length']}"/>
+      value="${robot['manipulator']['link1']['length']}"/>
 
     <xacro:property
       name="arm_link_1_width"
-      value="${robot['arm']['link1']['width']}"/>
+      value="${robot['manipulator']['link1']['width']}"/>
 
     <xacro:property
       name="arm_link_1_height"
-      value="${robot['arm']['link1']['height']}"/>
+      value="${robot['manipulator']['link1']['height']}"/>
 
     <xacro:property
       name="arm_link_1_mass"
-      value="${robot['arm']['link1']['mass']}"/>
+      value="${robot['manipulator']['link1']['mass']}"/>
 
 
     <!-- Link 2 -->
 
     <xacro:property
       name="arm_link_2_length"
-      value="${robot['arm']['link2']['length']}"/>
+      value="${robot['manipulator']['link2']['length']}"/>
 
     <xacro:property
       name="arm_link_2_width"
-      value="${robot['arm']['link2']['width']}"/>
+      value="${robot['manipulator']['link2']['width']}"/>
 
     <xacro:property
       name="arm_link_2_height"
-      value="${robot['arm']['link2']['height']}"/>
+      value="${robot['manipulator']['link2']['height']}"/>
 
     <xacro:property
       name="arm_link_2_mass"
-      value="${robot['arm']['link2']['mass']}"/>
+      value="${robot['manipulator']['link2']['mass']}"/>
 
 
     <!-- Wrist -->
 
     <xacro:property
       name="wrist_length"
-      value="${robot['arm']['wrist']['length']}"/>
+      value="${robot['manipulator']['wrist']['length']}"/>
 
     <xacro:property
       name="wrist_width"
-      value="${robot['arm']['wrist']['width']}"/>
+      value="${robot['manipulator']['wrist']['width']}"/>
 
     <xacro:property
       name="wrist_height"
-      value="${robot['arm']['wrist']['height']}"/>
+      value="${robot['manipulator']['wrist']['height']}"/>
 
     <xacro:property
       name="wrist_mass"
-      value="${robot['arm']['wrist']['mass']}"/>
+      value="${robot['manipulator']['wrist']['mass']}"/>
 
 
     <!-- Camera -->
 
     <xacro:property
       name="camera_length"
-      value="${robot['arm']['camera']['length']}"/>
+      value="${robot['manipulator']['camera']['length']}"/>
 
     <xacro:property
       name="camera_width"
-      value="${robot['arm']['camera']['width']}"/>
+      value="${robot['manipulator']['camera']['width']}"/>
 
     <xacro:property
       name="camera_height"
-      value="${robot['arm']['camera']['height']}"/>
+      value="${robot['manipulator']['camera']['height']}"/>
 
     <xacro:property
       name="camera_mass"
-      value="${robot['arm']['camera']['mass']}"/>
+      value="${robot['manipulator']['camera']['mass']}"/>
 
 
     <!-- Joints -->
 
     <xacro:property
       name="base_yaw_joint_cfg"
-      value="${robot['arm']['joints']['base_yaw']}"/>
+      value="${robot['manipulator']['joints']['base_yaw']}"/>
 
     <xacro:property
       name="shoulder_joint_cfg"
-      value="${robot['arm']['joints']['shoulder']}"/>
+      value="${robot['manipulator']['joints']['shoulder']}"/>
 
     <xacro:property
       name="elbow_joint_cfg"
-      value="${robot['arm']['joints']['elbow']}"/>
+      value="${robot['manipulator']['joints']['elbow']}"/>
 
     <xacro:property
       name="wrist_joint_cfg"
-      value="${robot['arm']['joints']['wrist']}"/>
+      value="${robot['manipulator']['joints']['wrist']}"/>
 
 
     <!-- ============================================= -->
@@ -417,74 +417,6 @@
     </joint>
 
 
-    <!-- ============================================= -->
-    <!-- Camera                                        -->
-    <!-- ============================================= -->
-
-    <link name="camera_link">
-
-      <visual>
-        <geometry>
-          <box
-            size="${camera_length}
-                  ${camera_width}
-                  ${camera_height}"/>
-        </geometry>
-
-        <material name="black"/>
-      </visual>
-
-
-      <collision>
-        <geometry>
-          <box
-            size="${camera_length}
-                  ${camera_width}
-                  ${camera_height}"/>
-        </geometry>
-      </collision>
-
-
-      <xacro:box_inertial
-        mass="${camera_mass}"
-        length="${camera_length}"
-        width="${camera_width}"
-        height="${camera_height}"/>
-
-    </link>
-
-
-    <joint name="camera_joint" type="fixed">
-
-      <parent link="wrist_link"/>
-      <child link="camera_link"/>
-
-      <origin
-        xyz="${wrist_length} 0 0"
-        rpy="0 0 0"/>
-
-    </joint>
-
-    <!-- ============================================= -->
-    <!-- Camera optical frame                          -->
-    <!-- ROS optical convention:                       -->
-    <!--   x -> right                                  -->
-    <!--   y -> down                                   -->
-    <!--   z -> forward                                -->
-    <!-- ============================================= -->
-
-    <link name="camera_optical_frame"/>
-
-    <joint name="camera_optical_joint" type="fixed">
-
-      <parent link="camera_link"/>
-      <child link="camera_optical_frame"/>
-
-      <origin
-        xyz="0 0 0"
-        rpy="-1.57079632679 0 -1.57079632679"/>
-
-    </joint>
 
   </xacro:macro>
 

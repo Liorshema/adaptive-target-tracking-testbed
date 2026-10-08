@@ -117,7 +117,7 @@ def test_model_pipeline() -> None:
 
     desired_rotation_world_end_effector = (
         LookAtReference.compute(
-            camera_position_world=(
+            frame_position_world=(
                 transform_world_end_effector[:3, 3]
             ),
             target_position_world=target_position_world,
@@ -129,7 +129,7 @@ def test_model_pipeline() -> None:
             desired_position_world=(
                 transform_world_end_effector[:3, 3]
             ),
-            desired_rotation_world_camera=(
+            desired_rotation_world_frame=(
                 desired_rotation_world_end_effector
             ),
         )

@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- =============================================== -->
+  <!-- Virtual tracking frame                          -->
+  <!-- =============================================== -->
+
+  <xacro:macro name="tracking_frame" params="robot">
+
+    <xacro:property
+      name="tracking_cfg"
+      value="${robot['tracking_frame']}"/>
+
+    <link name="tracking_frame"/>
+
+    <joint name="tracking_frame_joint" type="fixed">
+
+      <parent link="${tracking_cfg['parent']}"/>
+      <child link="tracking_frame"/>
+
+      <origin
+        xyz="${tracking_cfg['translation'][0]}
+             ${tracking_cfg['translation'][1]}
+             ${tracking_cfg['translation'][2]}"
+        rpy="${tracking_cfg['rotation_rpy'][0]}
+             ${tracking_cfg['rotation_rpy'][1]}
+             ${tracking_cfg['rotation_rpy'][2]}"/>
+
+    </joint>
+
+  </xacro:macro>
+
+</robot>

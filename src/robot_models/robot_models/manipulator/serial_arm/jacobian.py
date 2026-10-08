@@ -1,4 +1,4 @@
-"""Geometric Jacobian for the 4-DOF camera arm."""
+"""Geometric Jacobian for the 4-DOF serial manipulator."""
 
 import numpy as np
 
@@ -7,7 +7,7 @@ from robot_models.common.transforms import make_transform
 
 
 class ArmJacobian:
-    """Compute the geometric Jacobian of the camera arm."""
+    """Compute the geometric Jacobian of the manipulator end-effector."""
 
     DOF = 4
 
@@ -138,27 +138,8 @@ class ArmJacobian:
                 @ joint_transform
             )
 
-        camera_offset_local = np.array(
-            [
-                self.wrist_length,
-                0.0,
-                0.0,
-            ],
-            dtype=float,
-        )
-
-        rotation_base_to_current = (
-            transform_base_to_current[:3, :3]
-        )
-
-        translation_base_to_current = (
+        end_effector_position_base = (
             transform_base_to_current[:3, 3]
-        )
-
-        camera_position_base = (
-            rotation_base_to_current
-            @ camera_offset_local
-            + translation_base_to_current
         )
 
         jacobian = np.zeros(
@@ -175,14 +156,14 @@ class ArmJacobian:
                 joint_axes_base,
             )
         ):
-            joint_to_camera_base = (
-                camera_position_base
+            joint_to_end_effector_base = (
+                end_effector_position_base
                 - joint_position_base
             )
 
             jacobian[:3, index] = np.cross(
                 joint_axis_base,
-                joint_to_camera_base,
+                joint_to_end_effector_base,
             )
 
             jacobian[3:, index] = (

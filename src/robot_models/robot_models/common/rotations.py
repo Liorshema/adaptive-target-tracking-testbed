@@ -177,8 +177,26 @@ def rotation_z(
         np.array([0.0, 0.0, 1.0]),
         angle,
     )
-    """Return rotation matrix about the z-axis."""
-    return axis_angle_rotation(
-        axis=np.array([0.0, 0.0, 1.0]),
-        angle=angle,
+
+
+def rpy_to_rotation(
+    rpy: np.ndarray,
+) -> np.ndarray:
+    """Return rotation matrix from roll-pitch-yaw angles."""
+    rpy = np.asarray(
+        rpy,
+        dtype=float,
+    )
+
+    if rpy.shape != (3,):
+        raise ValueError(
+            'rpy must have shape (3,)'
+        )
+
+    roll, pitch, yaw = rpy
+
+    return (
+        rotation_z(yaw)
+        @ rotation_y(pitch)
+        @ rotation_x(roll)
     )

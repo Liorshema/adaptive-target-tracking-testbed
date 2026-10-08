@@ -12,7 +12,7 @@ def generate_launch_description():
     xacro_path = os.path.join(
         package_share,
         'urdf',
-        'simple_robot.urdf.xacro',
+        'robot.urdf.xacro',
     )
 
     rviz_config_path = os.path.join(

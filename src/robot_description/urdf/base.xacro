@@ -55,14 +55,6 @@
       value="${robot['wheels']['z_offset']}"/>
 
 
-    <xacro:property
-      name="wheel_mu"
-      value="${robot['simulation']['friction']['wheel_mu']}"/>
-
-    <xacro:property
-        name="wheel_mu2"
-        value="${robot['simulation']['friction']['wheel_mu2']}"/>
-
 
 
 
@@ -104,11 +96,6 @@
           length="${wheel_width}"/>
 
       </link>
-
-      <gazebo reference="${name}">
-        <mu1>${wheel_mu}</mu1>
-        <mu2>${wheel_mu2}</mu2>
-      </gazebo>
 
 
       <joint name="${name}_joint" type="continuous">
