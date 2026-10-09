@@ -1,0 +1,16 @@
+experiment:
+  name: flat_turn_baseline
+  terrain: flat
+
+  segments:
+    - duration: 3.0
+      linear_velocity: 0.4
+      angular_velocity: 0.0
+
+    - duration: 4.0
+      linear_velocity: 0.3
+      angular_velocity: 0.5
+
+    - duration: 3.0
+      linear_velocity: 0.4
+      angular_velocity: 0.0

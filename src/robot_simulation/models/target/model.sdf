@@ -1,0 +1,43 @@
+
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="target">
+    <static>false</static>
+    <link name="target_link">
+      <gravity>false</gravity>
+      <kinematic>true</kinematic>
+
+      <visual name="target_visual">
+        <geometry>
+          <sphere>
+            <radius>0.10</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>1 0.3 0.1 1</ambient>
+          <diffuse>1 0.3 0.1 1</diffuse>
+        </material>
+      </visual>
+
+      <collision name="target_collision">
+        <geometry>
+          <sphere>
+            <radius>0.10</radius>
+          </sphere>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>0.0004</ixx>
+          <iyy>0.0004</iyy>
+          <izz>0.0004</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+  </model>
+</sdf>

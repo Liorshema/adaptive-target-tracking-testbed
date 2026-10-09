@@ -1,0 +1,22 @@
+
+target:
+  geometry:
+    type: sphere
+    parameters:
+      radius: 0.10
+
+  appearance:
+    color: [1.0, 0.3, 0.1, 1.0]
+
+  physics:
+    kinematic: true
+    gravity: false
+    collision_enabled: false
+
+  dynamics:
+    type: fight_flight
+    parameters:
+      alpha: 1.0
+      preferred_distance: 1.0
+      damping: 0.5
+      distance_epsilon: 1.0e-6

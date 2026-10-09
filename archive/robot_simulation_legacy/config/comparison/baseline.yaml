@@ -1,0 +1,27 @@
+comparison:
+  name: gazebo_vs_nominal_kinematics
+
+  reference:
+    name: gazebo_truth
+    topic: /model/simple_robot/odometry
+
+  estimate:
+    name: nominal_kinematics
+    topic: /nominal/odom
+
+  variables:
+    - x
+    - y
+    - yaw
+    - linear_velocity
+    - angular_velocity
+
+  synchronization:
+    queue_size: 100
+    tolerance_sec: 0.02
+
+  metrics:
+    - rmse
+    - mae
+    - max_absolute_error
+    - final_error

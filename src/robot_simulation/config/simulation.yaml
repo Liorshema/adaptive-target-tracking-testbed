@@ -1,0 +1,9 @@
+
+simulation:
+  backend: numerical
+
+  integration:
+    type: rk4
+    parameters:
+      dt: 0.01
+    max_steps: 1000

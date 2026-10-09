@@ -1,3 +1,4 @@
+
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd"
            schematypens="http://www.w3.org/2001/XMLSchema"?>
@@ -8,28 +9,45 @@
   <version>0.0.0</version>
 
   <description>
-    Simulation, experiment orchestration, and model comparison for the robot.
+    Modular 3D target simulation for the Adaptive Target Tracking
+    Testbed, including behavioral dynamics, disturbances, synthetic
+    measurements, ground truth, and Gazebo integration.
   </description>
 
   <maintainer email="liorshema@gmail.com">user</maintainer>
 
   <license>Apache-2.0</license>
 
-  <!-- Runtime dependencies -->
+  <!-- Shared robot and target models -->
+
+  <depend>robot_models</depend>
+  <exec_depend>robot_description</exec_depend>
+
+  <!-- ROS 2 runtime -->
 
   <exec_depend>rclpy</exec_depend>
-
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-
   <exec_depend>ament_index_python</exec_depend>
 
-  <exec_depend>message_filters</exec_depend>
+  <!-- ROS messages and Gazebo service interfaces -->
 
-  <exec_depend>robot_description</exec_depend>
-  <exec_depend>robot_dynamics</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>ros_gz_interfaces</exec_depend>
+
+  <!-- Gazebo integration -->
+
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <!-- Robot and world description -->
+
   <exec_depend>xacro</exec_depend>
+
+  <!-- Python numerical and configuration dependencies -->
+
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
   <!-- Testing -->
 
