@@ -1,0 +1,37 @@
+
+# Example deployment configuration. Replace this file or pass config:=... .
+
+paths:
+  base: package
+
+world:
+  source: worlds/tracking_testbed.sdf.xacro
+  terrain_config: config/terrain/flat.yaml
+  output_name: world.sdf
+  system_plugins:
+    - {filename: gz-sim-physics-system, name: 'gz::sim::systems::Physics'}
+    - {filename: gz-sim-user-commands-system, name: 'gz::sim::systems::UserCommands'}
+    - {filename: gz-sim-scene-broadcaster-system, name: 'gz::sim::systems::SceneBroadcaster'}
+
+target:
+  config: config/target.yaml
+  entity_name: target
+  initial_position: [2.0, 0.0, 1.0]
+  initial_velocity: [0.0, 0.0, 0.0]
+
+tracking:
+  source: static
+  position: [0.0, 0.0, 1.0]
+  reference_frame: world
+  tracking_frame: tracking_frame
+
+simulation:
+  config: config/simulation.yaml
+  environment_config: config/environment.yaml
+
+gazebo:
+  gui: true
+  start_running: true
+  clock_topic: /clock
+  pose_service_template: /world/{world}/set_pose
+  pose_service_type: ros_gz_interfaces/srv/SetEntityPose
