@@ -4,9 +4,16 @@ from ament_index_python.packages import get_package_share_directory
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from robot_interfaces.msg import (
+    PredictedTrajectory as PredictedTrajectoryMsg,
+    StateEstimate as StateEstimateMsg,
+)
 
 from robot_prediction.config_loader import PredictionConfig
-from robot_prediction.interfaces.prediction_data import PredictionInput
+from robot_prediction.interfaces.prediction_data import (
+    PredictionInput,
+    TrajectoryPrediction,
+)
 from robot_prediction.interfaces.state_layout import StateLayout
 from robot_prediction.system_factory import PredictionSystemFactory
 from std_msgs.msg import Float64MultiArray, MultiArrayDimension
@@ -54,13 +61,22 @@ class PredictionNode(Node):
             ).create()
         )
 
-        self._timestamp = 0.0
+        self._last_timestamp = None
         self._state_dimension = None
+        self._frame_id = None
+
+        self.declare_parameter(
+            'estimated_state_topic',
+            '/estimation/target_state_full',
+        )
+        estimated_state_topic = str(
+            self.get_parameter('estimated_state_topic').value
+        )
 
         self._state_subscription = (
             self.create_subscription(
-                Float64MultiArray,
-                'estimated_state',
+                StateEstimateMsg,
+                estimated_state_topic,
                 self._state_callback,
                 10,
             )
@@ -72,6 +88,16 @@ class PredictionNode(Node):
                 'predicted_trajectory',
                 10,
             )
+        )
+
+        self.declare_parameter(
+            "trajectory_full_topic",
+            "/prediction/trajectory",
+        )
+        self._trajectory_full_publisher = self.create_publisher(
+            PredictedTrajectoryMsg,
+            str(self.get_parameter("trajectory_full_topic").value),
+            10,
         )
 
         self._confidence_publisher = (
@@ -88,65 +114,79 @@ class PredictionNode(Node):
 
     def _state_callback(
         self,
-        message: Float64MultiArray,
+        message: StateEstimateMsg,
     ) -> None:
-        """Process a new estimated target state."""
-        state = np.asarray(
-            message.data,
-            dtype=float,
+        """Predict from a stamped state estimate and its full covariance."""
+        state = np.asarray(message.mean, dtype=float)
+        timestamp = (
+            float(message.header.stamp.sec)
+            + float(message.header.stamp.nanosec) * 1e-9
         )
+        frame_id = message.header.frame_id
 
         try:
-            layout = (
-                StateLayout.from_state_dimension(
-                    state.size
+            layout = StateLayout.from_state_dimension(state.size)
+            covariance = np.asarray(message.covariance, dtype=float)
+            if covariance.size != state.size ** 2:
+                raise ValueError(
+                    'Invalid covariance length: expected '
+                    f'{state.size ** 2}, received {covariance.size}.'
                 )
-            )
+            covariance = covariance.reshape(state.size, state.size)
 
-            self._validate_state_dimension(
-                layout.state_dimension
-            )
+            if not np.isfinite(timestamp) or not np.all(np.isfinite(state)):
+                raise ValueError('State and timestamp must be finite.')
+            if not np.all(np.isfinite(covariance)):
+                raise ValueError('Covariance must contain finite values.')
+            if not np.allclose(covariance, covariance.T, atol=1e-8):
+                raise ValueError('Covariance must be symmetric.')
+            if not frame_id:
+                raise ValueError('Estimated state frame_id is empty.')
+            if self._last_timestamp is not None and timestamp <= self._last_timestamp:
+                self.get_logger().warning(
+                    'Ignoring out-of-order or duplicate target estimate.'
+                )
+                return
+            if self._frame_id is not None and frame_id != self._frame_id:
+                raise ValueError(
+                    'Target reference frame changed without a transform.'
+                )
+
+            self._validate_state_dimension(layout.state_dimension)
 
             if self._system.last_prediction is not None:
-                performance = (
-                    self._system.update(
-                        observed_state=state
+                observation_dt = timestamp - self._last_timestamp
+                performance = self._system.update(
+                    observed_state=state,
+                    observation_dt=observation_dt,
+                    observation_timestamp=timestamp,
+                )
+                if performance is not None:
+                    self._publish_confidence(
+                        confidence=performance.confidence,
+                        residual=performance.residual,
                     )
-                )
-
-                self._publish_confidence(
-                    confidence=performance.confidence,
-                    residual=performance.residual,
-                )
 
             prediction_input = PredictionInput(
                 state=state,
-                timestamp=self._timestamp,
+                timestamp=timestamp,
                 dt=self._dt,
                 horizon=self._horizon,
+                covariance=covariance,
             )
+            prediction = self._system.predict(prediction_input)
+            self._publish_full_trajectory(
+                prediction=prediction,
+                reference_timestamp=timestamp,
+                frame_id=frame_id,
+            )
+            self._publish_trajectory(prediction.states)
 
-            prediction = (
-                self._system.predict(
-                    prediction_input
-                )
-            )
+            self._last_timestamp = timestamp
+            self._frame_id = frame_id
 
-            self._publish_trajectory(
-                prediction.states
-            )
-
-            self._timestamp += (
-                self._dt
-            )
-
-        except (
-            RuntimeError,
-            ValueError,
-        ) as error:
-            self.get_logger().error(
-                f'Prediction failed: {error}'
-            )
+        except (RuntimeError, ValueError) as error:
+            self.get_logger().error(f'Prediction failed: {error}')
 
     def _validate_state_dimension(
         self,
@@ -174,6 +214,41 @@ class PredictionNode(Node):
             raise ValueError(
                 'target state dimension changed during execution.'
             )
+
+    def _publish_full_trajectory(
+        self,
+        prediction: TrajectoryPrediction,
+        reference_timestamp: float,
+        frame_id: str,
+    ) -> None:
+        """Publish the same prediction with timestamps and frame metadata."""
+        states = np.asarray(prediction.states, dtype=float)
+        timestamps = np.asarray(prediction.timestamps, dtype=float)
+
+        if states.ndim != 2 or min(states.shape) == 0:
+            raise ValueError("Predicted states must be a nonempty matrix.")
+
+        horizon, state_dimension = states.shape
+        if timestamps.shape != (horizon,):
+            raise ValueError("Prediction timestamps must match the horizon.")
+        if not np.all(np.isfinite(states)):
+            raise ValueError("Predicted states must be finite.")
+        if not np.all(np.isfinite(timestamps)):
+            raise ValueError("Prediction timestamps must be finite.")
+        if not np.isfinite(reference_timestamp):
+            raise ValueError("Prediction reference timestamp must be finite.")
+        if timestamps[0] <= reference_timestamp or np.any(np.diff(timestamps) <= 0):
+            raise ValueError("Prediction timestamps must increase after reference time.")
+
+        message = PredictedTrajectoryMsg()
+        message.header.stamp = rclpy.time.Time(seconds=reference_timestamp).to_msg()
+        message.header.frame_id = frame_id
+        message.horizon = horizon
+        message.state_dimension = state_dimension
+        message.timestamps = timestamps.tolist()
+        message.states = states.ravel(order="C").tolist()
+
+        self._trajectory_full_publisher.publish(message)
 
     def _publish_trajectory(
         self,

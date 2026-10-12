@@ -14,7 +14,8 @@ estimation_node:
     target_acceleration_noise_std: 0.1
 
     target_position_variance:
-      [0.05, 0.05, 0.05]
+      [0.01, 0.01, 0.01]
 
     target_measurement_topic: "/perception/target_position"
     target_state_topic: "/estimation/target_state"
+    target_state_full_topic: "/estimation/target_state_full"

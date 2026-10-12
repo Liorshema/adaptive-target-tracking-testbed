@@ -151,6 +151,9 @@ def configure(context):
                 "simulation_config": str(
                     resolve_path(simulation_cfg["config"])
                 ),
+                "measurement_config": str(
+                    resolve_path(simulation_cfg["measurement_config"])
+                ),
                 "pose_service": pose_service,
                 "entity_name": target_cfg["entity_name"],
                 "tracking_source": tracking_cfg["source"],

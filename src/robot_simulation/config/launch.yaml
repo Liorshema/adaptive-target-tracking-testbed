@@ -28,6 +28,7 @@ tracking:
 simulation:
   config: config/simulation.yaml
   environment_config: config/environment.yaml
+  measurement_config: config/measurements.yaml
 
 gazebo:
   gui: true

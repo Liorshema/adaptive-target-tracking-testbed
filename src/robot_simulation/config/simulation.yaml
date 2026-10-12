@@ -1,4 +1,3 @@
-
 simulation:
   backend: numerical
 
@@ -7,3 +6,6 @@ simulation:
     parameters:
       dt: 0.01
     max_steps: 1000
+
+  ground_truth:
+    topic: /simulation/target_position

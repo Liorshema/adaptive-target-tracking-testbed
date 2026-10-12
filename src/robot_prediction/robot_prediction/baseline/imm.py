@@ -196,8 +196,18 @@ class IMMPredictor(Predictor):
     def update(
         self,
         observed_state: np.ndarray,
+        observation_dt: float | None = None,
     ) -> np.ndarray:
-        """Update model probabilities and motion estimates."""
+        """Update model probabilities and motion estimates.
+
+        observation_dt is the elapsed time between consecutive observed
+        states. It is independent of the future prediction step size.
+        When omitted, the legacy prediction step is used for compatibility.
+        """
+        if observation_dt is not None:
+            observation_dt = float(observation_dt)
+            if not np.isfinite(observation_dt) or observation_dt <= 0.0:
+                raise ValueError('observation_dt must be finite and positive.')
         if self._last_model_predictions is None:
             raise RuntimeError(
                 'predict() must be called before update().'
@@ -283,7 +293,8 @@ class IMMPredictor(Predictor):
         )
 
         self._update_motion_estimates(
-            observation
+            observation,
+            dt=(self._last_dt if observation_dt is None else observation_dt),
         )
 
         self._previous_observation = (
@@ -295,15 +306,13 @@ class IMMPredictor(Predictor):
     def _update_motion_estimates(
         self,
         observation: np.ndarray,
+        dt: float | None,
     ) -> None:
         """Estimate acceleration and planar turn rate from state history."""
         if self._previous_observation is None:
             return
 
-        if self._last_dt is None:
-            return
-
-        if self._last_dt <= 0.0:
+        if dt is None or not np.isfinite(dt) or dt <= 0.0:
             return
 
         layout = self._layout
@@ -319,7 +328,7 @@ class IMMPredictor(Predictor):
         self._estimated_acceleration = (
             current_velocity
             - previous_velocity
-        ) / self._last_dt
+        ) / dt
 
         if layout.spatial_dimension < 2:
             self._estimated_turn_rate = 0.0
@@ -374,7 +383,7 @@ class IMMPredictor(Predictor):
 
         self._estimated_turn_rate = (
             wrapped_difference
-            / self._last_dt
+            / dt
         )
 
     def _to_model_state(

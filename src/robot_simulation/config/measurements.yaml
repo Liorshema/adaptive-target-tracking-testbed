@@ -1,0 +1,16 @@
+measurements:
+  target_position:
+    enabled: true
+    topic: /perception/target_position
+
+    observation:
+      components: [position]
+
+    noise:
+      covariance:
+        - [0.01, 0.0, 0.0]
+        - [0.0, 0.01, 0.0]
+        - [0.0, 0.0, 0.01]
+
+    random_seed: 42
+    rate_hz: 20.0
