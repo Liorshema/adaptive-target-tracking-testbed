@@ -1,6 +1,0 @@
-terrain:
-  name: flat
-
-  friction:
-    mu: 1.0
-    mu2: 1.0
