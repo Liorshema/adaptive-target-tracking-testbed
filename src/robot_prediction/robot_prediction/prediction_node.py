@@ -3,6 +3,8 @@ from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 import numpy as np
 import rclpy
+from rclpy.clock import JumpThreshold
+from rclpy.duration import Duration
 from rclpy.node import Node
 from robot_interfaces.msg import (
     PredictedTrajectory as PredictedTrajectoryMsg,
@@ -65,6 +67,19 @@ class PredictionNode(Node):
         self._state_dimension = None
         self._frame_id = None
 
+        self.declare_parameter('future_tolerance', 0.01)
+        tolerance = float(self.get_parameter('future_tolerance').value)
+        if not np.isfinite(tolerance) or tolerance < 0.0:
+            raise ValueError('future_tolerance must be finite and nonnegative.')
+        self._clock_jump_handle = self.get_clock().create_jump_callback(
+            JumpThreshold(
+                min_forward=None,
+                min_backward=Duration(nanoseconds=-1),
+                on_clock_change=True,
+            ),
+            post_callback=self._on_time_jump,
+        )
+
         self.declare_parameter(
             'estimated_state_topic',
             '/estimation/target_state_full',
@@ -112,6 +127,14 @@ class PredictionNode(Node):
             'Prediction node started.'
         )
 
+    def _on_time_jump(self, _jump) -> None:
+        """Discard prediction/adaptation history when ROS time changes epoch."""
+        self._system = PredictionSystemFactory(config=self._config).create()
+        self._last_timestamp = None
+        self._state_dimension = None
+        self._frame_id = None
+        self.get_logger().warning('ROS clock changed; reset prediction history.')
+
     def _state_callback(
         self,
         message: StateEstimateMsg,
@@ -142,9 +165,17 @@ class PredictionNode(Node):
                 raise ValueError('Covariance must be symmetric.')
             if not frame_id:
                 raise ValueError('Estimated state frame_id is empty.')
+            now = self.get_clock().now().nanoseconds * 1e-9
+            tolerance = float(self.get_parameter('future_tolerance').value)
+            if timestamp > now + tolerance:
+                raise ValueError(
+                    f'Target estimate timestamp is in the future: '
+                    f'stamp={timestamp:.6f}, now={now:.6f}'
+                )
             if self._last_timestamp is not None and timestamp <= self._last_timestamp:
                 self.get_logger().warning(
-                    'Ignoring out-of-order or duplicate target estimate.'
+                    'Ignoring out-of-order or duplicate target estimate.',
+                    throttle_duration_sec=5.0,
                 )
                 return
             if self._frame_id is not None and frame_id != self._frame_id:
@@ -186,7 +217,7 @@ class PredictionNode(Node):
             self._frame_id = frame_id
 
         except (RuntimeError, ValueError) as error:
-            self.get_logger().error(f'Prediction failed: {error}')
+            self.get_logger().error(f'Prediction failed: {error}', throttle_duration_sec=5.0)
 
     def _validate_state_dimension(
         self,

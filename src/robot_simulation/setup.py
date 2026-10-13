@@ -104,6 +104,7 @@ setup(
             "config/terrain",
             "config/terrain/*.yaml",
         ),
+        *install_directory_tree("config/gazebo"),
     ],
 
     install_requires=[

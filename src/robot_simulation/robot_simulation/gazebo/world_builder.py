@@ -17,6 +17,7 @@ def build_world(
     *,
     entity_name,
     system_plugins,
+    models=(),
 ):
     """Render the configured world and add a target and selected system plugins.
 
@@ -59,6 +60,14 @@ def build_world(
         raise ValueError(f'Duplicate target model: {entity_name}')
 
     world.append(model)
+
+    for extra in models:
+        name = extra.get('name')
+        if extra.tag != 'model' or not name:
+            raise ValueError('Extra world models require a name')
+        if any(existing.get('name') == name for existing in world.findall('model')):
+            raise ValueError(f'Duplicate world model: {name}')
+        world.append(extra)
 
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)

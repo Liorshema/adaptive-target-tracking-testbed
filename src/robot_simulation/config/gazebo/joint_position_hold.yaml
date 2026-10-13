@@ -1,0 +1,29 @@
+# Simulation-local effort PID holding. Disable before another arm actuator owns these joints.
+joint_position_hold:
+  enabled: true
+  # Reuse the PID gains validated by compute_only_gazebo.py.
+  # cmd_min/max are derived from each authoritative description effort limit.
+  pid:
+    p_gain: 100.0
+    i_gain: 5.0
+    d_gain: 5.0
+    i_min: -1.0
+    i_max: 1.0
+    cmd_offset: 0.0
+  # Startup targets [rad], keyed by robot_description manipulator.joints.
+  # Positive shoulder raises the arm for its configured [0,-1,0] axis.
+  positions:
+    base_yaw: 0.0
+    shoulder: 0.523599
+    elbow: -0.4
+    wrist: 0.0
+  # The loaded arm's joints have different inertias and gravity loads.
+  # Shoulder needs more stiffness; wrist needs lower derivative gain to avoid
+  # a velocity-limit oscillation at the world's 1 ms physics step.
+  joint_overrides:
+    shoulder:
+      pid:
+        p_gain: 200.0
+    wrist:
+      pid:
+        d_gain: 0.5

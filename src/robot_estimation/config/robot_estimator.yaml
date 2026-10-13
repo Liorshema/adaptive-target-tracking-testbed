@@ -1,8 +1,20 @@
+
 estimation_node:
   ros__parameters:
 
+    # Robot structure
     joint_count: 4
 
+    # Select and reorder arm joints from Gazebo messages, which may include wheels.
+    # Order matches robot_description/robot.yaml manipulator.joints.
+    joint_names: [base_yaw_joint, shoulder_joint, elbow_joint, wrist_joint]
+    future_tolerance: 0.01
+    # Full estimates require both sources; IMU remains optional.
+    max_wheel_odometry_age: 0.2
+    max_joint_state_age: 0.2
+
+    # Initial robot state:
+    # [x, y, yaw, v, omega, q, q_dot]
     robot_initial_state:
       [0.0, 0.0, 0.0, 0.0, 0.0,
        0.0, 0.0, 0.0, 0.0,
@@ -13,20 +25,28 @@ estimation_node:
        1.0, 1.0, 1.0, 1.0,
        1.0, 1.0, 1.0, 1.0]
 
+    # Process noise
     linear_acceleration_noise_std: 0.1
     angular_acceleration_noise_std: 0.05
     joint_acceleration_noise_std: 0.1
 
+    # Measurement uncertainty
     wheel_linear_velocity_variance: 0.05
     wheel_angular_velocity_variance: 0.02
-
     imu_yaw_rate_variance: 0.01
-
     joint_position_variance: 0.02
     joint_velocity_variance: 0.02
 
+    # Sensor input topics
     imu_topic: "/imu"
     wheel_odometry_topic: "/wheel/odometry"
     joint_states_topic: "/joint_states"
 
+    # Existing output: backward compatibility
     robot_state_topic: "/estimation/robot_state"
+
+    # Full state output for downstream control
+    robot_state_full_topic: "/estimation/robot_state_full"
+
+    # Coordinate frame of estimated base position and yaw
+    robot_state_frame_id: "odom"

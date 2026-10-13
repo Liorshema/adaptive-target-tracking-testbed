@@ -29,6 +29,8 @@
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
   <exec_depend>ros_gz_interfaces</exec_depend>
 
   <!-- Gazebo integration -->
@@ -37,6 +39,8 @@
 
   <!-- Robot and world description -->
   <exec_depend>xacro</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <!-- Python numerical and configuration dependencies -->
   <exec_depend>python3-numpy</exec_depend>

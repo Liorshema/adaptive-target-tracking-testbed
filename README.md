@@ -24,6 +24,9 @@ The workspace is organized into separate ROS 2 packages with clear responsibilit
 
 ## Key Features
 
+The current Control Compute Only milestone, verified behavior, and local
+reproduction commands are documented in [docs/control_compute_only.md](docs/control_compute_only.md).
+
 - Modular and reusable architecture
 - Configurable target motion and disturbances
 - Classical and adaptive prediction methods

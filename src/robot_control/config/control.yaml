@@ -1,0 +1,101 @@
+
+control_node:
+  ros__parameters:
+
+    # ============================================================
+    # 1. Robot configuration
+    # ============================================================
+
+    joint_count: 4
+
+    # Model implementation identifiers
+    base_model_type: "differential_drive"
+    manipulator_model_type: "serial_arm"
+    kinematics_adapter_type: "planar"
+
+    # ============================================================
+    # 2. ROS input topics
+    # ============================================================
+
+    robot_state_topic: "/estimation/robot_state_full"
+    prediction_topic: "/prediction/trajectory"
+
+    # ============================================================
+    # 3. Input freshness and validation
+    # ============================================================
+
+    # Maximum input age [seconds]
+    max_robot_state_age: 0.2
+    max_prediction_age: 0.5
+
+    # Clock tolerance [seconds]
+    future_tolerance: 0.01
+
+    # Input validation frequency [Hz]
+    validation_rate: 20.0
+
+    # ============================================================
+    # 4. Control execution
+    # ============================================================
+
+    # Compute safe commands without actuating the robot.
+    compute_enabled: true
+
+    # Do not publish actuator commands.
+    publish_commands: false
+
+    # ============================================================
+    # 5. Controller selection
+    # ============================================================
+
+    controller_type: "jacobian"
+
+    # Damped least-squares regularization
+    controller_damping: 1.0
+
+    # Selected task-space components:
+    # [vx, vy, vz, wx, wy, wz]
+    #
+    # Current task: Cartesian position tracking.
+    controller_task_axes: [0, 1, 2]
+
+    # Diagonal task-space gains
+    controller_task_gains: [1.0, 1.0, 1.0]
+
+    # ============================================================
+    # 6. Tracking reference
+    # ============================================================
+
+    reference_geometry_type: "sphere"
+    reference_policy_type: "radial"
+
+    # Desired distance from the target [m]
+    tracking_radius: 1.0
+
+    # Prediction lookahead [seconds]
+    tracking_lookahead_time: 0.0
+
+    # ============================================================
+    # 7. Tracking-frame conventions
+    # ============================================================
+
+    # Local axis of tracking_frame pointing toward the target.
+    tracking_forward_axis: [0.0, 0.0, 1.0]
+
+    # Local axis defining the tracking frame's upward direction.
+    tracking_up_axis: [0.0, -1.0, 0.0]
+
+    # Preferred upward direction in the world frame.
+    world_up_axis: [0.0, 0.0, 1.0]
+
+    # ============================================================
+    # 8. Safety
+    # ============================================================
+
+    # Explicit example operating limits in [v (m/s), omega (rad/s)] order.
+    # Joint limits are loaded from robot_description/config/robot/robot.yaml.
+    base_velocity_lower: [-0.5, -1.0]
+    base_velocity_upper: [0.5, 1.0]
+
+    # Safety is mandatory for control computation.
+    safety_enabled: true

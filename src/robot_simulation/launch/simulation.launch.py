@@ -20,6 +20,7 @@ from launch_ros.actions import Node
 
 from robot_simulation.factory.config_loader import load_yaml
 from robot_simulation.gazebo.world_builder import build_world
+from robot_simulation.gazebo.robot_builder import build_robot_model
 
 
 def configure(context):
@@ -80,6 +81,20 @@ def configure(context):
         tempfile.mkdtemp(prefix="robot_simulation_")
     )
 
+    robot_launch = cfg.get('robot', {'enabled': False})
+    robot_model = None
+    robot_cfg = None
+    if robot_launch['enabled']:
+        robot_cfg = load_yaml(resolve_path(robot_launch['config']))['robot']
+        hold_cfg = load_yaml(resolve_path(robot_launch['joint_position_hold']))['joint_position_hold']
+        description = robot_cfg['description']
+        description_share = Path(get_package_share_directory(description['package']))
+        robot_model = build_robot_model(
+            description_share / description['xacro'],
+            description_share / description['config'],
+            robot_cfg, hold_cfg, output_dir,
+        )
+
     world_path, world_name = build_world(
         resolve_path(world_cfg["source"]),
         resolve_path(world_cfg["terrain_config"]),
@@ -87,6 +102,7 @@ def configure(context):
         output_dir / world_cfg["output_name"],
         entity_name=target_cfg["entity_name"],
         system_plugins=world_cfg["system_plugins"],
+        models=[] if robot_model is None else [robot_model],
     )
 
     # Start Gazebo.
@@ -99,7 +115,11 @@ def configure(context):
     if gazebo_cfg["start_running"]:
         gz_args = "-r " + gz_args
 
-    if not gazebo_cfg["gui"]:
+    gui_override = LaunchConfiguration('gui').perform(context).lower()
+    if gui_override not in ['', 'true', 'false']:
+        raise ValueError('gui must be true or false')
+    gui_enabled = gazebo_cfg['gui'] if not gui_override else gui_override == 'true'
+    if not gui_enabled:
         gz_args = "-s " + gz_args
 
     gazebo = IncludeLaunchDescription(
@@ -116,20 +136,31 @@ def configure(context):
         "pose_service_template"
     ].format(world=world_name)
 
+    bridge_arguments = [
+        (
+            f'{gazebo_cfg["clock_topic"]}'
+            "@rosgraph_msgs/msg/Clock"
+            "[gz.msgs.Clock"
+        ),
+        (
+            f'{pose_service}'
+            f'@{gazebo_cfg["pose_service_type"]}'
+        ),
+    ]
+    if robot_cfg is not None:
+        bridge_arguments.append(
+            f'{robot_cfg["joint_states"]["topic"]}'
+            '@sensor_msgs/msg/JointState[gz.msgs.Model'
+        )
+        if robot_cfg['differential_drive']['enabled']:
+            bridge_arguments.append(
+                f'{robot_cfg["differential_drive"]["odom_topic"]}'
+                '@nav_msgs/msg/Odometry[gz.msgs.Odometry'
+            )
     bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=[
-            (
-                f'{gazebo_cfg["clock_topic"]}'
-                "@rosgraph_msgs/msg/Clock"
-                "[gz.msgs.Clock"
-            ),
-            (
-                f'{pose_service}'
-                f'@{gazebo_cfg["pose_service_type"]}'
-            ),
-        ],
+        arguments=bridge_arguments,
         output="screen",
     )
 
@@ -198,6 +229,10 @@ def generate_launch_description():
                     "Absolute or package-relative path "
                     "to the simulation launch YAML"
                 ),
+            ),
+            DeclareLaunchArgument(
+                'gui', default_value='',
+                description='Override configured Gazebo GUI: true or false',
             ),
             OpaqueFunction(function=configure),
         ]

@@ -20,3 +20,6 @@ Thumbs.db
 
 # ROS bag recordings
 rosbag2_*/
+# Test caches and local backups
+.pytest_cache/
+*.bak

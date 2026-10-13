@@ -1,12 +1,19 @@
+"""ROS 2 orchestration for robot and target state estimation."""
+
 from typing import Optional
+
 import numpy as np
 import rclpy
+
 from geometry_msgs.msg import PointStamped
 from nav_msgs.msg import Odometry
+from rclpy.clock import JumpThreshold
+from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from sensor_msgs.msg import Imu, JointState
 from std_msgs.msg import Float64MultiArray
+
 from robot_interfaces.msg import StateEstimate as StateEstimateMsg
 from robot_estimation.common.measurement import Measurement
 from robot_estimation.common.state import StateEstimate
@@ -18,13 +25,12 @@ from robot_estimation.target.models.measurement_model import PositionMeasurement
 from robot_estimation.target.models.process_model import ConstantVelocityProcessModel
 from robot_estimation.target.target_state_estimator import TargetStateEstimator
 
+
 class EstimationNode(Node):
     """
     ROS 2 orchestration node for robot and target state estimation.
-
     The node converts ROS messages into generic Measurement objects
     and delegates all estimation mathematics to the estimation layer.
-
     Robot state:
         x_R = [
             x_B,
@@ -35,7 +41,6 @@ class EstimationNode(Node):
             q,
             q_dot
         ]^T
-
     Target state:
         x_T = [
             p,
@@ -50,7 +55,17 @@ class EstimationNode(Node):
         self._target_estimator = self._create_target_estimator()
         self._last_robot_time: Optional[float] = None
         self._last_target_time: Optional[float] = None
+        self._last_wheel_time: Optional[float] = None
+        self._last_joint_time: Optional[float] = None
         self._target_frame_id = ""
+        self._clock_jump_handle = self.get_clock().create_jump_callback(
+            JumpThreshold(
+                min_forward=None,
+                min_backward=Duration(nanoseconds=-1),
+                on_clock_change=True,
+            ),
+            post_callback=self._on_time_jump,
+        )
         self._create_publishers()
         self._create_subscriptions()
         self.get_logger().info('Estimation node initialized.')
@@ -58,6 +73,10 @@ class EstimationNode(Node):
     # Parameter schemas define types, never experiment-specific values.
     _PARAMETERS = {
         "joint_count": Parameter.Type.INTEGER,
+        "joint_names": Parameter.Type.STRING_ARRAY,
+        "future_tolerance": Parameter.Type.DOUBLE,
+        "max_wheel_odometry_age": Parameter.Type.DOUBLE,
+        "max_joint_state_age": Parameter.Type.DOUBLE,
         "robot_initial_state": Parameter.Type.DOUBLE_ARRAY,
         "robot_initial_covariance_diagonal": Parameter.Type.DOUBLE_ARRAY,
         "linear_acceleration_noise_std": Parameter.Type.DOUBLE,
@@ -78,6 +97,8 @@ class EstimationNode(Node):
         "joint_states_topic": Parameter.Type.STRING,
         "target_measurement_topic": Parameter.Type.STRING,
         "robot_state_topic": Parameter.Type.STRING,
+        "robot_state_full_topic": Parameter.Type.STRING,
+        "robot_state_frame_id": Parameter.Type.STRING,
         "target_state_topic": Parameter.Type.STRING,
         "target_state_full_topic": Parameter.Type.STRING,
     }
@@ -86,7 +107,6 @@ class EstimationNode(Node):
         """Declare strictly typed parameters supplied by ROS YAML overrides."""
         for name, parameter_type in self._PARAMETERS.items():
             self.declare_parameter(name, parameter_type)
-
         missing = [
             name for name in self._PARAMETERS
             if self.get_parameter(name).value is None
@@ -97,6 +117,20 @@ class EstimationNode(Node):
                 + ", ".join(missing)
                 + ". Load both robot_estimator.yaml and target_estimator.yaml."
             )
+        joint_names = list(self.get_parameter('joint_names').value)
+        if (
+            len(joint_names) != int(self.get_parameter('joint_count').value)
+            or len(set(joint_names)) != len(joint_names)
+            or any(not name for name in joint_names)
+        ):
+            raise ValueError('joint_names must contain one unique name per arm joint.')
+        tolerance = float(self.get_parameter('future_tolerance').value)
+        if not np.isfinite(tolerance) or tolerance < 0.0:
+            raise ValueError('future_tolerance must be finite and nonnegative.')
+        for name in ['max_wheel_odometry_age', 'max_joint_state_age']:
+            age = float(self.get_parameter(name).value)
+            if not np.isfinite(age) or age <= 0.0:
+                raise ValueError(f'{name} must be finite and positive.')
 
     def _create_robot_estimator(self) -> RobotStateEstimator:
         """
@@ -146,6 +180,11 @@ class EstimationNode(Node):
         robot_state_topic = str(self.get_parameter('robot_state_topic').value)
         target_state_topic = str(self.get_parameter('target_state_topic').value)
         self._robot_state_publisher = self.create_publisher(Float64MultiArray, robot_state_topic, 10)
+        self._robot_state_full_publisher = self.create_publisher(
+            StateEstimateMsg,
+            str(self.get_parameter('robot_state_full_topic').value),
+            10,
+        )
         self._target_state_publisher = self.create_publisher(Float64MultiArray, target_state_topic, 10)
         self._target_state_full_publisher = self.create_publisher(
             StateEstimateMsg,
@@ -167,12 +206,13 @@ class EstimationNode(Node):
         Fuse planar IMU yaw-rate measurement.
         """
         timestamp = self._stamp_to_seconds(msg.header.stamp)
-        self._predict_robot_if_needed(timestamp)
         variance = float(self.get_parameter('imu_yaw_rate_variance').value)
         if variance < 0.0:
             self.get_logger().error('imu_yaw_rate_variance must be non-negative.')
             return
         measurement = Measurement(value=np.array([msg.angular_velocity.z], dtype=float), covariance=np.array([[variance]], dtype=float), timestamp=timestamp)
+        if not self._measurement_valid(measurement) or not self._predict_robot_if_needed(timestamp):
+            return
         self._robot_estimator.update_imu(measurement)
         self._publish_robot_state()
 
@@ -181,14 +221,16 @@ class EstimationNode(Node):
         Fuse wheel-derived linear and angular velocity.
         """
         timestamp = self._stamp_to_seconds(msg.header.stamp)
-        self._predict_robot_if_needed(timestamp)
         linear_variance = float(self.get_parameter('wheel_linear_velocity_variance').value)
         angular_variance = float(self.get_parameter('wheel_angular_velocity_variance').value)
         if linear_variance < 0.0 or angular_variance < 0.0:
             self.get_logger().error('Wheel odometry variances must be non-negative.')
             return
         measurement = Measurement(value=np.array([msg.twist.twist.linear.x, msg.twist.twist.angular.z], dtype=float), covariance=np.diag([linear_variance, angular_variance]), timestamp=timestamp)
+        if not self._measurement_valid(measurement) or not self._predict_robot_if_needed(timestamp):
+            return
         self._robot_estimator.update_wheel_odometry(measurement)
+        self._last_wheel_time = timestamp
         self._publish_robot_state()
 
     def _joint_state_callback(self, msg: JointState) -> None:
@@ -196,15 +238,23 @@ class EstimationNode(Node):
         Fuse joint positions and velocities.
         """
         timestamp = self._stamp_to_seconds(msg.header.stamp)
-        self._predict_robot_if_needed(timestamp)
-        joint_count = int(self.get_parameter('joint_count').value)
-        positions = np.asarray(msg.position, dtype=float)
-        velocities = np.asarray(msg.velocity, dtype=float)
-        if positions.shape != (joint_count,):
-            self.get_logger().warning(f'Ignoring JointState message with {positions.shape[0]} positions. Expected {joint_count}.')
-            return
-        if velocities.shape != (joint_count,):
-            self.get_logger().warning(f'Ignoring JointState message with {velocities.shape[0]} velocities. Expected {joint_count}.')
+        joint_names = list(self.get_parameter('joint_names').value)
+        joint_count = len(joint_names)
+        try:
+            names = list(msg.name)
+            if len(set(names)) != len(names):
+                raise ValueError('JointState contains duplicate joint names.')
+            if len(msg.position) != len(names) or len(msg.velocity) != len(names):
+                raise ValueError('JointState requires position and velocity for each named joint.')
+            indices = [names.index(name) for name in joint_names]
+            positions = np.asarray(msg.position, dtype=float)[indices]
+            velocities = np.asarray(msg.velocity, dtype=float)[indices]
+            if not np.all(np.isfinite(positions)) or not np.all(np.isfinite(velocities)):
+                raise ValueError('JointState arm measurements must be finite.')
+        except ValueError as error:
+            self.get_logger().warning(
+                f'Ignoring invalid JointState: {error}', throttle_duration_sec=5.0,
+            )
             return
         position_variance = float(self.get_parameter('joint_position_variance').value)
         velocity_variance = float(self.get_parameter('joint_velocity_variance').value)
@@ -213,7 +263,10 @@ class EstimationNode(Node):
             return
         covariance_diagonal = np.concatenate([np.full(joint_count, position_variance), np.full(joint_count, velocity_variance)])
         measurement = Measurement(value=np.concatenate([positions, velocities]), covariance=np.diag(covariance_diagonal), timestamp=timestamp)
+        if not self._measurement_valid(measurement) or not self._predict_robot_if_needed(timestamp):
+            return
         self._robot_estimator.update_joint_encoders(measurement)
+        self._last_joint_time = timestamp
         self._publish_robot_state()
 
     def _target_measurement_callback(self, msg: PointStamped) -> None:
@@ -221,7 +274,6 @@ class EstimationNode(Node):
         Fuse a target position measurement.
         """
         timestamp = self._stamp_to_seconds(msg.header.stamp)
-        self._predict_target_if_needed(timestamp)
         spatial_dimension = int(self.get_parameter('target_spatial_dimension').value)
         if spatial_dimension != 3:
             self.get_logger().error('PointStamped currently supports target_spatial_dimension=3.')
@@ -235,44 +287,152 @@ class EstimationNode(Node):
             self.get_logger().error('target_position_variance must contain non-negative values.')
             return
         measurement = Measurement(value=position, covariance=np.diag(variances), timestamp=timestamp)
+        if not msg.header.frame_id or (
+            self._target_frame_id and msg.header.frame_id != self._target_frame_id
+        ):
+            self.get_logger().error('Target measurement frame is empty or changed without a transform.')
+            return
+        if not self._measurement_valid(measurement) or not self._predict_target_if_needed(timestamp):
+            return
         self._target_estimator.update(measurement)
         self._target_frame_id = msg.header.frame_id
         self._publish_target_state()
 
-    def _predict_robot_if_needed(self, timestamp: float) -> None:
+    def _measurement_valid(self, measurement: Measurement) -> bool:
+        """Reject nonfinite sensor data before prediction or correction."""
+        if (
+            not np.all(np.isfinite(measurement.value))
+            or not np.all(np.isfinite(measurement.covariance))
+        ):
+            self.get_logger().warning(
+                'Ignoring nonfinite sensor measurement.', throttle_duration_sec=5.0,
+            )
+            return False
+        return True
+
+    def _on_time_jump(self, _jump) -> None:
+        """Reinitialize both filters when ROS time changes epoch."""
+        self._robot_estimator = self._create_robot_estimator()
+        self._target_estimator = self._create_target_estimator()
+        self._last_robot_time = None
+        self._last_target_time = None
+        self._last_wheel_time = None
+        self._last_joint_time = None
+        self._target_frame_id = ''
+        self.get_logger().warning('ROS clock changed; reinitialized estimation filters.')
+
+    def _measurement_time_valid(
+        self, timestamp: float, previous: Optional[float], name: str,
+    ) -> bool:
+        """Reject delayed and former-epoch measurements before filter mutation."""
+        now = self.get_clock().now().nanoseconds * 1e-9
+        tolerance = float(self.get_parameter('future_tolerance').value)
+        if (
+            not np.isfinite(timestamp)
+            or timestamp > now + tolerance
+            or (previous is not None and timestamp < previous)
+        ):
+            self.get_logger().warning(
+                f'Ignoring {name} measurement time: '
+                f'stamp={timestamp:.6f}, last={previous}, now={now:.6f}',
+                throttle_duration_sec=5.0,
+            )
+            return False
+        return True
+
+    def _predict_robot_if_needed(self, timestamp: float) -> bool:
         """
         Predict robot state to the incoming measurement time.
         """
+        if not self._measurement_time_valid(timestamp, self._last_robot_time, 'robot'):
+            return False
         if self._last_robot_time is None:
             self._last_robot_time = timestamp
-            return
+            return True
         dt = timestamp - self._last_robot_time
         if dt <= 0.0:
-            return
+            return True
         self._robot_estimator.predict(dt=dt)
         self._last_robot_time = timestamp
+        return True
 
-    def _predict_target_if_needed(self, timestamp: float) -> None:
+    def _predict_target_if_needed(self, timestamp: float) -> bool:
         """
         Predict target state to the incoming measurement time.
         """
+        if not self._measurement_time_valid(timestamp, self._last_target_time, 'target'):
+            return False
         if self._last_target_time is None:
             self._last_target_time = timestamp
-            return
+            return True
         dt = timestamp - self._last_target_time
         if dt <= 0.0:
-            return
+            return True
         self._target_estimator.predict(dt=dt)
         self._last_target_time = timestamp
+        return True
 
     def _publish_robot_state(self) -> None:
-        """
-        Publish current robot-state mean.
-        """
+        """Publish the legacy state vector and the full stamped estimate."""
         state = self._robot_estimator.state
-        msg = Float64MultiArray()
-        msg.data = state.mean.tolist()
-        self._robot_state_publisher.publish(msg)
+
+        legacy_msg = Float64MultiArray()
+        legacy_msg.data = state.mean.tolist()
+        self._robot_state_publisher.publish(legacy_msg)
+
+        # A fresh aggregate filter timestamp alone does not prove all
+        # configuration components have been observed recently.
+        now = self.get_clock().now().nanoseconds * 1e-9
+        for name, timestamp, max_age in [
+            ('wheel odometry', self._last_wheel_time,
+             float(self.get_parameter('max_wheel_odometry_age').value)),
+            ('joint states', self._last_joint_time,
+             float(self.get_parameter('max_joint_state_age').value)),
+        ]:
+            if timestamp is None or now - timestamp > max_age:
+                self.get_logger().warning(
+                    f'Full robot estimate unavailable: waiting for fresh {name}.',
+                    throttle_duration_sec=5.0,
+                )
+                return
+
+        if state.timestamp is None:
+            self.get_logger().warning(
+                'Robot estimate has no timestamp; skipping full publication.'
+            )
+            return
+
+        timestamp = float(state.timestamp)
+        mean = np.asarray(state.mean, dtype=float)
+        covariance = np.asarray(state.covariance, dtype=float)
+
+        if (
+            not np.isfinite(timestamp)
+            or mean.ndim != 1
+            or not np.all(np.isfinite(mean))
+            or covariance.shape != (mean.size, mean.size)
+            or not np.all(np.isfinite(covariance))
+        ):
+            self.get_logger().error(
+                'Invalid robot estimate; skipping full publication.'
+            )
+            return
+
+        frame_id = str(self.get_parameter('robot_state_frame_id').value)
+        if not frame_id:
+            self.get_logger().error(
+                'Robot state frame_id is empty; skipping full publication.'
+            )
+            return
+
+        full_msg = StateEstimateMsg()
+        full_msg.header.stamp = rclpy.time.Time(
+            seconds=timestamp
+        ).to_msg()
+        full_msg.header.frame_id = frame_id
+        full_msg.mean = mean.tolist()
+        full_msg.covariance = covariance.ravel(order='C').tolist()
+        self._robot_state_full_publisher.publish(full_msg)
 
     def _publish_target_state(self) -> None:
         """
@@ -282,11 +442,9 @@ class EstimationNode(Node):
         legacy_msg = Float64MultiArray()
         legacy_msg.data = state.mean.tolist()
         self._target_state_publisher.publish(legacy_msg)
-
         if state.timestamp is None:
             self.get_logger().warning('Full target estimate has no timestamp; skipping.')
             return
-
         full_msg = StateEstimateMsg()
         full_msg.header.stamp = rclpy.time.Time(seconds=float(state.timestamp)).to_msg()
         full_msg.header.frame_id = self._target_frame_id
@@ -295,11 +453,13 @@ class EstimationNode(Node):
         self._target_state_full_publisher.publish(full_msg)
 
     @staticmethod
+
     def _stamp_to_seconds(stamp) -> float:
         """
         Convert a ROS time stamp to floating-point seconds.
         """
         return float(stamp.sec) + float(stamp.nanosec) * 1e-09
+
 
 def main(args=None) -> None:
     """
@@ -312,5 +472,6 @@ def main(args=None) -> None:
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 if __name__ == '__main__':
     main()
