@@ -1,13 +1,12 @@
 """Load mathematical robot-model parameters from robot description."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import yaml
-
-from ament_index_python.packages import get_package_share_directory
 
 
 @dataclass(frozen=True)
@@ -81,7 +80,23 @@ def load_robot_model_parameters(
     if not isinstance(data, dict):
         raise ValueError('Robot configuration must be a mapping.')
 
-    robot = _require_mapping(data, 'robot')
+    return robot_model_parameters_from_description(data)
+
+
+def robot_model_parameters_from_description(
+    description: Mapping[str, Any],
+) -> RobotModelParameters:
+    """
+    Validate and normalize physical parameters from a parsed document.
+
+    Joint order and dimension follow the authoritative joint mapping. Concrete
+    kinematic implementations may impose their own topology constraints.
+    This parser performs no file access and requires no ROS runtime.
+    """
+    if not isinstance(description, Mapping):
+        raise TypeError('Robot description must be a mapping.')
+
+    robot = _require_mapping(description, 'robot')
     body = _require_mapping(robot, 'body')
     wheels = _require_mapping(robot, 'wheels')
     manipulator = _require_mapping(robot, 'manipulator')
@@ -120,6 +135,9 @@ def load_robot_model_parameters(
             f'({joint_count}, 3).'
         )
 
+    if not np.all(np.isfinite(joint_axes)):
+        raise ValueError('Manipulator joint axes must be finite.')
+
     axis_norms = np.linalg.norm(
         joint_axes,
         axis=1,
@@ -129,6 +147,9 @@ def load_robot_model_parameters(
         raise ValueError(
             'Manipulator joint axes must be non-zero.'
         )
+
+    if not np.all(np.isfinite(axis_norms)):
+        raise ValueError('Manipulator joint axis norms must be finite.')
 
     joint_axes = (
         joint_axes
@@ -237,6 +258,8 @@ def load_robot_model_parameters(
 
 def _default_config_path() -> Path:
     """Return the installed robot.yaml path."""
+    from ament_index_python.packages import get_package_share_directory
+
     package_share = Path(
         get_package_share_directory(
             'robot_description'
@@ -252,13 +275,13 @@ def _default_config_path() -> Path:
 
 
 def _require_mapping(
-    mapping: dict[str, Any],
+    mapping: Mapping[str, Any],
     key: str,
-) -> dict[str, Any]:
+) -> Mapping[str, Any]:
     """Return a required nested mapping."""
     value = mapping.get(key)
 
-    if not isinstance(value, dict):
+    if not isinstance(value, Mapping):
         raise ValueError(
             f'Missing or invalid mapping: {key}'
         )
@@ -267,7 +290,7 @@ def _require_mapping(
 
 
 def _positive_float(
-    mapping: dict[str, Any],
+    mapping: Mapping[str, Any],
     key: str,
 ) -> float:
     """Return a required positive scalar parameter."""
@@ -278,6 +301,9 @@ def _positive_float(
 
     value = float(mapping[key])
 
+    if not np.isfinite(value):
+        raise ValueError(f'Parameter {key} must be finite.')
+
     if value <= 0.0:
         raise ValueError(
             f'Parameter {key} must be positive.'
@@ -287,7 +313,7 @@ def _positive_float(
 
 
 def _joint_vector(
-    joint_configs: list[dict[str, Any]],
+    joint_configs: list[Mapping[str, Any]],
     key: str,
     size: int,
 ) -> np.ndarray:
@@ -310,10 +336,14 @@ def _joint_vector(
             f'Joint parameter {key} must have shape ({size},).'
         )
 
+    if not np.all(np.isfinite(vector)):
+        raise ValueError(f'Joint parameter {key} must be finite.')
+
     return vector
 
+
 def _vector(
-    mapping: dict[str, Any],
+    mapping: Mapping[str, Any],
     key: str,
     size: int,
 ) -> np.ndarray:
@@ -332,5 +362,8 @@ def _vector(
         raise ValueError(
             f'Parameter {key} must have shape ({size},).'
         )
+
+    if not np.all(np.isfinite(vector)):
+        raise ValueError(f'Parameter {key} must be finite.')
 
     return vector

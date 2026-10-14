@@ -13,6 +13,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PredictedTrajectory.msg"
   "msg/SafeVelocityCommand.msg"
   "msg/ControlTelemetry.msg"
+  "msg/ActuationTelemetry.msg"
   DEPENDENCIES std_msgs geometry_msgs
 )
 

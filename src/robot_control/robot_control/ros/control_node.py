@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 import signal
+from time import perf_counter
 
 import numpy as np
 import rclpy
@@ -37,6 +38,7 @@ from robot_control.factory.project_components import (
     create_project_registries,
 )
 from robot_control.factory.project_configuration import (
+    apply_strategy_configuration,
     project_control_configuration,
 )
 from robot_control.interfaces.control_data import (
@@ -103,9 +105,10 @@ class ControlNode(Node):
         self._telemetry_publisher = None
         self._session_id = str(uuid4())
         self._sequence = 0
-        self._command_names = list(self.get_parameter('command_joint_names').value or [])
+        self._command_names = []
         self._command_frame = str(self.get_parameter('command_frame_id').value)
         if self.get_parameter('publish_commands').value:
+            self._command_names = list(self.get_parameter('command_joint_names').value or [])
             if not self._compute_enabled or not self.get_parameter('safety_enabled').value:
                 raise ValueError('Publication requires compute_enabled and safety_enabled')
             if (len(self._command_names) != joint_count or
@@ -123,23 +126,6 @@ class ControlNode(Node):
             joint_count=joint_count,
         )
         self._prediction_adapter = PredictionMessageAdapter()
-
-        self._validator = InputValidator(
-            InputValidationConfig(
-                max_robot_state_age=float(
-                    self.get_parameter("max_robot_state_age").value
-                ),
-                max_prediction_age=float(
-                    self.get_parameter("max_prediction_age").value
-                ),
-                future_tolerance=float(
-                    self.get_parameter("future_tolerance").value
-                ),
-                lookahead_time=float(
-                    self.get_parameter("tracking_lookahead_time").value or 0.0
-                ),
-            )
-        )
 
         self._status_tracker = InputStatusTracker()
 
@@ -180,6 +166,22 @@ class ControlNode(Node):
 
         if self._compute_enabled:
             self._pipeline = self._build_pipeline(joint_count)
+
+        self._validator = InputValidator(
+            InputValidationConfig(
+                max_robot_state_age=float(
+                    self.get_parameter("max_robot_state_age").value
+                ),
+                max_prediction_age=float(
+                    self.get_parameter("max_prediction_age").value
+                ),
+                future_tolerance=float(
+                    self.get_parameter("future_tolerance").value
+                ),
+                lookahead_time=getattr(self, '_tracking_lookahead', float(
+                    self.get_parameter("tracking_lookahead_time").value or 0.0)),
+            )
+        )
 
         self.create_subscription(
             StateEstimateMsg,
@@ -223,6 +225,10 @@ class ControlNode(Node):
         self.declare_parameter('command_joint_names', Parameter.Type.STRING_ARRAY)
         self.declare_parameter('publish_telemetry', False)
         self.declare_parameter('telemetry_topic', Parameter.Type.STRING)
+        self.declare_parameter('strategy_config_file', '')
+        self.declare_parameter('robot_description_file', '')
+        self.declare_parameter('feedforward_override', '')
+        self.declare_parameter('lookahead_override', '')
 
         for name, parameter_type in self._CONTROL_PARAMETERS.items():
             self.declare_parameter(name, parameter_type)
@@ -272,12 +278,10 @@ class ControlNode(Node):
                 "arrays in [v, omega] order"
             )
 
+        configured_description = self.get_parameter('robot_description_file').value
         description_path = (
-            Path(get_package_share_directory("robot_description"))
-            / "config"
-            / "robot"
-            / "robot.yaml"
-        )
+            Path(configured_description).expanduser() if configured_description else
+            Path(get_package_share_directory("robot_description")) / 'config/robot/robot.yaml')
 
         with description_path.open(encoding="utf-8") as stream:
             description = yaml.safe_load(stream)
@@ -304,12 +308,22 @@ class ControlNode(Node):
             robot_configuration=robot_config,
             safety_configuration=safety_config,
         )
-
-        factory_config["tracking"]["frame"] = {
-            "transform_end_effector_tracking": (
-                transform_et.tolist()
-            ),
-        }
+        strategy_path = self.get_parameter('strategy_config_file').value
+        if strategy_path:
+            strategy_path = Path(strategy_path)
+            if not strategy_path.is_absolute():
+                strategy_path = Path(get_package_share_directory('robot_control')) / strategy_path
+            strategy = yaml.safe_load(strategy_path.read_text())
+            factory_config = apply_strategy_configuration(factory_config, strategy)
+        feedforward = self.get_parameter('feedforward_override').value
+        if feedforward:
+            if feedforward not in ['true', 'false']:
+                raise ValueError('feedforward_override must be true, false or empty')
+            factory_config['tracking']['target_velocity_feedforward'] = feedforward == 'true'
+        lookahead = self.get_parameter('lookahead_override').value
+        if lookahead:
+            factory_config['tracking']['lookahead_time'] = float(lookahead)
+        self._tracking_lookahead = factory_config['tracking']['lookahead_time']
 
         factory = ControlFactory(
             registries=create_project_registries(),
@@ -588,11 +602,13 @@ class ControlNode(Node):
                 dt = max(elapsed, self._nominal_dt)
 
         try:
+            compute_start = perf_counter()
             result = self._pipeline.compute(
                 robot_state=self._robot_state,
                 prediction=prediction,
                 now=now,
                 dt=dt,
+                previous_velocity=getattr(self, '_last_safe_velocity', None),
             )
 
         except (TypeError, ValueError, np.linalg.LinAlgError) as error:
@@ -605,6 +621,8 @@ class ControlNode(Node):
             return
 
         self._last_compute_time = now
+        self._last_safe_velocity = result.safe_output.command.copy()
+        self._compute_duration = perf_counter() - compute_start
         self._publish_command(result.safe_output.command, active=True)
         self._publish_telemetry(result=result)
 
@@ -650,6 +668,7 @@ class ControlNode(Node):
 
     def _stop(self, reason):
         """Explicitly invalidate actuation and expose blocked-cycle diagnostics."""
+        self._last_safe_velocity = None
         self._publish_command(np.zeros(2 + len(self._command_names)), active=False)
         self._publish_telemetry(reason=reason)
 
@@ -674,6 +693,14 @@ class ControlNode(Node):
                     quaternion)
             message.raw_velocity = result.raw_output.command.tolist()
             message.safe_velocity = result.safe_output.command.tolist()
+            message.computation_time = getattr(self, '_compute_duration', 0.)
+            details = diagnostic.controller
+            message.task_error = np.asarray(details.get('task_error', [])).tolist()
+            message.jacobian_singular_values = np.asarray(
+                details.get('singular_values', [])).tolist()
+            message.weighted_motion_cost = details.get('weighted_motion_cost', 0.)
+            message.active_bounds = details.get('active_bounds', 0)
+            message.task_residual = details.get('task_residual', 0.)
         self._telemetry_publisher.publish(message)
 
 

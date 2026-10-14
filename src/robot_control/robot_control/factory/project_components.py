@@ -16,6 +16,8 @@ from robot_models.reference.geometry.sphere_reference import (
     SphereReference,
 )
 
+from robot_control.optimization.weighted_least_squares import WeightedLeastSquaresController
+from robot_control.tracking.velocity_task import CartesianVelocityTask, DistancePointingTask
 from robot_control.adapters.planar_kinematics_adapter import (
     PlanarKinematicsAdapter,
 )
@@ -61,6 +63,10 @@ def create_project_registries() -> dict[str, ComponentRegistry]:
         PlanarKinematicsAdapter,
     )
 
+    registries['task'] = ComponentRegistry()
+    registries['task'].register('cartesian', CartesianVelocityTask)
+    registries['task'].register('distance_pointing', DistancePointingTask)
+    registries['controller'].register('weighted_least_squares', WeightedLeastSquaresController)
     return registries
 
 
@@ -79,52 +85,5 @@ def robot_configuration_from_description(
         Joint ordering follows the configured description order.
         The runtime estimator must use the same order.
     """
-    if not isinstance(description, Mapping):
-        raise TypeError("Robot description must be a mapping")
-
-    robot = description["robot"]
-    body = robot["body"]
-    wheels = robot["wheels"]
-    manipulator = robot["manipulator"]
-
-    joints = manipulator["joints"]
-    joint_axes = [
-        joint["axis"]
-        for joint in joints.values()
-    ]
-
-    if len(joint_axes) != 4:
-        raise ValueError(
-            "SerialArmModel requires exactly four joints"
-        )
-
-    return {
-        "base": {
-            "type": "differential_drive",
-            "parameters": {
-                "wheel_radius": float(wheels["radius"]),
-                "track_width": 2.0 * abs(
-                    float(wheels["y_offset"])
-                ),
-            },
-        },
-        "manipulator": {
-            "type": "serial_arm",
-            "parameters": {
-                "joint_axes": joint_axes,
-                "body_height": float(body["height"]),
-                "arm_base_height": float(
-                    manipulator["base"]["height"]
-                ),
-                "link_1_length": float(
-                    manipulator["link1"]["length"]
-                ),
-                "link_2_length": float(
-                    manipulator["link2"]["length"]
-                ),
-                "wrist_length": float(
-                    manipulator["wrist"]["length"]
-                ),
-            },
-        },
-    }
+    from robot_description.configuration import robot_component_configuration
+    return robot_component_configuration(description)

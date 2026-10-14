@@ -38,22 +38,25 @@ class TrajectoryPredictionSystem:
         self._weighted_correction = WeightedCorrection()
 
         self._last_prediction: TrajectoryPrediction | None = None
+        self._last_baseline_prediction: TrajectoryPrediction | None = None
         self._last_input: PredictionInput | None = None
         self._last_performance: PerformanceSnapshot | None = None
+        self._last_observation_timestamp: float | None = None
 
     def predict(
         self,
         prediction_input: PredictionInput,
     ) -> TrajectoryPrediction:
         """Generate and store a trajectory prediction."""
-        prediction = self._predictor.predict(prediction_input)
+        baseline = self._predictor.predict(prediction_input)
+        prediction = baseline
 
         if (
             self._residual_adapter is not None
             and self._performance_monitor.sample_count > 0
         ):
             correction = self._residual_adapter.compute_correction(
-                statistics=self._performance_monitor.statistics,
+                statistics=self._performance_monitor.baseline_statistics,
                 horizon=prediction_input.horizon,
             )
 
@@ -64,6 +67,7 @@ class TrajectoryPredictionSystem:
 
         self._last_input = prediction_input
         self._last_prediction = prediction
+        self._last_baseline_prediction = baseline
 
         return prediction
 
@@ -111,15 +115,25 @@ class TrajectoryPredictionSystem:
                 "Observation time must follow prediction time."
             )
 
+        if observation_dt is None:
+            previous = (self._last_input.timestamp if self._last_observation_timestamp is None
+                        else self._last_observation_timestamp)
+            observation_dt = observation_timestamp - previous
+        if observation_dt <= 0:
+            raise ValueError('Observations must advance in time.')
+
         # Always update the online predictor, even if the
         # observation is outside the previous prediction horizon.
-        predictor_update = getattr(self._predictor, "update", None)
-
-        if callable(predictor_update):
+        timestamped_update = getattr(self._predictor, 'update_at', None)
+        predictor_update = getattr(self._predictor, 'update', None)
+        if callable(timestamped_update):
+            timestamped_update(observation, observation_dt, observation_timestamp)
+        elif callable(predictor_update):
             predictor_update(
                 observation,
                 observation_dt=observation_dt,
             )
+        self._last_observation_timestamp = observation_timestamp
 
         timestamps = np.asarray(
             self._last_prediction.timestamps,
@@ -138,10 +152,17 @@ class TrajectoryPredictionSystem:
             initial_timestamp=self._last_input.timestamp,
             observation_timestamp=observation_timestamp,
         )
+        baseline_predicted_state = interpolate_predicted_state(
+            prediction=self._last_baseline_prediction,
+            initial_state=self._last_input.state,
+            initial_timestamp=self._last_input.timestamp,
+            observation_timestamp=observation_timestamp,
+        )
 
         performance = self._performance_monitor.update(
             observed_state=observation,
             predicted_state=predicted_state,
+            baseline_predicted_state=baseline_predicted_state,
         )
 
         self._last_performance = performance

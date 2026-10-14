@@ -148,6 +148,8 @@ class SimulationNode(Node):
                 tracking_frame=required_string(
                     self, "tracking_frame"
                 ),
+                max_age=self.get_parameter('tracking_max_age').value,
+                future_tolerance=self.get_parameter('tracking_future_tolerance').value,
             )
 
         self._state: SimulationState | None = None
@@ -276,6 +278,8 @@ class SimulationNode(Node):
             self.declare_parameter(
                 name, Parameter.Type.DOUBLE_ARRAY
             )
+        self.declare_parameter('tracking_max_age', 0.2)
+        self.declare_parameter('tracking_future_tolerance', 0.01)
 
     def _read_tracking_position(self) -> np.ndarray | None:
         """Resolve the configured tracking-position source."""

@@ -1,0 +1,16 @@
+# Optional robot-reactive experiment. Requires world -> tracking_frame TF from
+# Bringup's measured-feedback tracking-frame broadcaster.
+extends: moving_target.yaml
+
+tracking:
+  source: tf
+
+target:
+  # Use the existing default Fight/Flight dynamics, including nonzero alpha.
+  # Their preferred_distance belongs to target dynamics and is independent of
+  # Control's desired robot tracking radius.
+  config: config/target.yaml
+  # Separate initial conditions for this reactive experiment. Comparisons with
+  # independent motion must explicitly choose matching initial conditions.
+  initial_position: [2.0, 0.0, 1.0]
+  initial_velocity: [0.0, 0.0, 0.0]

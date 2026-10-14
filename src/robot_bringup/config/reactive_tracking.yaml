@@ -1,0 +1,4 @@
+extends: optimal_tracking.yaml
+simulation_config: config/scenarios/reactive_target.yaml
+# Experimental interaction case. The TF path is verified; the active controller
+# may safely stop at joint-position bounds for these separate initial conditions.

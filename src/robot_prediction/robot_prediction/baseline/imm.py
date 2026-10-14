@@ -9,6 +9,9 @@ from robot_prediction.baseline.constant_velocity import (
 from robot_prediction.baseline.coordinated_turn import (
     CoordinatedTurnPredictor,
 )
+from robot_prediction.confidence.temporal_alignment import (
+    interpolate_predicted_state,
+)
 from robot_prediction.interfaces.prediction_data import (
     PredictionInput,
     TrajectoryPrediction,
@@ -98,6 +101,8 @@ class IMMPredictor(Predictor):
 
         self._layout = None
         self._last_dt = None
+        self._last_initial_state = None
+        self._last_timestamp = None
 
         self._estimated_acceleration = None
         self._estimated_turn_rate = 0.0
@@ -131,6 +136,8 @@ class IMMPredictor(Predictor):
 
         self._layout = layout
         self._last_dt = prediction_input.dt
+        self._last_initial_state = state.copy()
+        self._last_timestamp = prediction_input.timestamp
 
         self._predicted_probabilities = (
             self._transition_matrix.T
@@ -197,6 +204,7 @@ class IMMPredictor(Predictor):
         self,
         observed_state: np.ndarray,
         observation_dt: float | None = None,
+        observation_timestamp: float | None = None,
     ) -> np.ndarray:
         """Update model probabilities and motion estimates.
 
@@ -227,12 +235,32 @@ class IMMPredictor(Predictor):
             observed_state
         )
 
+        elapsed = self._last_dt if observation_dt is None else observation_dt
+        if observation_timestamp is None:
+            observation_timestamp = self._last_timestamp + elapsed
+        if (not np.isfinite(observation_timestamp) or
+                observation_timestamp <= self._last_timestamp):
+            raise ValueError('Observation timestamp must follow forecast origin.')
+
+        if observation_timestamp > self._last_model_predictions[0].timestamps[-1]:
+            # Keep the transition prior when the stored forecast has expired.
+            # Motion estimates can still learn from the new observation.
+            self._model_probabilities = self._predicted_probabilities.copy()
+            self._last_likelihoods = None
+            self._last_residuals = None
+            self._update_motion_estimates(observation, dt=elapsed)
+            self._previous_observation = observation.copy()
+            return self._model_probabilities.copy()
+
         residuals = []
         likelihoods = []
 
         for prediction in self._last_model_predictions:
-            predicted_state = (
-                prediction.states[0]
+            predicted_state = interpolate_predicted_state(
+                prediction=prediction,
+                initial_state=self._last_initial_state,
+                initial_timestamp=self._last_timestamp,
+                observation_timestamp=observation_timestamp,
             )
 
             residual = compute_residual(
@@ -294,7 +322,7 @@ class IMMPredictor(Predictor):
 
         self._update_motion_estimates(
             observation,
-            dt=(self._last_dt if observation_dt is None else observation_dt),
+            dt=elapsed,
         )
 
         self._previous_observation = (
@@ -302,6 +330,10 @@ class IMMPredictor(Predictor):
         )
 
         return self._model_probabilities.copy()
+
+    def update_at(self, observed_state, observation_dt, observation_timestamp):
+        """Separate forecast scoring time from consecutive-observation propagation."""
+        return self.update(observed_state, observation_dt, observation_timestamp)
 
     def _update_motion_estimates(
         self,

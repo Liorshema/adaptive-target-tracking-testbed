@@ -11,7 +11,7 @@ from launch.substitutions import LaunchConfiguration
 
 from launch_ros.actions import Node
 
-import yaml
+from robot_simulation.factory.config_loader import load_yaml
 
 
 def configure(context):
@@ -20,7 +20,7 @@ def configure(context):
         return Path(get_package_share_directory(package))
 
     def load(path):
-        return yaml.safe_load(path.read_text())
+        return load_yaml(path)
 
     def flag(name):
         value = LaunchConfiguration(name).perform(context).lower()
@@ -50,6 +50,8 @@ def configure(context):
     actuator = load(actuation_path)['actuation']
     control_path = share('robot_control') / cfg['control_config']
     control = load(control_path)['control_node']['ros__parameters']
+    estimation_overrides = (load(share('robot_bringup') / cfg['estimation_overrides'])
+                            if 'estimation_overrides' in cfg else {})
     enabled = flag('enable_actuation')
     publish_arg = LaunchConfiguration('publish_commands').perform(context).lower()
     publish = enabled if publish_arg == '' else flag('publish_commands')
@@ -57,7 +59,7 @@ def configure(context):
         raise ValueError('Command publishing requires explicit enable_actuation=true')
     pose = robot['pose']
     common = {'use_sim_time': True}
-    return [
+    nodes = [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(str(share('robot_simulation') /
                                               'launch/simulation.launch.py')),
@@ -72,6 +74,7 @@ def configure(context):
         Node(package='robot_estimation', executable='estimation_node', output='screen',
              parameters=[str(share('robot_estimation') / cfg['robot_estimator_config']),
                          str(share('robot_estimation') / cfg['target_estimator_config']), common,
+                         estimation_overrides,
                          {'joint_count': len(names), 'joint_names': names,
                           'wheel_odometry_topic': drive['odom_topic'],
                           'joint_states_topic': robot['joint_states']['topic'],
@@ -83,6 +86,13 @@ def configure(context):
                          {'publish_commands': publish, 'command_joint_names': names,
                           'command_frame_id': drive['child_frame_id'],
                           'command_topic': actuator['command_topic'],
+                          'joint_count': len(names),
+                          'robot_description_file': str(description_path),
+                          'strategy_config_file': (
+                              LaunchConfiguration('strategy_config').perform(context)),
+                          'lookahead_override': LaunchConfiguration('lookahead').perform(context),
+                          'feedforward_override': (
+                              LaunchConfiguration('feedforward').perform(context)),
                           'publish_telemetry': True}]),
         Node(package='robot_simulation', executable='velocity_actuation', output='screen',
              parameters=[common, {'enabled': enabled,
@@ -92,6 +102,17 @@ def configure(context):
                                   'base_velocity_lower': control['base_velocity_lower'],
                                   'base_velocity_upper': control['base_velocity_upper']}]),
     ]
+    if simulation_cfg['tracking']['source'] == 'tf':
+        nodes.append(Node(package='robot_bringup', executable='tracking_feedback_tf',
+                          output='screen', parameters=[
+                              common, cfg['tracking_tf'],
+                              {'joint_names': names,
+                               'description_file': str(description_path),
+                               'joint_topic': robot['joint_states']['topic'],
+                               'odom_topic': drive['odom_topic'],
+                               'parent_frame': drive['frame_id'],
+                               'child_frame': simulation_cfg['tracking']['tracking_frame']}]))
+    return nodes
 
 
 def generate_launch_description():
@@ -102,5 +123,11 @@ def generate_launch_description():
         DeclareLaunchArgument('enable_actuation', default_value='false'),
         DeclareLaunchArgument('publish_commands', default_value='',
                               description='Optional disable override for watchdog experiments'),
+        DeclareLaunchArgument('strategy_config', default_value='',
+                              description='Control strategy YAML; empty retains v1 DLS'),
+        DeclareLaunchArgument('lookahead', default_value='',
+                              description='Override strategy lookahead in simulation seconds'),
+        DeclareLaunchArgument('feedforward', default_value='',
+                              description='Override strategy target feedforward: true or false'),
         OpaqueFunction(function=configure),
     ])

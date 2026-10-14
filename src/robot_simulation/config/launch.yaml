@@ -8,6 +8,8 @@ world:
   source: worlds/tracking_testbed.sdf.xacro
   terrain_config: config/terrain/flat.yaml
   output_name: world.sdf
+  # 2 ms validated under gravity with existing PIDs; 1 ms remains selectable.
+  physics: {max_step_size: 0.002, real_time_factor: 1.0}
   system_plugins:
     - {filename: gz-sim-physics-system, name: 'gz::sim::systems::Physics'}
     - {filename: gz-sim-user-commands-system, name: 'gz::sim::systems::UserCommands'}
@@ -29,6 +31,8 @@ tracking:
   position: [0.0, 0.0, 1.0]
   reference_frame: world
   tracking_frame: tracking_frame
+  max_age: 0.2
+  future_tolerance: 0.01
 
 simulation:
   config: config/simulation.yaml

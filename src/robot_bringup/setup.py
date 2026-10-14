@@ -28,6 +28,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'tracking_feedback_tf = robot_bringup.tracking_feedback_tf:main',
         ],
     },
 )

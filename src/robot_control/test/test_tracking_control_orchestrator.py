@@ -172,6 +172,31 @@ def make_orchestrator(
     )
 
 
+def test_linear_sampling_accepts_exact_single_forecast_sample(model, reference_builder):
+    """An exact query needs no interpolation interval or extrapolation."""
+    instance = TrackingControlOrchestrator(
+        model, RecordingController(), reference_builder,
+        prediction_sampling='linear', target_velocity_feedforward=True)
+    forecast = PredictedTargetTrajectory(
+        states=np.array([[1., 2., 3., .1, .2, .3]]),
+        timestamps=np.array([10.1]), frame_id='odom')
+    np.testing.assert_allclose(instance._select_target_state(forecast, 10.1), forecast.states[0])
+
+
+def test_linear_prediction_interpolates_position_and_velocity(model, reference_builder):
+    """Query time must determine both state components without rounding to the future."""
+    instance = TrackingControlOrchestrator(
+        model, RecordingController(), reference_builder,
+        prediction_sampling='linear', target_velocity_feedforward=True)
+    forecast = PredictedTargetTrajectory(
+        states=np.array([[1., 2., 3., .1, .2, .3], [2., 4., 6., .2, .4, .6]]),
+        timestamps=np.array([10.1, 10.3]), frame_id='odom')
+    np.testing.assert_allclose(instance._select_target_state(forecast, 10.2),
+                               (forecast.states[0] + forecast.states[1]) / 2)
+    with pytest.raises(ValueError, match='horizon'):
+        instance._select_target_state(forecast, 10.4)
+
+
 def test_reference_generation(
     model, reference_builder, robot_state, prediction, robot_kinematics
 ):

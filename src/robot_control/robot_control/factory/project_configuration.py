@@ -3,6 +3,7 @@
 
 from collections.abc import Mapping
 from typing import Any
+from copy import deepcopy
 
 import numpy as np
 
@@ -12,6 +13,36 @@ from robot_models.common.transforms import make_transform
 from robot_control.factory.project_components import (
     robot_configuration_from_description,
 )
+
+
+def apply_strategy_configuration(config, strategy):
+    """Bind a selected project strategy to the existing shared tracking settings."""
+    if not isinstance(strategy, Mapping) or set(strategy).difference({'controller', 'tracking'}):
+        raise ValueError('Strategy may configure controller and tracking only')
+    result = deepcopy(config)
+    controller = deepcopy(strategy['controller'])
+    task = controller.get('task')
+    if task is not None:
+        parameters = task.setdefault('parameters', {})
+        if task['type'] == 'distance_pointing':
+            pose = result['tracking']['pose']
+            shared = {'radius': result['tracking']['policy']['parameters']['radius'],
+                      'forward_axis_local': pose['forward_axis_local'],
+                      'tangent_axis_local': pose['up_axis_local']}
+        elif task['type'] == 'cartesian':
+            shared = {'selection_matrix': result['controller']['task_selection']}
+        else:
+            shared = {}
+        if set(parameters).intersection(shared):
+            raise ValueError('Task geometry must use shared tracking configuration')
+        parameters.update(shared)
+    result['controller'] = controller
+    overrides = strategy.get('tracking', {})
+    if set(overrides).difference({
+            'prediction_sampling', 'target_velocity_feedforward', 'lookahead_time'}):
+        raise ValueError('Unsupported strategy tracking override')
+    result['tracking'].update(overrides)
+    return result
 
 
 def _bounds(
@@ -191,4 +222,5 @@ def project_control_configuration(
         position=translation,
     )
 
+    model_config['tracking_frame'] = deepcopy(dict(frame))
     return model_config, safety_config, transform_et

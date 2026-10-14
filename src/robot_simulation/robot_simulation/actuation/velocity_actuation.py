@@ -17,7 +17,7 @@ from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.signals import SignalHandlerOptions
 
-from robot_interfaces.msg import SafeVelocityCommand
+from robot_interfaces.msg import ActuationTelemetry, SafeVelocityCommand
 
 from robot_simulation.actuation.position_reference import PositionReference
 
@@ -86,6 +86,13 @@ class VelocityActuationNode(Node):
         self._last_tick = None
         self._was_active = False
         self._reason = None
+        self._accepted_commands = 0
+        self._rejected_commands = 0
+        self._inactive_commands = 0
+        self._feedback_rejections = 0
+        self._timeout_events = 0
+        self._reference_limit_events = 0
+        self._diagnostic_publisher = None
         self._base_publisher = None
         self._joint_publishers = []
         self._output_topics = []
@@ -113,6 +120,13 @@ class VelocityActuationNode(Node):
         self._watchdog_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self._watchdog = self.create_timer(
             1 / self._config['rate_hz'], self._watchdog_tick, clock=self._watchdog_clock)
+        if self._config.get('publish_diagnostics', False):
+            rate = float(self._config['diagnostic_rate_hz'])
+            if not np.isfinite(rate) or rate <= 0:
+                raise ValueError('Diagnostic rate must be finite and positive')
+            self._diagnostic_publisher = self.create_publisher(
+                ActuationTelemetry, self._config['diagnostic_topic'], 10)
+            self._diagnostic_timer = self.create_timer(1 / rate, self._publish_diagnostics)
         self.get_logger().info(f'Velocity actuation enabled={self._enabled}')
 
     def _now(self):
@@ -154,6 +168,7 @@ class VelocityActuationNode(Node):
             self._last_joint_stamp = stamp
             self._joint = (stamp, self._wall(), measured)
         except (ValueError, IndexError, TypeError) as error:
+            self._feedback_rejections += 1
             self._joint = None
             self._halt(str(error))
 
@@ -178,6 +193,7 @@ class VelocityActuationNode(Node):
             self._last_odom_stamp = stamp
             self._odom = (stamp, self._wall())
         except (ValueError, TypeError) as error:
+            self._feedback_rejections += 1
             self._odom = None
             self._halt(str(error))
 
@@ -216,6 +232,7 @@ class VelocityActuationNode(Node):
             self._sequence = message.sequence
             self._command_stamp = stamp
             if not message.active:
+                self._inactive_commands += 1
                 self._halt('Control invalid or disabled')
                 return
             if (not self._feedback_ready() or
@@ -225,9 +242,11 @@ class VelocityActuationNode(Node):
                 self._reference.initialize(self._joint[2])
                 self._last_tick = self._now()
             self._command = (stamp, self._wall(), velocity)
+            self._accepted_commands += 1
             self._was_active = True
             self._reason = None
         except (ValueError, TypeError) as error:
+            self._rejected_commands += 1
             self._halt(str(error))
 
     def _halt(self, reason):
@@ -259,6 +278,7 @@ class VelocityActuationNode(Node):
             if (not self._fresh(self._command, self._config['command_max_age']) or
                     not self._feedback_ready() or not self._owns_outputs()):
                 self._halt('Command or feedback timeout')
+                self._timeout_events += 1
 
     def _owns_outputs(self):
         return all(len(self.get_publishers_info_by_topic(topic)) == 1
@@ -276,12 +296,34 @@ class VelocityActuationNode(Node):
         if dt <= 0:
             return
         try:
+            expected = self._reference.position + dt * self._command[2][2:]
             self._reference.step(self._command[2][2:], self._joint[2], dt)
+            if not np.allclose(expected, self._reference.position, atol=1e-10):
+                self._reference_limit_events += 1
         except ValueError as error:
             self._halt(str(error))
             return
         self._last_tick = now
         self._send(self._command[2])
+
+    def _publish_diagnostics(self):
+        """Observe transport and reference limiting without per-callback logging."""
+        message = ActuationTelemetry()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = self._frame
+        message.enabled = self._enabled
+        message.active = self._command is not None
+        message.reason = self._reason or ''
+        if self._command is not None:
+            message.commanded_velocity = self._command[2].tolist()
+        if self._reference.position is not None:
+            message.position_reference = self._reference.position.tolist()
+        if self._joint is not None:
+            message.measured_positions = self._joint[2].tolist()
+        for name in ['accepted_commands', 'rejected_commands', 'inactive_commands',
+                     'feedback_rejections', 'timeout_events', 'reference_limit_events']:
+            setattr(message, name, getattr(self, '_' + name))
+        self._diagnostic_publisher.publish(message)
 
     def _send(self, velocity=None):
         if self._base_publisher is None:

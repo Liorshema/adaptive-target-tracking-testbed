@@ -13,7 +13,7 @@ from robot_simulation.gazebo.tracking_frame_provider import (
 )
 
 
-def make_provider():
+def make_provider(**parameters):
     """Create a provider without a running ROS graph."""
     with (
         patch(
@@ -30,6 +30,7 @@ def make_provider():
             node=Mock(),
             reference_frame="world",
             tracking_frame="tracking_frame",
+            **parameters,
         )
 
     return provider, buffer
@@ -93,3 +94,18 @@ def test_rejects_non_finite_position():
 
     with pytest.raises(ValueError, match="non-finite"):
         provider.position_world()
+
+
+@pytest.mark.parametrize('timestamp,available', [(9.9, True), (9.7, False), (10.1, False)])
+def test_reactive_tracking_rejects_stale_and_future_transforms(timestamp, available):
+    """A stopped broadcaster must not silently leave a reactive target using old FK."""
+    provider, buffer = make_provider(max_age=.2, future_tolerance=.01)
+    provider._clock.now.return_value.nanoseconds = 10_000_000_000
+    transform = Mock()
+    transform.header.stamp.sec = int(timestamp)
+    transform.header.stamp.nanosec = round((timestamp - int(timestamp)) * 1e9)
+    transform.transform.translation.x = 1.
+    transform.transform.translation.y = 2.
+    transform.transform.translation.z = 3.
+    buffer.lookup_transform.return_value = transform
+    assert (provider.position_world() is not None) == available

@@ -177,6 +177,28 @@ class SafeControlPipeline:
                 "SafeControlPipeline supports velocity mode only"
             )
 
+        return self._projector.project(
+            output=output,
+            bounds=[self.feasible_bounds(previous_velocity, joint_positions, dt)],
+        )
+
+    @property
+    def velocity_limits(self):
+        """Return the configured physical/operational velocity contract."""
+        return self._velocity_limits
+
+    @property
+    def joint_limits(self):
+        """Return the optional physical position contract."""
+        return self._joint_limits
+
+    @property
+    def joint_velocity_indices(self):
+        """Return the named-order joint indices, independent of robot dimension."""
+        return self._joint_velocity_indices
+
+    def feasible_bounds(self, previous_velocity=None, joint_positions=None, dt=None):
+        """Share one feasible interval with optimization and final safety projection."""
         bounds = [velocity_bounds(self._velocity_limits)]
 
         if self._acceleration_limits is not None:
@@ -211,7 +233,8 @@ class SafeControlPipeline:
                 )
             )
 
-        return self._projector.project(
-            output=output,
-            bounds=bounds,
-        )
+        lower = np.maximum.reduce([bound[0] for bound in bounds])
+        upper = np.minimum.reduce([bound[1] for bound in bounds])
+        if np.any(lower > upper):
+            raise ValueError('Infeasible constraints: empty intersection')
+        return lower, upper

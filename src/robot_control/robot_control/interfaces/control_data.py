@@ -188,6 +188,9 @@ class ControlInput:
     reference: TrackingReference
     reference_trajectory: Optional[ReferenceTrajectory] = None
     target_prediction: Optional[PredictedTargetTrajectory] = None
+    target_state: Optional[Array] = None
+    dt: Optional[float] = None
+    previous_velocity: Optional[Array] = None
 
 
 @dataclass(frozen=True)

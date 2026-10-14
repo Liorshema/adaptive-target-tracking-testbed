@@ -1,0 +1,15 @@
+# Defined before matched production comparisons; position-only v1 averaged
+# about 0.18 m radial error, and did not control optical pointing.
+duration: 35.0
+settling_time: 10.0
+wall_timeout: 180.0
+max_feedback_skew: 0.08
+max_mean_distance_error: 0.20
+max_distance_error: 0.45
+max_mean_pointing_degrees: 10.0
+max_pointing_degrees: 25.0
+min_base_excursion: 0.1
+min_arm_motion: 0.1
+max_watchdog_timeouts_after_settling: 0
+min_mean_rtf: 0.5
+physical_numerical_tolerance: 0.001

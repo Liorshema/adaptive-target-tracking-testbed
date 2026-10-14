@@ -51,6 +51,17 @@ class EstimationNode(Node):
     def __init__(self) -> None:
         super().__init__('estimation_node')
         self._declare_parameters()
+        self.declare_parameter('full_state_publish_rate', 0.)
+        self.declare_parameter('diagnostic_log_period', 5.)
+        rate = float(self.get_parameter('full_state_publish_rate').value)
+        period = float(self.get_parameter('diagnostic_log_period').value)
+        if not np.isfinite(rate) or rate < 0 or not np.isfinite(period) or period <= 0:
+            raise ValueError('Invalid publication rate or diagnostic period')
+        self._full_state_period = 0. if rate == 0 else 1 / rate
+        self._last_full_publish_time = None
+        self._diagnostic_log_period = period
+        self._last_time_warning = None
+        self._time_rejections = 0
         self._robot_estimator = self._create_robot_estimator()
         self._target_estimator = self._create_target_estimator()
         self._last_robot_time: Optional[float] = None
@@ -319,6 +330,8 @@ class EstimationNode(Node):
         self._last_wheel_time = None
         self._last_joint_time = None
         self._target_frame_id = ''
+        self._last_full_publish_time = None
+        self._last_time_warning = None
         self.get_logger().warning('ROS clock changed; reinitialized estimation filters.')
 
     def _measurement_time_valid(
@@ -332,11 +345,16 @@ class EstimationNode(Node):
             or timestamp > now + tolerance
             or (previous is not None and timestamp < previous)
         ):
-            self.get_logger().warning(
-                f'Ignoring {name} measurement time: '
-                f'stamp={timestamp:.6f}, last={previous}, now={now:.6f}',
-                throttle_duration_sec=5.0,
-            )
+            self._time_rejections = getattr(self, '_time_rejections', 0) + 1
+            last = getattr(self, '_last_time_warning', None)
+            interval = getattr(self, '_diagnostic_log_period', 5.)
+            if last is None or now < last or now - last >= interval:
+                self._last_time_warning = now
+                self.get_logger().warning(
+                    f'Ignoring {name} measurement time: '
+                    f'stamp={timestamp:.6f}, last={previous}, now={now:.6f}; '
+                    f'total timestamp rejections={self._time_rejections}',
+                )
             return False
         return True
 
@@ -403,6 +421,10 @@ class EstimationNode(Node):
             return
 
         timestamp = float(state.timestamp)
+        previous = getattr(self, '_last_full_publish_time', None)
+        period = getattr(self, '_full_state_period', 0.)
+        if previous is not None and period > 0 and 0 <= timestamp - previous < period - 1e-9:
+            return
         mean = np.asarray(state.mean, dtype=float)
         covariance = np.asarray(state.covariance, dtype=float)
 
@@ -433,6 +455,7 @@ class EstimationNode(Node):
         full_msg.mean = mean.tolist()
         full_msg.covariance = covariance.ravel(order='C').tolist()
         self._robot_state_full_publisher.publish(full_msg)
+        self._last_full_publish_time = timestamp
 
     def _publish_target_state(self) -> None:
         """

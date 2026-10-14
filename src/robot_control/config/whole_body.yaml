@@ -1,0 +1,25 @@
+# Task geometry uses control.yaml's radius and axes; physical bounds come from
+# robot_description. Costs act on dimensionless task/velocity quantities.
+controller:
+  type: weighted_least_squares
+  uses_safety_bounds: true
+  task:
+    type: distance_pointing
+    parameters:
+      minimum_distance: 0.001
+      antipodal_tolerance: 0.00001
+  parameters:
+    gains: [1.0, 3.0, 3.0]
+    task_weights: [4.0, 12.0, 12.0]
+    task_scales: [1.0, 1.0, 1.0]  # metres, radians, radians
+    motion_weights: [1.0, 2.0, 3.0, 3.0, 3.0, 2.0]
+    damping: 0.08
+    posture_weight: 0.01
+    posture_gain: 0.3
+    smoothness_weight: 0.005
+    limit_avoidance_weight: 0.002
+# Compensate measured state/prediction latency without selecting a fixed viewpoint.
+tracking:
+  lookahead_time: 0.25
+  prediction_sampling: linear
+  target_velocity_feedforward: true

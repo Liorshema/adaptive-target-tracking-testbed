@@ -91,6 +91,8 @@ class SafeTrackingController:
             transform_world_base=transform_world_base,
             joint_positions=joint_positions,
             now=now,
+            dt=dt,
+            previous_velocity=previous_velocity,
         )
 
         safe_output = self._safety.apply(

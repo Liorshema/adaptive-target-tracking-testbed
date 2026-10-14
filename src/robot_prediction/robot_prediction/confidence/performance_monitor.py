@@ -37,6 +37,9 @@ class PerformanceMonitor:
         self._residual_buffer = ResidualBuffer(
             capacity=buffer_capacity
         )
+        self._baseline_residual_buffer = ResidualBuffer(
+            capacity=buffer_capacity
+        )
 
         self._confidence_model = PredictionConfidence(
             scale=confidence_scale
@@ -46,16 +49,26 @@ class PerformanceMonitor:
         self,
         observed_state: np.ndarray,
         predicted_state: np.ndarray,
+        baseline_predicted_state: np.ndarray | None = None,
     ) -> PerformanceSnapshot:
         """Update performance metrics from a new prediction outcome."""
         residual = compute_residual(
             observed_state=observed_state,
             predicted_state=predicted_state,
         )
+        baseline_residual = (
+            residual
+            if baseline_predicted_state is None
+            else compute_residual(
+                observed_state=observed_state,
+                predicted_state=baseline_predicted_state,
+            )
+        )
 
         self._residual_buffer.append(
             residual
         )
+        self._baseline_residual_buffer.append(baseline_residual)
 
         statistics = self.statistics
 
@@ -77,6 +90,16 @@ class PerformanceMonitor:
     ) -> None:
         """Clear stored performance history."""
         self._residual_buffer.clear()
+        self._baseline_residual_buffer.clear()
+
+    @property
+    def baseline_statistics(self) -> ResidualStatistics:
+        """Return uncorrected forecast errors for residual-bias adaptation."""
+        if self._baseline_residual_buffer.size == 0:
+            raise RuntimeError('no baseline residual samples are available.')
+        return ResidualStatistics(
+            residuals=self._baseline_residual_buffer.as_array()
+        )
 
     @property
     def statistics(

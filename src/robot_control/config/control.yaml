@@ -106,3 +106,9 @@ control_node:
     command_joint_names: []
     publish_telemetry: false
     telemetry_topic: /control/telemetry
+    # Empty preserves the existing Jacobian controller. Bringup can select v2.
+    strategy_config_file: ''
+    robot_description_file: ''  # Empty uses the installed authoritative default.
+    feedforward_override: ''
+
+    lookahead_override: ''

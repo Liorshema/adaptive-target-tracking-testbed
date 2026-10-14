@@ -13,10 +13,7 @@ import numpy as np
 from robot_models.constraints.acceleration_limits import AccelerationLimits
 from robot_models.constraints.joint_limits import JointLimits
 from robot_models.constraints.velocity_limits import VelocityLimits
-from robot_models.interfaces.base_model import BaseModel
-from robot_models.interfaces.manipulator_model import ManipulatorModel
-from robot_models.interfaces.robot_model import RobotModel
-from robot_models.whole_body.composer import WholeBodyComposer
+from robot_models.whole_body.factory import build_configured_model
 
 from robot_control.adapters.planar_kinematics_adapter import (
     PlanarKinematicsAdapter,
@@ -156,29 +153,11 @@ class ControlFactory:
         safety_config = _section(config, "safety")
         adapter_config = _section(config, "adapter")
 
-        # 1. Build robot components.
-        base = self._create(
-            "base",
-            _section(robot_config, "base"),
-        )
-        manipulator = self._create(
-            "manipulator",
-            _section(robot_config, "manipulator"),
-        )
-
-        if not isinstance(base, BaseModel):
-            raise TypeError("Registered base must implement BaseModel")
-
-        if not isinstance(manipulator, ManipulatorModel):
-            raise TypeError(
-                "Registered manipulator must implement "
-                "ManipulatorModel"
-            )
-
-        model: RobotModel = WholeBodyComposer(
-            base=base,
-            manipulator=manipulator,
-        )
+        # One shared model-construction contract; physical mount is applied once.
+        if 'tracking_frame' in robot_config and tracking_config.get('frame') is not None:
+            raise ValueError('Tracking-frame mount cannot be supplied twice')
+        model = build_configured_model(robot_config, self._create)
+        base, manipulator = model.base, model.manipulator
 
         velocity_dimension = model.generalized_velocity_dimension
 
@@ -219,30 +198,6 @@ class ControlFactory:
             pose_generator=pose_generator,
         )
 
-        # 3. Build the selected task-space controller.
-        task = TaskSpaceError(
-            selection_matrix=_array(
-                controller_config["task_selection"],
-                "task_selection",
-            ),
-        )
-
-        controller_parameters = dict(
-            controller_config.get("parameters", {})
-        )
-
-        controller_parameters["task"] = task
-
-        controller = self._registries["controller"].create(
-            controller_config["type"],
-            controller_parameters,
-        )
-
-        if not isinstance(controller, Controller):
-            raise TypeError(
-                "Registered controller must implement Controller"
-            )
-
         # 4. Configure the controlled tracking frame.
         tracking_frame = None
         frame_config = tracking_config.get('frame')
@@ -254,17 +209,6 @@ class ControlFactory:
                     'transform_end_effector_tracking',
                 ),
             )
-
-        # 5. Build prediction-based tracking.
-        tracking = TrackingControlOrchestrator(
-            model=model,
-            controller=controller,
-            reference_builder=reference_builder,
-            lookahead_time=float(
-                tracking_config.get("lookahead_time", 0.0)
-            ),
-            tracking_frame_kinematics=tracking_frame,
-        )
 
         # 5. Build safety constraints.
         velocity_config = _section(safety_config, "velocity")
@@ -343,6 +287,45 @@ class ControlFactory:
             acceleration_limits=acceleration_limits,
             joint_limits=joint_limits,
             joint_velocity_indices=joint_velocity_indices,
+        )
+
+        # 3. Build the selected task-space controller.
+        if 'task' in controller_config:
+            task = self._create('task', _section(controller_config, 'task'))
+        else:
+            task = TaskSpaceError(
+                selection_matrix=_array(controller_config['task_selection'], 'task_selection'),
+            )
+
+        controller_parameters = dict(
+            controller_config.get("parameters", {})
+        )
+
+        controller_parameters["task"] = task
+        if controller_config.get('uses_safety_bounds', False):
+            controller_parameters['safety'] = safety
+
+        controller = self._registries["controller"].create(
+            controller_config["type"],
+            controller_parameters,
+        )
+
+        if not isinstance(controller, Controller):
+            raise TypeError(
+                "Registered controller must implement Controller"
+            )
+
+        # 5. Build prediction-based tracking.
+        tracking = TrackingControlOrchestrator(
+            model=model,
+            controller=controller,
+            reference_builder=reference_builder,
+            lookahead_time=float(
+                tracking_config.get("lookahead_time", 0.0)
+            ),
+            tracking_frame_kinematics=tracking_frame,
+            prediction_sampling=tracking_config.get('prediction_sampling', 'first_future'),
+            target_velocity_feedforward=tracking_config.get('target_velocity_feedforward', False),
         )
 
         # 6. Build the robot-state adapter.

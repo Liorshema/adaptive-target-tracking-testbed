@@ -1,5 +1,7 @@
 """Construct configured robot models from robot-description parameters."""
 
+from dataclasses import asdict
+
 from robot_description.model_parameters import (
     load_robot_model_parameters,
     RobotModelParameters,
@@ -9,8 +11,17 @@ from robot_models.base.differential_drive.kinematics import (
     DifferentialDriveKinematics,
 )
 from robot_models.manipulator.serial_arm.model import SerialArmModel
-from robot_models.manipulator.fixed_mount.model import FixedMountModel
 from robot_models.whole_body.composer import WholeBodyComposer
+from robot_models.whole_body.factory import build_configured_model
+
+
+def _create_component(category, specification):
+    """Select Bringup's existing model implementations for shared composition."""
+    implementations = {
+        'base': DifferentialDriveKinematics,
+        'manipulator': SerialArmModel,
+    }
+    return implementations[category](**specification['parameters'])
 
 
 def create_robot_model(
@@ -24,27 +35,9 @@ def create_robot_model(
     if parameters is None:
         parameters = load_robot_model_parameters()
 
-    base = DifferentialDriveKinematics(
-        wheel_radius=parameters.base.wheel_radius,
-        track_width=parameters.base.track_width,
-    )
-
-    arm = SerialArmModel(
-        joint_axes=parameters.manipulator.joint_axes,
-        body_height=parameters.manipulator.body_height,
-        arm_base_height=parameters.manipulator.arm_base_height,
-        link_1_length=parameters.manipulator.link_1_length,
-        link_2_length=parameters.manipulator.link_2_length,
-        wrist_length=parameters.manipulator.wrist_length,
-    )
-
-    manipulator = FixedMountModel(
-        parent=arm,
-        translation=parameters.tracking_frame.translation,
-        rotation_rpy=parameters.tracking_frame.rotation_rpy,
-    )
-
-    return WholeBodyComposer(
-        base=base,
-        manipulator=manipulator,
-    )
+    configuration = {
+        'base': {'type': 'differential_drive', 'parameters': asdict(parameters.base)},
+        'manipulator': {'type': 'serial_arm', 'parameters': asdict(parameters.manipulator)},
+        'tracking_frame': asdict(parameters.tracking_frame),
+    }
+    return build_configured_model(configuration, _create_component)

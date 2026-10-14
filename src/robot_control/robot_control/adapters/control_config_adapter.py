@@ -230,6 +230,8 @@ class ControlConfigAdapter:
             "robot": {
                 "base": base,
                 "manipulator": manipulator,
+                **({'tracking_frame': deepcopy(robot_configuration['tracking_frame'])}
+                   if 'tracking_frame' in robot_configuration else {}),
             },
             "tracking": {
                 "geometry": {

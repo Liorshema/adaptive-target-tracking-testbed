@@ -62,6 +62,33 @@ def wheel_message(timestamp=10.0, velocity=0.0):
     return message
 
 
+def test_full_state_publication_budget_preserves_fusion_without_duplicate_output(node):
+    """Fuse equal-time measurements while keeping the full-message rate bounded."""
+    node._full_state_period = .02
+    node._last_full_publish_time = None
+    node._wheel_odometry_callback(wheel_message())
+    node._joint_state_callback(joint_message())
+    initial = len(node.robot_messages)
+    node._joint_state_callback(joint_message(10.005))
+    assert len(node.robot_messages) == initial
+    node._joint_state_callback(joint_message(10.02))
+    assert len(node.robot_messages) == initial + 1
+    node._wheel_odometry_callback(wheel_message(10.02, .2))
+    assert len(node.robot_messages) == initial + 1
+    assert node._robot_estimator.state.mean[3] > 0
+    for _ in range(100):
+        node._joint_state_callback(joint_message(10.02))
+    assert len(node.robot_messages) == initial + 1
+
+
+def test_rejected_time_counts_are_kept_without_per_packet_logging(node):
+    """Keep rejection evidence while avoiding repeated ROS throttling introspection."""
+    for _ in range(10):
+        assert not node._measurement_time_valid(9., 10., 'robot')
+    assert len(node.logs) == 1
+    assert node._time_rejections == 10
+
+
 def joint_message(timestamp=10.0):
     """Include shuffled arm joints and a wheel as Gazebo can publish."""
     message = JointState()

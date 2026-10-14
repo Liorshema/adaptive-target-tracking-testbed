@@ -64,6 +64,7 @@ class JacobianController(Controller):
 
         self._gains = gains
         self._damping = float(damping)
+        self.last_diagnostics = {}
 
     def compute(
         self,
@@ -152,6 +153,11 @@ class JacobianController(Controller):
 
         if not np.all(np.isfinite(velocity_command)):
             raise ValueError("Computed velocity is not finite")
+        self.last_diagnostics = {
+            'task_error': task_error.copy(),
+            'singular_values': np.linalg.svd(selected_jacobian, compute_uv=False),
+            'task_residual': float(np.linalg.norm(
+                selected_jacobian @ velocity_command - desired_task_velocity))}
 
         return ControlOutput(
             command=velocity_command,

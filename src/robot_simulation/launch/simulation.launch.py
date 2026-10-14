@@ -103,6 +103,7 @@ def configure(context):
         entity_name=target_cfg["entity_name"],
         system_plugins=world_cfg["system_plugins"],
         models=[] if robot_model is None else [robot_model],
+        physics=world_cfg.get('physics'),
     )
 
     # Start Gazebo.
@@ -186,6 +187,7 @@ def configure(context):
         output="screen",
         parameters=[
             {
+                'use_sim_time': True,
                 "target_config": str(
                     resolve_path(target_cfg["config"])
                 ),
@@ -221,6 +223,8 @@ def configure(context):
                 "tracking_frame": tracking_cfg[
                     "tracking_frame"
                 ],
+                'tracking_max_age': tracking_cfg.get('max_age', 0.2),
+                'tracking_future_tolerance': tracking_cfg.get('future_tolerance', 0.01),
             }
         ],
     )

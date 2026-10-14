@@ -4,6 +4,7 @@
 from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
+import math
 
 from robot_simulation.factory.config_loader import load_yaml
 from robot_simulation.geometry.sdf_generator import SDFGenerator
@@ -18,6 +19,7 @@ def build_world(
     entity_name,
     system_plugins,
     models=(),
+    physics=None,
 ):
     """Render the configured world and add a target and selected system plugins.
 
@@ -35,6 +37,19 @@ def build_world(
 
     if world is None or not world.get('name'):
         raise ValueError('World SDF requires a named <world> element.')
+    if physics is not None:
+        if set(physics).difference({'max_step_size', 'real_time_factor'}):
+            raise ValueError('Unsupported physics parameters')
+        element = world.find('physics')
+        if element is None:
+            raise ValueError('Configured world must provide a physics element')
+        for name, value in physics.items():
+            if not math.isfinite(float(value)) or float(value) <= 0:
+                raise ValueError(f'Physics {name} must be finite and positive')
+            parameter = element.find(name)
+            if parameter is None:
+                parameter = ET.SubElement(element, name)
+            parameter.text = str(value)
 
     for plugin in system_plugins:
         filename, name = plugin['filename'], plugin['name']

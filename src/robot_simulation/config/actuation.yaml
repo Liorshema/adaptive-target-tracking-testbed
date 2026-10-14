@@ -7,3 +7,6 @@ actuation:
   future_tolerance: 0.01
   max_position_lead: 0.08
   max_integration_dt: 0.1
+  publish_diagnostics: true
+  diagnostic_rate_hz: 10.0
+  diagnostic_topic: /simulation/actuation/telemetry

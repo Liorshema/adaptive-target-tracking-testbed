@@ -6,7 +6,7 @@ It generates control commands but never executes or publishes them.
 """
 
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
@@ -38,6 +38,7 @@ class TrackingDiagnostics:
     target_position: Array
     desired_pose: Array
     actual_pose: Array
+    controller: dict = field(default_factory=dict)
 
 
 class TrackingControlOrchestrator:
@@ -52,6 +53,8 @@ class TrackingControlOrchestrator:
         tracking_frame_kinematics: Optional[
             TrackingFrameKinematics
         ] = None,
+        prediction_sampling='first_future',
+        target_velocity_feedforward=False,
     ) -> None:
         """Configure tracking using externally supplied components."""
         if not isinstance(model, RobotModel):
@@ -85,6 +88,11 @@ class TrackingControlOrchestrator:
                 "TrackingFrameKinematics or None"
             )
 
+        if prediction_sampling not in ['first_future', 'linear']:
+            raise ValueError('Unknown prediction sampling policy')
+        self._prediction_sampling = prediction_sampling
+        self._target_velocity_feedforward = bool(target_velocity_feedforward)
+        self._controller = controller
         self._model = model
         self._reference_builder = reference_builder
         self._lookahead_time = float(lookahead_time)
@@ -131,6 +139,34 @@ class TrackingControlOrchestrator:
 
         return prediction.states[index, :3].copy()
 
+    def _select_target_state(self, prediction, query_time):
+        """Sample position/velocity at the query time without future extrapolation."""
+        times, states = prediction.timestamps, prediction.states
+        index = int(np.searchsorted(times, query_time, side='left'))
+        if index >= len(times):
+            raise ValueError('Requested time exceeds prediction horizon')
+        if states.shape[1] < 3:
+            raise ValueError('Prediction must contain at least 3 position components')
+        if self._target_velocity_feedforward and states.shape[1] < 6:
+            raise ValueError('Tracking requires target [position, velocity] states')
+        states = np.column_stack([states[:, :3], states[:, 3:6]]) if states.shape[1] >= 6 else (
+            np.column_stack([states[:, :3], np.zeros((len(states), 3))]))
+        if self._prediction_sampling == 'first_future' or query_time == times[index]:
+            result = states[index].copy()
+        elif index == 0:
+            # Forecasts begin one sample after their reference time. Recover the
+            # short initial interval using its supplied position and velocity.
+            if len(times) < 2 or times[0] - query_time > times[1] - times[0] + 1e-9:
+                raise ValueError('Query precedes the supported prediction interval')
+            result = states[0].copy()
+            result[:3] += (query_time - times[0]) * result[3:]
+        else:
+            fraction = (query_time - times[index - 1]) / (times[index] - times[index - 1])
+            result = (1 - fraction) * states[index - 1] + fraction * states[index]
+        if not self._target_velocity_feedforward:
+            result[3:] = 0.
+        return result
+
     def compute(
         self,
         robot_state: RobotState,
@@ -138,6 +174,8 @@ class TrackingControlOrchestrator:
         transform_world_base: Array,
         joint_positions: Array,
         now: float,
+        dt=None,
+        previous_velocity=None,
     ) -> ControlOutput:
         """Compute a tracking command without actuator execution."""
         if not isinstance(robot_state, RobotState):
@@ -158,10 +196,8 @@ class TrackingControlOrchestrator:
 
         query_time = float(now) + self._lookahead_time
 
-        target_position = self._select_target_position(
-            prediction=prediction,
-            query_time=query_time,
-        )
+        target_state = self._select_target_state(prediction, query_time)
+        target_position = target_state[:3]
 
         transform_world_base = np.asarray(
             transform_world_base,
@@ -203,6 +239,9 @@ class TrackingControlOrchestrator:
             robot_state=robot_state,
             reference=bundle.reference,
             target_prediction=prediction,
+            target_state=target_state,
+            dt=dt,
+            previous_velocity=previous_velocity,
         )
 
         # 4. Compute control with the same tracking-frame geometry.
@@ -215,5 +254,6 @@ class TrackingControlOrchestrator:
         )
         self.last_diagnostics = TrackingDiagnostics(
             target_position.copy(), bundle.desired_pose.copy(), current_pose.copy(),
+            getattr(self._controller, 'last_diagnostics', {}).copy(),
         )
         return output

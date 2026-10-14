@@ -4,3 +4,8 @@ actuation_config: config/actuation.yaml
 control_config: config/control.yaml
 robot_estimator_config: config/robot_estimator.yaml
 target_estimator_config: config/target_estimator.yaml
+tracking_tf:
+  rate_hz: 20.0
+  max_age: 0.2
+  max_skew: 0.05
+  future_tolerance: 0.01

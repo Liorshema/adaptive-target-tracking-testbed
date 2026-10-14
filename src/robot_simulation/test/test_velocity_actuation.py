@@ -47,6 +47,12 @@ def actuator():
     node._last_odom_stamp = None
     node._was_active = False
     node._reason = None
+    node._accepted_commands = 0
+    node._rejected_commands = 0
+    node._inactive_commands = 0
+    node._feedback_rejections = 0
+    node._timeout_events = 0
+    node._reference_limit_events = 0
     return node
 
 

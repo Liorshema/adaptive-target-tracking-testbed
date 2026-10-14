@@ -1,46 +1,14 @@
+# Independent target motion: this scenario's dynamics set alpha=0, so the
+# static tracking position does not introduce a reaction to robot motion.
+extends: ../launch.yaml
+
 paths:
   base: package
-world:
-  source: worlds/tracking_testbed.sdf.xacro
-  terrain_config: config/terrain/flat.yaml
-  output_name: world.sdf
-  system_plugins:
-  - filename: gz-sim-physics-system
-    name: gz::sim::systems::Physics
-  - filename: gz-sim-user-commands-system
-    name: gz::sim::systems::UserCommands
-  - filename: gz-sim-scene-broadcaster-system
-    name: gz::sim::systems::SceneBroadcaster
+
 target:
   config: config/scenarios/target.yaml
-  entity_name: target
-  initial_position:
-  - 2.7
-  - 0.0
-  - 0.85
-  initial_velocity:
-  - 0.0
-  - 0.35
-  - 0.0
-robot:
-  enabled: true
-  config: config/gazebo/robot.yaml
-  joint_position_hold: config/gazebo/joint_position_hold.yaml
-tracking:
-  source: static
-  position:
-  - 0.0
-  - 0.0
-  - 1.0
-  reference_frame: world
-  tracking_frame: tracking_frame
+  initial_position: [2.7, 0.0, 0.85]
+  initial_velocity: [0.0, 0.35, 0.0]
+
 simulation:
-  config: config/simulation.yaml
   environment_config: config/scenarios/environment.yaml
-  measurement_config: config/measurements.yaml
-gazebo:
-  gui: true
-  start_running: true
-  clock_topic: /clock
-  pose_service_template: /world/{world}/set_pose
-  pose_service_type: ros_gz_interfaces/srv/SetEntityPose

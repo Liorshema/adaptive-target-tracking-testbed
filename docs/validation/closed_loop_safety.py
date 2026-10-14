@@ -27,6 +27,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case', choices=['smoke', 'failures'], required=True)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--config', default='')
+    parser.add_argument('--strategy-config', default='')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault('ROS_DOMAIN_ID', '91')
@@ -39,6 +41,10 @@ def main():
     thresholds = yaml.safe_load(Path(__file__).with_name('closed_loop_thresholds.yaml').read_text())
     names = [robot['joint_name_template'].format(key=key) for key in limits]
     launch = ['ros2', 'launch', 'robot_bringup', 'closed_loop.launch.py', 'enable_actuation:=true']
+    if args.config:
+        launch.append(f'config:={args.config}')
+    if args.strategy_config:
+        launch.append(f'strategy_config:={args.strategy_config}')
     if args.case == 'smoke':
         launch.append('publish_commands:=false')
     log = (args.output / 'runtime.log').open('w')
