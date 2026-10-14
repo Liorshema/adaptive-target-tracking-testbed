@@ -1,0 +1,9 @@
+actuation:
+  command_topic: /control/safe_velocity
+  rate_hz: 50.0
+  command_max_age: 0.25
+  feedback_max_age: 0.2
+  wall_timeout: 0.5
+  future_tolerance: 0.01
+  max_position_lead: 0.08
+  max_integration_dt: 0.1

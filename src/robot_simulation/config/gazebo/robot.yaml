@@ -8,6 +8,7 @@ robot:
   # Base center is wheel_radius - wheels.z_offset above the flat ground.
   pose: [0.0, 0.0, 0.25, 0.0, 0.0, 0.0]
   joint_name_template: '{key}_joint'
+  joint_position_topic_template: '/model/{model}/joint/{joint}/cmd_pos'
   joint_states:
     topic: /joint_states
   differential_drive:

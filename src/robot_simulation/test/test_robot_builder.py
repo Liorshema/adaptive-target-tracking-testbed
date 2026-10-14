@@ -26,6 +26,7 @@ def inputs():
     config = {
         'entity_name': 'other_robot', 'pose': [1., 2., 0.25, 0., 0., 0.3],
         'joint_name_template': 'custom_{key}',
+        'joint_position_topic_template': '/custom/{model}/{joint}/position',
         'joint_states': {'topic': '/custom/joints'},
         'differential_drive': {'enabled': False},
     }
@@ -46,6 +47,7 @@ def test_hold_uses_configured_names_targets_gains_and_authoritative_effort(input
     assert len(plugins) == 4
     for plugin, key in zip(plugins, ['base_yaw', 'shoulder', 'elbow', 'wrist']):
         assert plugin.findtext('joint_name') == 'custom_' + key
+        assert plugin.findtext('topic') == f'/custom/other_robot/custom_{key}/position'
         assert float(plugin.findtext('initial_position')) == inputs[3]['positions'][key]
         assert float(plugin.findtext('p_gain')) == 80.0
         assert float(plugin.findtext('i_gain')) == 4.0

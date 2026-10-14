@@ -18,6 +18,7 @@ from robot_control.interfaces.control_data import (
 )
 from robot_control.pipeline.tracking_control_orchestrator import (
     TrackingControlOrchestrator,
+    TrackingDiagnostics,
 )
 from robot_control.safety.safe_control_pipeline import SafeControlPipeline
 
@@ -30,6 +31,7 @@ class SafeTrackingResult:
 
     raw_output: ControlOutput
     safe_output: ControlOutput
+    diagnostics: Optional[TrackingDiagnostics] = None
 
 
 class SafeTrackingController:
@@ -101,4 +103,5 @@ class SafeTrackingController:
         return SafeTrackingResult(
             raw_output=raw_output,
             safe_output=safe_output,
+            diagnostics=self._tracking.last_diagnostics,
         )

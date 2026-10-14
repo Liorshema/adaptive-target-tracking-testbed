@@ -7,9 +7,29 @@ No ROS nodes or Gazebo execution are required.
 
 import numpy as np
 import pytest
-from robot_bringup.model_factory import create_robot_model
+from pathlib import Path
+import yaml
+from robot_control.factory.project_components import (
+    create_project_registries, robot_configuration_from_description,
+)
+from robot_models.manipulator.fixed_mount.model import FixedMountModel
+from robot_models.whole_body.composer import WholeBodyComposer
 from robot_models.whole_body.jacobian import WholeBodyJacobian
 from robot_models.whole_body.kinematics import WholeBodyKinematics
+
+
+def create_robot_model():
+    """Build the configured tracking model without depending on orchestration."""
+    path = Path(__file__).parents[2] / 'robot_description/config/robot/robot.yaml'
+    description = yaml.safe_load(path.read_text())
+    config = robot_configuration_from_description(description)
+    registry = create_project_registries()
+    base = registry['base'].create(config['base']['type'], config['base']['parameters'])
+    arm = registry['manipulator'].create(config['manipulator']['type'],
+                                         config['manipulator']['parameters'])
+    mount = description['robot']['tracking_frame']
+    return WholeBodyComposer(base=base, manipulator=FixedMountModel(
+        parent=arm, translation=mount['translation'], rotation_rpy=mount['rotation_rpy']))
 
 
 def base_transform(pose):

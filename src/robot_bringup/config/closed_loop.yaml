@@ -1,0 +1,6 @@
+# Package-owned resources; launch overrides are deployment choices.
+simulation_config: config/scenarios/moving_target.yaml
+actuation_config: config/actuation.yaml
+control_config: config/control.yaml
+robot_estimator_config: config/robot_estimator.yaml
+target_estimator_config: config/target_estimator.yaml

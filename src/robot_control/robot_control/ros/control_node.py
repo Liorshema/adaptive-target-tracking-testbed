@@ -1,13 +1,9 @@
-"""ROS 2 orchestration for validated, compute-only robot control.
-
-Receive estimates and predictions, validate inputs, and optionally
-compute safety-constrained tracking commands.
-
-No actuator commands are published by this node.
-"""
+"""Validated tracking with optional simulator-independent safe publication."""
 
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
+import signal
 
 import numpy as np
 import rclpy
@@ -17,11 +13,13 @@ from rclpy.clock import JumpThreshold
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
 from robot_interfaces.msg import (
     PredictedTrajectory as PredictedTrajectoryMsg,
 )
 from robot_interfaces.msg import StateEstimate as StateEstimateMsg
+from robot_interfaces.msg import ControlTelemetry, SafeVelocityCommand
 from scipy.spatial.transform import Rotation
 from tf2_ros import Buffer, TransformException, TransformListener
 
@@ -97,14 +95,29 @@ class ControlNode(Node):
             self.get_parameter("compute_enabled").value
         )
 
-        if self.get_parameter("publish_commands").value:
-            raise ValueError(
-                "Command publishing is not supported by ControlNode"
-            )
-
         joint_count = int(
             self.get_parameter("joint_count").value
         )
+
+        self._command_publisher = None
+        self._telemetry_publisher = None
+        self._session_id = str(uuid4())
+        self._sequence = 0
+        self._command_names = list(self.get_parameter('command_joint_names').value or [])
+        self._command_frame = str(self.get_parameter('command_frame_id').value)
+        if self.get_parameter('publish_commands').value:
+            if not self._compute_enabled or not self.get_parameter('safety_enabled').value:
+                raise ValueError('Publication requires compute_enabled and safety_enabled')
+            if (len(self._command_names) != joint_count or
+                    len(set(self._command_names)) != joint_count or
+                    any(not name.strip() for name in self._command_names) or
+                    not self._command_frame.strip()):
+                raise ValueError('Publication requires explicit unique joint names and body frame')
+            self._command_publisher = self.create_publisher(
+                SafeVelocityCommand, self.get_parameter('command_topic').value, 10)
+        if self.get_parameter('publish_telemetry').value:
+            self._telemetry_publisher = self.create_publisher(
+                ControlTelemetry, self.get_parameter('telemetry_topic').value, 10)
 
         self._robot_adapter = RobotStateMessageAdapter(
             joint_count=joint_count,
@@ -193,10 +206,9 @@ class ControlNode(Node):
             else "INPUT VALIDATION ONLY"
         )
 
-        self.get_logger().info(
-            f"ControlNode initialized: {mode}. "
-            "Actuator command publishing disabled."
-        )
+        if self._command_publisher is not None:
+            mode = 'SAFE COMMAND PUBLICATION'
+        self.get_logger().info(f'ControlNode initialized: {mode}.')
 
     def _declare_parameters(self) -> None:
         """Declare required, control, and execution parameters."""
@@ -206,6 +218,11 @@ class ControlNode(Node):
         self.declare_parameter("compute_enabled", False)
         self.declare_parameter("publish_commands", False)
         self.declare_parameter("safety_enabled", True)
+        self.declare_parameter('command_topic', Parameter.Type.STRING)
+        self.declare_parameter('command_frame_id', '')
+        self.declare_parameter('command_joint_names', Parameter.Type.STRING_ARRAY)
+        self.declare_parameter('publish_telemetry', False)
+        self.declare_parameter('telemetry_topic', Parameter.Type.STRING)
 
         for name, parameter_type in self._CONTROL_PARAMETERS.items():
             self.declare_parameter(name, parameter_type)
@@ -359,6 +376,8 @@ class ControlNode(Node):
     @staticmethod
     def _stamp_to_seconds(stamp) -> float:
         """Convert a ROS timestamp to seconds."""
+        if stamp.sec < 0 or not 0 <= stamp.nanosec < 1_000_000_000:
+            raise ValueError('Invalid ROS timestamp')
         return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
     @staticmethod
@@ -376,6 +395,7 @@ class ControlNode(Node):
 
     def _set_invalid(self, reason: str) -> None:
         """Report input validity transitions."""
+        self._stop(reason)
         if self._status_tracker.set_invalid(reason):
             now = self.get_clock().now().nanoseconds * 1e-9
             robot_time = (
@@ -397,6 +417,9 @@ class ControlNode(Node):
 
     def _on_time_jump(self, _jump) -> None:
         """Invalidate cached data when ROS time changes epoch."""
+        self._stop('clock reset')
+        self._session_id = str(uuid4())
+        self._sequence = 0
         self._robot_state = None
         self._prediction = None
         self._prediction_reference_timestamp = None
@@ -420,6 +443,7 @@ class ControlNode(Node):
     def _robot_callback(self, message: StateEstimateMsg) -> None:
         """Accept same-time fused updates; reject older estimates."""
         try:
+            self._stamp_to_seconds(message.header.stamp)
             state = self._robot_adapter.convert(message)
             self._check_reference_time(state.timestamp, 'Robot state')
 
@@ -433,6 +457,9 @@ class ControlNode(Node):
                     f"last={self._last_robot_timestamp:.6f}",
                     throttle_duration_sec=5.0,
                 )
+                if self._command_publisher is not None:
+                    self._robot_state = None
+                    self._stop('out-of-order robot estimate')
                 return
 
             self._robot_state = state
@@ -443,6 +470,10 @@ class ControlNode(Node):
                 f"Invalid robot state estimate: {error}",
                 throttle_duration_sec=5.0,
             )
+
+            if self._command_publisher is not None:
+                self._robot_state = None
+                self._stop(str(error))
 
     def _prediction_callback(
         self,
@@ -465,6 +496,9 @@ class ControlNode(Node):
                     "Ignoring duplicate or out-of-order prediction.",
                     throttle_duration_sec=5.0,
                 )
+                if self._command_publisher is not None:
+                    self._prediction = None
+                    self._stop('duplicate or out-of-order prediction')
                 return
 
             self._prediction = prediction
@@ -476,6 +510,10 @@ class ControlNode(Node):
                 f"Invalid target prediction: {error}",
                 throttle_duration_sec=5.0,
             )
+
+            if self._command_publisher is not None:
+                self._prediction = None
+                self._stop(str(error))
 
     def _validate_inputs(self) -> None:
         """Validate inputs and optionally compute constrained control."""
@@ -497,6 +535,7 @@ class ControlNode(Node):
                 self.get_logger().info(reason)
 
             self._last_compute_time = None
+            self._stop(reason)
             return
 
         now = self.get_clock().now().nanoseconds * 1e-9
@@ -533,7 +572,7 @@ class ControlNode(Node):
         now: float,
         prediction: PredictedTargetTrajectory,
     ) -> None:
-        """Compute and report safe commands without publishing them."""
+        """Compute once and optionally publish only the constrained output."""
         if self._pipeline is None:
             return
 
@@ -558,6 +597,7 @@ class ControlNode(Node):
 
         except (TypeError, ValueError, np.linalg.LinAlgError) as error:
             self._last_compute_time = None
+            self._stop(str(error))
             self.get_logger().warning(
                 f"Control computation unavailable: {error}",
                 throttle_duration_sec=5.0,
@@ -565,6 +605,8 @@ class ControlNode(Node):
             return
 
         self._last_compute_time = now
+        self._publish_command(result.safe_output.command, active=True)
+        self._publish_telemetry(result=result)
 
         if (
             self._last_output_log_time is not None
@@ -587,24 +629,79 @@ class ControlNode(Node):
         )
 
         self.get_logger().info(
-            f"CONTROL COMPUTE ONLY | raw={raw} | safe={safe}"
+            f"CONTROL {'ACTIVE' if self._command_publisher else 'COMPUTE ONLY'} "
+            f"| raw={raw} | safe={safe}"
         )
+
+    def _publish_command(self, velocity, *, active):
+        """Publish body-frame safe velocities with an explicit clock session."""
+        if self._command_publisher is None:
+            return
+        message = SafeVelocityCommand()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = self._command_frame
+        message.session_id = self._session_id
+        self._sequence += 1
+        message.sequence = self._sequence
+        message.joint_names = self._command_names
+        message.velocity = np.asarray(velocity, dtype=float).tolist()
+        message.active = active
+        self._command_publisher.publish(message)
+
+    def _stop(self, reason):
+        """Explicitly invalidate actuation and expose blocked-cycle diagnostics."""
+        self._publish_command(np.zeros(2 + len(self._command_names)), active=False)
+        self._publish_telemetry(reason=reason)
+
+    def _publish_telemetry(self, result=None, reason=''):
+        """Expose reference and sensed-state FK without duplicating computation."""
+        if self._telemetry_publisher is None:
+            return
+        message = ControlTelemetry()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.reason = reason
+        message.valid = result is not None
+        if result is not None:
+            message.header.frame_id = self._robot_state.frame_id
+            diagnostic = result.diagnostics
+            message.target_position.x, message.target_position.y, message.target_position.z = (
+                diagnostic.target_position.tolist())
+            for pose, transform in [(message.actual_pose, diagnostic.actual_pose),
+                                    (message.desired_pose, diagnostic.desired_pose)]:
+                pose.position.x, pose.position.y, pose.position.z = transform[:3, 3].tolist()
+                quaternion = Rotation.from_matrix(transform[:3, :3]).as_quat().tolist()
+                pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w = (
+                    quaternion)
+            message.raw_velocity = result.raw_output.command.tolist()
+            message.safe_velocity = result.safe_output.command.tolist()
+        self._telemetry_publisher.publish(message)
 
 
 def main(args=None) -> None:
     """Start the ROS 2 control node."""
-    rclpy.init(args=args)
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
+
+    def interrupt(_signal, _frame):
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, interrupt)
     node = None
 
     try:
         node = ControlNode()
         rclpy.spin(node)
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
 
     finally:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if node is not None:
+            if rclpy.ok():
+                node._timer.cancel()
+                node._stop('Shutdown')
+                rclpy.spin_once(node, timeout_sec=0.05)
             node.destroy_node()
 
         if rclpy.ok():

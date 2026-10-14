@@ -1,0 +1,20 @@
+environment:
+  acceleration_fields:
+  - type: linear_restoring
+    enabled: true
+    parameters:
+      center:
+      - 2.2
+      - 0.0
+      - 0.85
+      gain_matrix:
+      - - 0.5
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.5
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 0.5
+  stochastic_disturbances: []

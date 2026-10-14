@@ -64,7 +64,8 @@ explicit examples in control.yaml, not inferred from wheel geometry.
 - Shipped YAML disabled computation and lacked required base velocity bounds.
   It now enables computation, retains safety, and supplies explicit example
   bounds of ±0.5 m/s and ±1 rad/s. `publish_commands` stays false; requesting
-  true is rejected by the node.
+  true requires explicit joint identities and a body frame. The default remains
+  false. Production opt-in actuation is documented in [Closed-Loop Tracking v1](closed_loop_tracking_v1.md).
 - Estimation publishes successive sensor corrections at equal timestamps.
   Control now retains the latest same-time robot estimate, rejects older ones,
   and throttles rejection logs. Equal-time input still undergoes normal

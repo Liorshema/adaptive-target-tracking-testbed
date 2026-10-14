@@ -99,3 +99,10 @@ control_node:
 
     # Safety is mandatory for control computation.
     safety_enabled: true
+
+    # Simulator-independent opt-in transport (Bringup derives joint names).
+    command_topic: /control/safe_velocity
+    command_frame_id: base_link
+    command_joint_names: []
+    publish_telemetry: false
+    telemetry_topic: /control/telemetry

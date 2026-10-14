@@ -1,0 +1,12 @@
+# Evaluation uses measured wheel odometry and arm encoders, in odom frame.
+duration: 35.0
+settling_time: 10.0
+wall_timeout: 240.0
+max_feedback_skew: 0.08
+max_mean_position_error: 0.3
+max_rmse_position_error: 0.35
+min_relative_improvement: 0.25
+min_target_excursion: 0.3
+min_base_excursion: 0.1
+min_joint_smoke_response: 0.02
+max_stopped_base_speed: 0.01

@@ -6,6 +6,7 @@ It generates control commands but never executes or publishes them.
 """
 
 from typing import Optional
+from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
@@ -28,6 +29,15 @@ from robot_control.tracking.tracking_reference_builder import (
 )
 
 Array = NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class TrackingDiagnostics:
+    """Reference and measured-state FK used by a successful control cycle."""
+
+    target_position: Array
+    desired_pose: Array
+    actual_pose: Array
 
 
 class TrackingControlOrchestrator:
@@ -79,6 +89,7 @@ class TrackingControlOrchestrator:
         self._reference_builder = reference_builder
         self._lookahead_time = float(lookahead_time)
         self._tracking_frame_kinematics = tracking_frame_kinematics
+        self.last_diagnostics = None
 
         self._pipeline = ControlPipeline(
             model=model,
@@ -195,10 +206,14 @@ class TrackingControlOrchestrator:
         )
 
         # 4. Compute control with the same tracking-frame geometry.
-        return self._pipeline.compute(
+        output = self._pipeline.compute(
             control_input=control_input,
             transform_world_base=transform_world_base,
             joint_positions=joint_positions,
             desired_end_effector_transform_world=bundle.desired_pose,
             desired_end_effector_twist_world=bundle.desired_twist,
         )
+        self.last_diagnostics = TrackingDiagnostics(
+            target_position.copy(), bundle.desired_pose.copy(), current_pose.copy(),
+        )
+        return output

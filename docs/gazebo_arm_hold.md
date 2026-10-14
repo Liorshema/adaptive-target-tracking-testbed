@@ -138,3 +138,5 @@ second copy of its robot. It can override or disable the robot/holding through
 configuration while establishing the correct TF and sensor/actuator ownership.
 Replacing position holding with generalized-velocity execution still requires
 an explicit actuator interface; do not send velocity values to cmd_pos.
+Closed-Loop Tracking v1 now provides that bounded adapter and a production
+Bringup launch; see [the milestone report](closed_loop_tracking_v1.md).

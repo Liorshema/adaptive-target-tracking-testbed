@@ -115,6 +115,9 @@ def configure_robot_model(model, description, config, hold):
                 raise ValueError(f'{key} PID offset exceeds description effort limit')
             _plugin(model, 'JointPositionController', [
                 ('joint_name', names[key]), ('initial_position', position),
+                *([('topic', config['joint_position_topic_template'].format(
+                    model=name, joint=names[key]))]
+                  if 'joint_position_topic_template' in config else []),
                 *gains, ('i_min', integral_lower), ('i_max', integral_upper),
                 ('cmd_offset', offset), ('cmd_min', -effort), ('cmd_max', effort),
                 ('use_velocity_commands', 'false'),

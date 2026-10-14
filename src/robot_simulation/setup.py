@@ -105,6 +105,7 @@ setup(
             "config/terrain/*.yaml",
         ),
         *install_directory_tree("config/gazebo"),
+        *install_directory_tree("config/scenarios"),
     ],
 
     install_requires=[
@@ -136,6 +137,7 @@ setup(
         "console_scripts": [
             "simulation_node = "
             "robot_simulation.nodes.simulation_node:main",
+            "velocity_actuation = robot_simulation.actuation.velocity_actuation:main",
         ],
     },
 )

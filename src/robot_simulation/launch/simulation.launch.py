@@ -157,6 +157,21 @@ def configure(context):
                 f'{robot_cfg["differential_drive"]["odom_topic"]}'
                 '@nav_msgs/msg/Odometry[gz.msgs.Odometry'
             )
+        enabled = LaunchConfiguration('enable_actuation').perform(context).lower()
+        if enabled not in ['true', 'false']:
+            raise ValueError('enable_actuation must be true or false')
+        if enabled == 'true':
+            if not hold_cfg['enabled'] or not robot_cfg['differential_drive']['enabled']:
+                raise ValueError('Actuation requires position PIDs and DiffDrive')
+            bridge_arguments.append(
+                f'{robot_cfg["differential_drive"]["topic"]}'
+                '@geometry_msgs/msg/Twist]gz.msgs.Twist')
+            physical = load_yaml(description_share / description['config'])
+            for key in physical['robot']['manipulator']['joints']:
+                joint = robot_cfg['joint_name_template'].format(key=key)
+                topic = robot_cfg['joint_position_topic_template'].format(
+                    model=robot_cfg['entity_name'], joint=joint)
+                bridge_arguments.append(f'{topic}@std_msgs/msg/Float64]gz.msgs.Double')
     bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -234,6 +249,8 @@ def generate_launch_description():
                 'gui', default_value='',
                 description='Override configured Gazebo GUI: true or false',
             ),
+            DeclareLaunchArgument('enable_actuation', default_value='false',
+                                  description='Explicitly enable ROS-to-Gazebo commands'),
             OpaqueFunction(function=configure),
         ]
     )

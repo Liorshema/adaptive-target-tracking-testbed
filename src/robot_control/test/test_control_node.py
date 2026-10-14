@@ -6,6 +6,7 @@ provide only a local clock and logger; all control mathematics is real.
 
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 from geometry_msgs.msg import TransformStamped
 import numpy as np
@@ -88,7 +89,51 @@ def node():
     control._compute_enabled = True
     control._nominal_dt = 0.05
     control._pipeline = control._build_pipeline(4)
+    control._command_publisher = None
+    control._telemetry_publisher = None
+    control._session_id = str(uuid4())
+    control._sequence = 0
+    control._command_names = ['base_yaw_joint', 'shoulder_joint', 'elbow_joint', 'wrist_joint']
+    control._command_frame = 'base_link'
     return control
+
+
+def test_opt_in_publishes_safe_output_and_stale_input_stops(node):
+    """Publish the constrained result; invalidity immediately commands a stop."""
+    commands = []
+    node._command_publisher = SimpleNamespace(publish=commands.append)
+    node._robot_callback(robot_message(shoulder=1.56))
+    node._prediction_callback(prediction_message())
+    node._validate_inputs()
+    result = node._pipeline.compute(node._robot_state,
+                                    node._prediction_in_robot_frame(node._prediction, 'odom', 10.),
+                                    node.test_now, dt=.05)
+    assert commands[-1].active
+    assert np.allclose(commands[-1].velocity, result.safe_output.command)
+    node.test_now = 11.
+    node._validate_inputs()
+    assert not commands[-1].active
+    assert not any(commands[-1].velocity)
+
+
+def test_reset_changes_command_session_and_requires_new_feedback(node):
+    """A reset cannot republish a command from the previous clock epoch."""
+    commands = []
+    node._command_publisher = SimpleNamespace(publish=commands.append)
+    old_session = node._session_id
+    node._on_time_jump(None)
+    assert node._session_id != old_session
+    node._validate_inputs()
+    assert all(not command.active for command in commands)
+
+
+def test_default_compute_only_creates_no_commands(node):
+    """The default configuration keeps command transport disabled."""
+    assert not node.get_parameter('publish_commands').value
+    node._robot_callback(robot_message())
+    node._prediction_callback(prediction_message())
+    node._validate_inputs()
+    assert node._command_publisher is None
 
 
 def test_equal_time_estimate_retains_new_sensor_fusion(node):
