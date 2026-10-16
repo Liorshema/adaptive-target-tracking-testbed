@@ -24,6 +24,10 @@ rosbag2_*/
 .pytest_cache/
 *.bak
 
+# File-scoped rollback snapshots for architecture hardening (preserve locally).
+docs/validation/m06_1_before/
+docs/validation/m06_1_semantic_before/
+
 # Local migration snapshots
 docs/validation/m06_migration_before/
 

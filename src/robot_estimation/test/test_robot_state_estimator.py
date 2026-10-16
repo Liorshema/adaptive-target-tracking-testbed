@@ -1,7 +1,7 @@
 import numpy as np
 
-from robot_estimation.common.measurement import Measurement
-from robot_estimation.common.state import StateEstimate
+from robot_estimation.measurement import Measurement
+from robot_estimation.state import StateEstimate
 from robot_estimation.robot.models.measurement_model import (
     ImuYawRateMeasurementModel,
     JointEncoderMeasurementModel,

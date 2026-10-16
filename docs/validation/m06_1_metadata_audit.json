@@ -1,0 +1,124 @@
+{
+  "robot_bringup": {
+    "xml_version": "0.0.0",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "liorshema@gmail.com"
+      }
+    ],
+    "setup_metadata_matches": true,
+    "license_file_bytes": 11358
+  },
+  "robot_configuration": {
+    "xml_version": "0.1.0",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "liorshema@gmail.com"
+      }
+    ],
+    "setup_metadata_matches": true,
+    "license_file_bytes": 11358
+  },
+  "robot_control": {
+    "xml_version": "0.0.0",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "liorshema@gmail.com"
+      }
+    ],
+    "setup_metadata_matches": true,
+    "license_file_bytes": 11358
+  },
+  "robot_description": {
+    "xml_version": "0.0.0",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "user@todo.todo"
+      }
+    ],
+    "setup_metadata_matches": true,
+    "license_file_bytes": 11358
+  },
+  "robot_estimation": {
+    "xml_version": "0.1.0",
+    "licenses": [
+      "MIT"
+    ],
+    "maintainers": [
+      {
+        "name": "Lior",
+        "email": "lior@example.com"
+      }
+    ],
+    "setup_metadata_matches": true
+  },
+  "robot_interfaces": {
+    "xml_version": "0.0.1",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "maintainer",
+        "email": "user@example.com"
+      }
+    ]
+  },
+  "robot_models": {
+    "xml_version": "0.0.1",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "liorshema@gmail.com"
+      }
+    ],
+    "setup_metadata_matches": true,
+    "license_file_bytes": 11358
+  },
+  "robot_prediction": {
+    "xml_version": "0.1.0",
+    "licenses": [
+      "MIT"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "liorshema@gmail.com"
+      }
+    ],
+    "setup_metadata_matches": true,
+    "license_file_bytes": 0
+  },
+  "robot_simulation": {
+    "xml_version": "0.0.0",
+    "licenses": [
+      "Apache-2.0"
+    ],
+    "maintainers": [
+      {
+        "name": "user",
+        "email": "liorshema@gmail.com"
+      }
+    ],
+    "setup_metadata_matches": true
+  }
+}

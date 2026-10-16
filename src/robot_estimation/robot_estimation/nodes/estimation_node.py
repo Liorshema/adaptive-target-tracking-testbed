@@ -18,17 +18,10 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 
-from robot_estimation.common.measurement import Measurement
-from robot_estimation.common.state import StateEstimate
-from robot_estimation.common.timestamp_buffer import TimestampBuffer
-from robot_estimation.filters.kalman_filter import KalmanFilter
-from robot_estimation.robot.joint_bounds import JointBoundsConditioner
-from robot_estimation.robot.models.measurement_model import (
-    ImuYawRateMeasurementModel, JointEncoderMeasurementModel, WheelOdometryMeasurementModel)
-from robot_estimation.robot.models.process_model import RobotProcessModel
+from robot_estimation.measurement import Measurement
+from robot_estimation.timestamp_buffer import TimestampBuffer
+from robot_estimation.factory.estimator_factory import create_robot_estimator, create_target_estimator
 from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
-from robot_estimation.target.models.measurement_model import PositionMeasurementModel
-from robot_estimation.target.models.process_model import ConstantVelocityProcessModel
 from robot_estimation.target.target_state_estimator import TargetStateEstimator
 
 from robot_interfaces.msg import StateEstimate as StateEstimateMsg
@@ -179,66 +172,22 @@ class EstimationNode(Node):
                 raise ValueError(f'{name} must be finite and positive.')
 
     def _create_robot_estimator(self) -> RobotStateEstimator:
-        """
-        Construct the configured robot EKF.
-        """
-        joint_count = int(self.get_parameter('joint_count').value)
-        process_model = RobotProcessModel(joint_count=joint_count, linear_acceleration_noise_std=float(self.get_parameter('linear_acceleration_noise_std').value), angular_acceleration_noise_std=float(self.get_parameter('angular_acceleration_noise_std').value), joint_acceleration_noise_std=float(self.get_parameter('joint_acceleration_noise_std').value))
-        state_dimension = process_model.state_dimension
-        initial_mean = np.asarray(self.get_parameter('robot_initial_state').value, dtype=float)
-        covariance_diagonal = np.asarray(self.get_parameter('robot_initial_covariance_diagonal').value, dtype=float)
-        if initial_mean.shape != (state_dimension,):
-            raise ValueError(f'robot_initial_state has invalid dimension. Expected {state_dimension}, got {initial_mean.shape}.')
-        if covariance_diagonal.shape != (state_dimension,):
-            raise ValueError(f'robot_initial_covariance_diagonal has invalid dimension. Expected {state_dimension}, got {covariance_diagonal.shape}.')
-        if np.any(covariance_diagonal < 0.0):
-            raise ValueError('robot_initial_covariance_diagonal must contain non-negative values.')
-        initial_state = StateEstimate(mean=initial_mean, covariance=np.diag(covariance_diagonal), timestamp=None)
-        wheel_measurement_model = WheelOdometryMeasurementModel(joint_count=joint_count)
-        imu_measurement_model = ImuYawRateMeasurementModel(joint_count=joint_count)
-        joint_measurement_model = JointEncoderMeasurementModel(joint_count=joint_count)
-        self._joint_constraint = None
-        if self.get_parameter('joint_bounds_enabled').value:
-            path = self.get_parameter('robot_description_file').value
+        """Resolve the physical description and delegate pure filter assembly."""
+        parameters = {name: self.get_parameter(name).value for name in self._PARAMETERS}
+        physical = None
+        if parameters['joint_bounds_enabled']:
+            path = parameters['robot_description_file']
             if not path:
                 path = Path(get_package_share_directory(
-                    self.get_parameter('robot_description_package').value)) / (
-                        self.get_parameter('robot_description_config').value)
+                    parameters['robot_description_package'])) / parameters['robot_description_config']
             physical = yaml.safe_load(Path(path).read_text())['robot']['manipulator']['joints']
-            if len(physical) != joint_count:
-                raise ValueError('Description joint order/count must match estimator layout')
-            self._joint_constraint = JointBoundsConditioner(
-                np.arange(5, 5 + joint_count),
-                [joint['lower'] for joint in physical.values()],
-                [joint['upper'] for joint in physical.values()],
-                self.get_parameter('joint_bounds_numerical_tolerance').value,
-                self.get_parameter('max_joint_state_age').value)
-        return RobotStateEstimator(
-            initial_state=initial_state, process_model=process_model,
-            wheel_measurement_model=wheel_measurement_model,
-            imu_measurement_model=imu_measurement_model,
-            joint_measurement_model=joint_measurement_model,
-            state_constraint=self._joint_constraint)
+        estimator, self._joint_constraint = create_robot_estimator(parameters, physical)
+        return estimator
 
     def _create_target_estimator(self) -> TargetStateEstimator:
-        """
-        Construct the configured target Kalman filter.
-        """
-        spatial_dimension = int(self.get_parameter('target_spatial_dimension').value)
-        process_model = ConstantVelocityProcessModel(spatial_dimension=spatial_dimension, acceleration_noise_std=float(self.get_parameter('target_acceleration_noise_std').value))
-        measurement_model = PositionMeasurementModel(spatial_dimension=spatial_dimension)
-        initial_mean = np.asarray(self.get_parameter('target_initial_state').value, dtype=float)
-        covariance_diagonal = np.asarray(self.get_parameter('target_initial_covariance_diagonal').value, dtype=float)
-        expected_state_dimension = process_model.state_dimension
-        if initial_mean.shape != (expected_state_dimension,):
-            raise ValueError(f'target_initial_state has invalid dimension. Expected {expected_state_dimension}, got {initial_mean.shape}.')
-        if covariance_diagonal.shape != (expected_state_dimension,):
-            raise ValueError(f'target_initial_covariance_diagonal has invalid dimension. Expected {expected_state_dimension}, got {covariance_diagonal.shape}.')
-        if np.any(covariance_diagonal < 0.0):
-            raise ValueError('target_initial_covariance_diagonal must contain non-negative values.')
-        initial_state = StateEstimate(mean=initial_mean, covariance=np.diag(covariance_diagonal), timestamp=None)
-        filter_ = KalmanFilter(initial_state=initial_state, state_transition=process_model.state_transition_matrix, process_covariance=process_model.process_covariance, measurement_matrix=measurement_model.measurement_matrix())
-        return TargetStateEstimator(filter_=filter_)
+        """Delegate target-filter assembly without moving ROS resource policy."""
+        return create_target_estimator({
+            name: self.get_parameter(name).value for name in self._PARAMETERS})
 
     def _create_publishers(self) -> None:
         """

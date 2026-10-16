@@ -169,7 +169,7 @@ def test_jacobian_closed_loop_tracking():
     """Verify that DLS reduces tracking error on the real robot model."""
     from robot_models.interfaces.model_data import ModelData
 
-    from robot_control.baseline.jacobian_controller import JacobianController
+    from robot_control.controllers.jacobian_controller import JacobianController
     from robot_control.interfaces.control_data import (
         ControlInput,
         ControlMode,
@@ -294,7 +294,7 @@ def test_jacobian_closed_loop_with_safety():
     from robot_models.constraints.velocity_limits import VelocityLimits
     from robot_models.interfaces.model_data import ModelData
 
-    from robot_control.baseline.jacobian_controller import JacobianController
+    from robot_control.controllers.jacobian_controller import JacobianController
     from robot_control.interfaces.control_data import (
         ControlInput,
         ControlMode,

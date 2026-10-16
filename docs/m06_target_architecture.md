@@ -1,5 +1,9 @@
 # M06 — Target architecture and proposed migration (Phase 1)
 
+> Historical M06 state. For current canonical paths and ownership, read
+> [ARCHITECTURE.md](ARCHITECTURE.md) and the
+> [M06.1 verification report](m06_1_architecture_hardening.md).
+
 2026-10-15 design, approved and implemented 2026-10-16.
 See [structural consolidation results](m06_structural_consolidation.md) for actual
 verification and [the final tree](validation/m06_final_tree.txt). The proposed tree

@@ -12,7 +12,7 @@ from robot_models.base.differential_drive.kinematics import (
 )
 from robot_models.manipulator.serial_arm.model import SerialArmModel
 from robot_models.whole_body.composer import WholeBodyComposer
-from robot_models.whole_body.factory import build_configured_model
+from robot_models.factory.whole_body_factory import build_configured_model
 
 
 def _create_component(category, specification):

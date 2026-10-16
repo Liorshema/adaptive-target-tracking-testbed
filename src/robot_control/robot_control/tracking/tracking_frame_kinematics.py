@@ -10,7 +10,7 @@ This module is independent of ROS, Gazebo, and robot geometry.
 import numpy as np
 from numpy.typing import NDArray
 
-from robot_models.common.rotations import skew
+from robot_models.spatial.rotations import skew
 
 Array = NDArray[np.float64]
 

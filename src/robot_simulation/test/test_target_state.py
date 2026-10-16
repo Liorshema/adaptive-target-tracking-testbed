@@ -3,8 +3,8 @@
 
 import numpy as np
 
-from robot_models.types import TargetState
-from robot_simulation.state.target_state import (
+from robot_models.target.target_state import TargetState
+from robot_simulation.adapters.target_state import (
     state_to_vector,
     vector_to_state,
 )

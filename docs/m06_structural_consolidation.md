@@ -1,5 +1,9 @@
 # M06 — Structural consolidation
 
+> Historical M06 state. For current canonical paths and ownership, read
+> [ARCHITECTURE.md](ARCHITECTURE.md) and the
+> [M06.1 verification report](m06_1_architecture_hardening.md).
+
 2026-10-16. **M06 verdict: PASS for the structural migration.** M02–M05 remain
 CONDITIONAL; physical actuation safety and aggressive tracking are not upgraded.
 No M07/M08 work, algorithm tuning, commit or push was performed.

@@ -53,7 +53,7 @@ def description():
 
 def test_component_specs_normalize_axes_for_three_joints(description):
     """The shared adapter must derive axes from the authoritative mapping."""
-    configuration = import_module('robot_description.configuration')
+    configuration = import_module('robot_description.adapters.configuration')
 
     assert configuration.robot_component_configuration(description) == {
         'base': {
@@ -80,7 +80,7 @@ def test_component_specs_normalize_axes_for_three_joints(description):
 
 def test_joint_configuration_preserves_names_and_limit_order(description):
     """Consumers must receive limits in exactly the configured joint order."""
-    configuration = import_module('robot_description.configuration')
+    configuration = import_module('robot_description.adapters.configuration')
 
     assert configuration.robot_joint_configuration(description) == {
         'names': ['tip', 'yaw', 'middle'],
@@ -130,7 +130,7 @@ def test_file_loader_normalizes_explicit_path(description, tmp_path):
 def test_shared_helpers_reject_invalid_joint_axes(description, helper):
     """A zero joint axis must not reach downstream model construction."""
     description['robot']['manipulator']['joints']['tip']['axis'] = [0, 0, 0]
-    configuration = import_module('robot_description.configuration')
+    configuration = import_module('robot_description.adapters.configuration')
 
     with pytest.raises(ValueError, match='non-zero'):
         getattr(configuration, helper)(description)
@@ -177,7 +177,7 @@ class RejectRuntimeImports(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, RejectRuntimeImports())
 sys.path.insert(0, sys.argv[1])
-from robot_description.configuration import robot_component_configuration
+from robot_description.adapters.configuration import robot_component_configuration
 """
     result = subprocess.run(
         [sys.executable, '-I', '-c', script, str(package_root)],

@@ -10,7 +10,7 @@ import sys
 
 import numpy as np
 from robot_simulation.nodes.simulation_node import SimulationNode
-from robot_simulation.state.target_state import state_to_vector
+from robot_simulation.adapters.target_state import state_to_vector
 
 states, references = [], []
 publish = SimulationNode._publish_ground_truth

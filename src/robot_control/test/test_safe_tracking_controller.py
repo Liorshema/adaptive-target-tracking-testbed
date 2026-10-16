@@ -11,7 +11,7 @@ from robot_models.interfaces.manipulator_model import ManipulatorModel
 from robot_models.reference.geometry.sphere_reference import SphereReference
 from robot_models.whole_body.composer import WholeBodyComposer
 
-from robot_control.baseline.jacobian_controller import JacobianController
+from robot_control.controllers.jacobian_controller import JacobianController
 from robot_control.interfaces.control_data import (
     ControlMode,
     PredictedTargetTrajectory,

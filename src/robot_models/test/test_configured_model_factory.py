@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from robot_models.base.differential_drive.kinematics import DifferentialDriveKinematics
-from robot_models.common.rotations import rotation_z, rpy_to_rotation
-from robot_models.common.transforms import make_transform
+from robot_models.spatial.rotations import rotation_z, rpy_to_rotation
+from robot_models.spatial.transforms import make_transform
 from robot_models.manipulator.serial_arm.model import SerialArmModel
 from robot_models.whole_body.jacobian import WholeBodyJacobian
 from robot_models.whole_body.kinematics import WholeBodyKinematics
@@ -36,7 +36,7 @@ def component_factory(category, specification):
 
 def build(config, create=component_factory):
     """Resolve the new generic factory only when a test exercises it."""
-    from robot_models.whole_body.factory import build_configured_model
+    from robot_models.factory.whole_body_factory import build_configured_model
     return build_configured_model(config, create)
 
 

@@ -3,11 +3,11 @@
 
 import numpy as np
 
-from robot_prediction.confidence.performance_monitor import (
+from robot_prediction.evaluation.performance_monitor import (
     PerformanceMonitor,
     PerformanceSnapshot,
 )
-from robot_prediction.confidence.temporal_alignment import (
+from robot_prediction.temporal_alignment import (
     interpolate_predicted_state,
 )
 from robot_prediction.fusion.weighted_correction import (

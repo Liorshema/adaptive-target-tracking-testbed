@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from robot_models.interfaces.model_data import ModelData
 
-from robot_control.baseline.jacobian_controller import JacobianController
+from robot_control.controllers.jacobian_controller import JacobianController
 from robot_control.interfaces.control_data import (
     ControlInput,
     ControlMode,

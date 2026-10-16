@@ -7,11 +7,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-from robot_models.types import TargetState
+from robot_models.target.target_state import TargetState
 from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.factory.simulation_factory import SimulationFactory
 from robot_simulation.state.simulation_state import SimulationState
-from robot_simulation.state.target_state import state_to_vector
+from robot_simulation.adapters.target_state import state_to_vector
 
 ROOT = Path(__file__).resolve().parents[2]
 

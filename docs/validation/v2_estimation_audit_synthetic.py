@@ -1,8 +1,8 @@
 """Quantify cadence sensitivity without changing production parameters."""
 import json
 import numpy as np
-from robot_estimation.common.state import StateEstimate
-from robot_estimation.common.measurement import Measurement
+from robot_estimation.state import StateEstimate
+from robot_estimation.measurement import Measurement
 from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
 from robot_estimation.robot.models.process_model import RobotProcessModel
 from robot_estimation.robot.models.measurement_model import WheelOdometryMeasurementModel,ImuYawRateMeasurementModel,JointEncoderMeasurementModel

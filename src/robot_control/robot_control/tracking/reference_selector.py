@@ -1,3 +1,4 @@
+from robot_control.interfaces.geometry_parameter_policy import GeometryParameterPolicy
 
 """Geometry-independent tracking reference selection.
 
@@ -7,11 +8,10 @@ Robot models convert those parameters into desired positions.
 This module has no ROS or Gazebo dependencies.
 """
 
-from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
-from robot_models.reference.geometry.reference_geometry import (
+from robot_models.interfaces.reference_geometry import (
     ReferenceGeometry,
 )
 
@@ -31,18 +31,6 @@ def _validate_position(value: Array, name: str) -> Array:
         raise ValueError(f"{name} contains nonfinite values")
 
     return result.copy()
-
-
-class GeometryParameterPolicy(Protocol):
-    """Interface for selecting tracking geometry parameters."""
-
-    def select_parameters(
-        self,
-        current_position: Array,
-        target_position: Array,
-    ) -> Array:
-        """Return parameters accepted by a ReferenceGeometry."""
-        ...
 
 
 class FixedGeometryParameters:

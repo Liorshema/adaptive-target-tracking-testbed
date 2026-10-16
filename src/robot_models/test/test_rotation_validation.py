@@ -4,7 +4,7 @@ import numpy as np
 
 import pytest
 
-from robot_models.common.rotations import is_rotation_matrix
+from robot_models.spatial.rotations import is_rotation_matrix
 
 from scipy.spatial.transform import Rotation
 

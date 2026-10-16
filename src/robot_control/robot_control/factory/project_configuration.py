@@ -7,8 +7,8 @@ from copy import deepcopy
 
 import numpy as np
 
-from robot_models.common.rotations import rpy_to_rotation
-from robot_models.common.transforms import make_transform
+from robot_models.spatial.rotations import rpy_to_rotation
+from robot_models.spatial.transforms import make_transform
 
 from robot_control.factory.project_components import (
     robot_configuration_from_description,

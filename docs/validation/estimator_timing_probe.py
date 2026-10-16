@@ -8,6 +8,8 @@ import runpy
 import sys
 import time
 
+from archived_estimation_imports import canonicalize_imports
+
 if os.environ.get('M03_BASELINE_ESTIMATION'):
     import robot_estimation.robot.models.process_model as process_module
     import robot_estimation.robot.robot_state_estimator as estimator_module
@@ -17,7 +19,7 @@ if os.environ.get('M03_BASELINE_ESTIMATION'):
                              (estimator_module, 'robot_state_estimator.py'),
                              (node_module, 'estimation_node.py')]:
         source = baseline / filename
-        exec(compile(source.read_text(), str(source), 'exec'), module.__dict__)
+        exec(compile(canonicalize_imports(source.read_text()), str(source), 'exec'), module.__dict__)
 
 from robot_estimation.nodes.estimation_node import EstimationNode
 

@@ -5,8 +5,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from robot_configuration.yaml_loader import load_yaml
-from robot_simulation.geometry.model_exporter import ModelExporter
-from robot_simulation.geometry.sdf_generator import SDFGenerator
+from robot_simulation.gazebo.model_exporter import ModelExporter
+from robot_simulation.gazebo.sdf_generator import SDFGenerator
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"

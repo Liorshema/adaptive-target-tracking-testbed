@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-from robot_models.common.transforms import make_transform
+from robot_models.spatial.transforms import make_transform
 
 from robot_control.interfaces.control_data import RobotState
 

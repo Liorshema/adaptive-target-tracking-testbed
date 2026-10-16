@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from robot_models.common.transforms import (
+from robot_models.spatial.transforms import (
     invert_transform,
 )
 

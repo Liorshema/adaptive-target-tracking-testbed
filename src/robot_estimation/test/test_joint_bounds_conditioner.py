@@ -4,7 +4,7 @@ import numpy as np
 
 import pytest
 
-from robot_estimation.common.state import StateEstimate
+from robot_estimation.state import StateEstimate
 from robot_estimation.robot.joint_bounds import JointBoundsConditioner
 
 
@@ -68,7 +68,7 @@ def test_deterministic_infeasible_prior_does_not_silently_gain_certainty():
 
 def test_real_filter_contact_and_release_remains_psd_and_responsive():
     """A constrained filter must release when encoders report real inward motion."""
-    from robot_estimation.common.measurement import Measurement
+    from robot_estimation.measurement import Measurement
     from robot_estimation.robot.models.measurement_model import (
         ImuYawRateMeasurementModel, JointEncoderMeasurementModel, WheelOdometryMeasurementModel)
     from robot_estimation.robot.models.process_model import RobotProcessModel

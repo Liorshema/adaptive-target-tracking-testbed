@@ -1,6 +1,6 @@
 import numpy as np
 
-from robot_prediction.residuals.residual_statistics import (
+from robot_prediction.evaluation.residual_statistics import (
     ResidualStatistics,
 )
 

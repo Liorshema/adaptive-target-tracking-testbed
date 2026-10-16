@@ -3,9 +3,9 @@ from typing import Callable, Optional
 import numpy as np
 from numpy.typing import NDArray
 
-from robot_estimation.common.measurement import Measurement
-from robot_estimation.common.state import StateEstimate
-from robot_estimation.filters.filter_interface import FilterInterface
+from robot_estimation.measurement import Measurement
+from robot_estimation.state import StateEstimate
+from robot_estimation.interfaces.filter_interface import FilterInterface
 
 
 Vector = NDArray[np.float64]

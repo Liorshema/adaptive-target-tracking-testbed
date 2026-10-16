@@ -13,7 +13,7 @@ from robot_models.reference.geometry.sphere_reference import SphereReference
 from robot_control.adapters.planar_kinematics_adapter import (
     PlanarKinematicsAdapter,
 )
-from robot_control.baseline.jacobian_controller import JacobianController
+from robot_control.controllers.jacobian_controller import JacobianController
 from robot_control.factory.component_registry import ComponentRegistry
 from robot_control.factory.control_factory import ControlFactory
 from robot_control.interfaces.control_data import (

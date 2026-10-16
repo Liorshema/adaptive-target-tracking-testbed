@@ -16,12 +16,12 @@ from robot_models.reference.geometry.sphere_reference import (
     SphereReference,
 )
 
-from robot_control.optimization.weighted_least_squares import WeightedLeastSquaresController
+from robot_control.controllers.weighted_least_squares import WeightedLeastSquaresController
 from robot_control.tracking.velocity_task import CartesianVelocityTask, DistancePointingTask
 from robot_control.adapters.planar_kinematics_adapter import (
     PlanarKinematicsAdapter,
 )
-from robot_control.baseline.jacobian_controller import (
+from robot_control.controllers.jacobian_controller import (
     JacobianController,
 )
 from robot_control.factory.component_registry import ComponentRegistry
@@ -85,5 +85,5 @@ def robot_configuration_from_description(
         Joint ordering follows the configured description order.
         The runtime estimator must use the same order.
     """
-    from robot_description.configuration import robot_component_configuration
+    from robot_description.adapters.configuration import robot_component_configuration
     return robot_component_configuration(description)

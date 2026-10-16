@@ -1,8 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from robot_estimation.common.measurement import Measurement
-from robot_estimation.robot.sensors.sensor_interface import SensorInterface
+from robot_estimation.measurement import Measurement
+from robot_estimation.interfaces.sensor_interface import SensorInterface
 
 
 Vector = NDArray[np.float64]

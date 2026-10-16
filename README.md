@@ -6,13 +6,16 @@ The platform follows a complete closed-loop pipeline:
 
 **Measurement → Estimation → Prediction → Reference → Control → Robot Motion**
 
-It is designed so that robot models, estimators, predictors, adaptation methods, controllers, target dynamics, and experiment configurations can be replaced independently without changing the overall architecture.
+Pure numerical components are separated from ROS deployment. Supported components
+can be extended through their domain interfaces; full YAML selection and additional
+robot families are not yet implemented.
 
 ## Main Components
 
 - `robot_description` — robot geometry and physical configuration
 - `robot_models` — reusable robot, camera, and whole-body models
 - `robot_configuration` — shared YAML mapping and inheritance loading
+- `robot_interfaces` — ROS state, trajectory, command and telemetry messages
 - `robot_estimation` — robot and target state estimation
 - `robot_prediction` — target-motion prediction and online adaptation
 - `robot_control` — tracking and robot command generation
@@ -29,10 +32,13 @@ matching model, state and actuator implementations.
 
 ROS adapters live in each Python package's `nodes/` directory. Assembly lives in
 `factory/`; mathematical domain directories retain their own structure. Existing
-ROS executable names are unchanged, and former Python paths remain temporary
-compatibility aliases. See [the M06 architecture audit](docs/m06_architecture_audit.md),
-[target design](docs/m06_target_architecture.md) and
-[migration results](docs/m06_structural_consolidation.md).
+ROS executable names are unchanged. Obsolete M06 Python aliases have been removed;
+use the canonical paths documented in [the current architecture guide](docs/ARCHITECTURE.md).
+`python3 tools/show_architecture.py` renders the real tree in canonical semantic order.
+Generic `common/` and `types.py` dumping grounds have been removed; controllers,
+prediction evaluation and Gazebo SDF construction have explicit homes.
+The [M06.1 hardening report](docs/m06_1_architecture_hardening.md) records verification
+and intentional internal API removals. Earlier M06 documents describe historical states.
 
 ## Key Features
 
@@ -44,8 +50,13 @@ reproduction commands are documented in [docs/control_compute_only.md](docs/cont
 - Classical and adaptive prediction methods
 - Online learning and residual correction
 - Replaceable estimation and control algorithms
-- Reproducible experiment configurations
-- Designed for easy extension to new robots and tracking problems
+- Inherited scenario configurations with recorded validation evidence
+- Explicit model, prediction, task and safety contracts
+
+`docs/validation/` holds reproducible validation utilities and selected historical
+evidence. New raw run outputs belong in gitignored `results/`; existing local evidence
+is preserved. Physical joint overspeed, skid localization and aggressive tracking
+remain research limitations, not hardware-safety guarantees.
 
 ## Technology
 

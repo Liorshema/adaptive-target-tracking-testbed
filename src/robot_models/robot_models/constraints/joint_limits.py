@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from robot_models.types import ConstraintSet
+from robot_models.constraints.constraint_set import ConstraintSet
 
 
 class JointLimits:

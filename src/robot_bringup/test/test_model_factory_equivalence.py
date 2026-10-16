@@ -7,8 +7,8 @@ import numpy as np
 from robot_bringup.factory.model_factory import create_robot_model
 from robot_description.model_parameters import load_robot_model_parameters
 from robot_models.base.differential_drive.kinematics import DifferentialDriveKinematics
-from robot_models.common.rotations import rotation_z
-from robot_models.common.transforms import make_transform
+from robot_models.spatial.rotations import rotation_z
+from robot_models.spatial.transforms import make_transform
 from robot_models.manipulator.fixed_mount.model import FixedMountModel
 from robot_models.manipulator.serial_arm.model import SerialArmModel
 from robot_models.whole_body.composer import WholeBodyComposer

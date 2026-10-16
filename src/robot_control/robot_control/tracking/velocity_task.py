@@ -1,30 +1,12 @@
 """Interchangeable task linearizations for whole-body velocity optimization."""
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from robot_control.interfaces.velocity_task import TaskLinearization, VelocityTask
+
 
 import numpy as np
 from robot_models.task_space.distance_pointing import DistancePointingGeometry
 
 from robot_control.tracking.task_space_error import TaskSpaceError
-
-
-@dataclass(frozen=True)
-class TaskLinearization:
-    """Error, robot-velocity derivative and target-only error derivative."""
-
-    error: np.ndarray
-    jacobian: np.ndarray
-    target_rate: np.ndarray
-    alternative_errors: tuple = ()
-
-
-class VelocityTask(ABC):
-    """Define a task without actuator, ROS or simulator assumptions."""
-
-    @abstractmethod
-    def evaluate(self, control_input, model_data):
-        """Return a task linearization at the measured robot and selected target."""
 
 
 class CartesianVelocityTask(VelocityTask):

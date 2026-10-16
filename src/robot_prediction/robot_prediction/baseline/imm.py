@@ -9,7 +9,7 @@ from robot_prediction.baseline.constant_velocity import (
 from robot_prediction.baseline.coordinated_turn import (
     CoordinatedTurnPredictor,
 )
-from robot_prediction.confidence.temporal_alignment import (
+from robot_prediction.temporal_alignment import (
     interpolate_predicted_state,
 )
 from robot_prediction.interfaces.prediction_data import (
@@ -18,7 +18,7 @@ from robot_prediction.interfaces.prediction_data import (
 )
 from robot_prediction.interfaces.predictor import Predictor
 from robot_prediction.interfaces.state_layout import StateLayout
-from robot_prediction.residuals.prediction_residual import (
+from robot_prediction.evaluation.prediction_residual import (
     compute_residual,
 )
 

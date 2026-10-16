@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from robot_estimation.common.state import StateEstimate
+from robot_estimation.state import StateEstimate
 
 from scipy.stats import truncnorm
 

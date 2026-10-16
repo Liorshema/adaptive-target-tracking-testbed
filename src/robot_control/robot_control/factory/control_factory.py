@@ -13,7 +13,7 @@ import numpy as np
 from robot_models.constraints.acceleration_limits import AccelerationLimits
 from robot_models.constraints.joint_limits import JointLimits
 from robot_models.constraints.velocity_limits import VelocityLimits
-from robot_models.whole_body.factory import build_configured_model
+from robot_models.factory.whole_body_factory import build_configured_model
 
 from robot_control.adapters.planar_kinematics_adapter import (
     PlanarKinematicsAdapter,

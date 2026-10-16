@@ -1,5 +1,9 @@
 # M06 — Architecture audit (Phase 1)
 
+> Historical M06 state. For current canonical paths and ownership, read
+> [ARCHITECTURE.md](ARCHITECTURE.md) and the
+> [M06.1 verification report](m06_1_architecture_hardening.md).
+
 2026-10-15. Audit/design only. No source migration, algorithm change, deletion,
 simulation run, commit or push. Companion design:
 [`m06_target_architecture.md`](m06_target_architecture.md).

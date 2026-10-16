@@ -15,7 +15,7 @@ from robot_control.safety.safe_control_pipeline import SafeControlPipeline
 
 def controller(weights, safety=None, **overrides):
     """Configure a synthetic robot independently of the physical four-joint arm."""
-    module = 'robot_control.optimization.weighted_least_squares'
+    module = 'robot_control.controllers.weighted_least_squares'
     assert importlib.util.find_spec(module), 'Weighted constrained controller is missing'
     task_module = importlib.import_module('robot_control.tracking.velocity_task')
     task = task_module.CartesianVelocityTask(selection_matrix=np.eye(6)[:1])

@@ -9,7 +9,7 @@ selects an achievable tangent direction rather than returning zero.
 
 import numpy as np
 
-from robot_models.common.rotations import skew
+from robot_models.spatial.rotations import skew
 
 
 class DistancePointingGeometry:

@@ -1,0 +1,203 @@
+{
+  "raw_output": "results/m06_1_semantic_smoke (local, ignored)",
+  "observer_exit_code": 1,
+  "verdict": "CONDITIONAL: active integration verified; physical speed acceptance fails",
+  "evaluation_time_sim_seconds": [
+    5.252,
+    17.252
+  ],
+  "metrics": {
+    "case": "reactive",
+    "target_initialization_time": 1.252,
+    "samples": 239,
+    "pose_source": "Gazebo physical base pose + measured joints",
+    "mean_distance_error": 0.09036666634680508,
+    "max_distance_error": 0.2605881108778998,
+    "mean_pointing_degrees": 7.983828632044846,
+    "max_pointing_degrees": 18.575383644951227,
+    "base_excursion": 0.6798972328281987,
+    "base_yaw_excursion": 0.16661033329850122,
+    "joint_excursions": [
+      0.21484659048175764,
+      0.17286971238484689,
+      0.12359249165209732,
+      0.4107766403844149
+    ],
+    "joint_velocity_peaks": [
+      0.220112190722165,
+      0.5337494632848968,
+      1.7546279934646711,
+      1.5141694077188035
+    ],
+    "weighted_motion_integral": 3.9058967293038247,
+    "mean_command_variation": 0.27693112204064785,
+    "mean_rtf": 0.8415222491652486,
+    "mean_compute_ms": 17.823257292863925,
+    "p95_compute_ms": 37.250569100251596,
+    "saturation_cycles": 3,
+    "watchdog_timeouts_after_settling": 0,
+    "counters": {
+      "accepted_commands": 318,
+      "rejected_commands": 0,
+      "timeout_events": 0,
+      "reference_limit_events": 6,
+      "inactive_commands": 25,
+      "feedback_rejections": 0
+    },
+    "actuation_active_fraction": 1.0,
+    "thresholds": {
+      "duration": 16.0,
+      "settling_time": 4.0,
+      "wall_timeout": 120.0,
+      "max_feedback_skew": 0.08,
+      "max_mean_distance_error": 0.2,
+      "max_distance_error": 0.45,
+      "max_mean_pointing_degrees": 10.0,
+      "max_pointing_degrees": 25.0,
+      "min_base_excursion": 0.1,
+      "min_arm_motion": 0.1,
+      "max_watchdog_timeouts_after_settling": 0,
+      "min_mean_rtf": 0.5,
+      "physical_numerical_tolerance": 0.001
+    },
+    "target_excursion": 0.7399145474823361,
+    "minimum_joint_limit_margin": 0.4852023976607797,
+    "checks": {
+      "physical_limits": true,
+      "watchdog": true,
+      "measured_joint_velocity_limits": false,
+      "safe_velocity_limits": true,
+      "shoulder_all_feedback": true,
+      "first_link_horizontal": true,
+      "first_link_base_clearance": true,
+      "live_tracking_tf": true
+    },
+    "observed_topic_rates_sim_hz": {
+      "joint": 489.125,
+      "odom": 53.875,
+      "base_command": 55.4375,
+      "physical": 21.5,
+      "control_telemetry": 21.5,
+      "robot_estimate": 47.8125,
+      "actuation": 10.75,
+      "target": 81.25,
+      "target_estimate": 17.3125,
+      "prediction": 17.3125
+    },
+    "telemetry_sampled_joint_velocity_peaks": [
+      0.21124883364826746,
+      0.47977107970627286,
+      0.3643573826270174,
+      1.5000000042170658
+    ],
+    "joint_speed_source": "all received joint-state measurements after settling"
+  },
+  "experiment": {
+    "physical_samples": 1121,
+    "joint_samples": 7826,
+    "minimum_shoulder": 0.0006396314507949644,
+    "maximum_shoulder": 0.6583070683580068,
+    "minimum_link_elevation": 0.01118466299247906,
+    "minimum_world_link_elevation": 0.01118466299247906,
+    "minimum_first_link_box_base_clearance": 0.0400025109054509,
+    "mean_target_speed": 0.2900803065241769,
+    "max_target_speed": 0.46492410804486395,
+    "target_path_length": 3.4540108500732813,
+    "target_max_displacement_from_initial": 0.6605283433058835,
+    "target_net_displacement": 0.4187066750079631,
+    "xyz_ranges": [
+      0.408133011911177,
+      0.6820485024293343,
+      0.2046023762350725
+    ],
+    "min_z": 0.8457055275023283,
+    "max_z": 1.0503079037374008,
+    "physical_tracking_samples": 784,
+    "mean_physical_distance_error": 0.0905023784908678,
+    "max_physical_distance_error": 0.2621191181547764,
+    "mean_physical_pointing_degrees": 8.160901431500085,
+    "max_physical_pointing_degrees": 18.59300257350313,
+    "tracking_tf_samples": 320,
+    "tracking_tf_excursion": 0.7236968486955796,
+    "joint_tolerance": 0.001,
+    "max_center_distance": 0.49641664341062997,
+    "raw_joint_speed_peaks": [
+      0.220112190722165,
+      0.5337494632848968,
+      1.7546279934646711,
+      1.5141694077188035
+    ]
+  },
+  "stream_counts": {
+    "joints": 7826,
+    "targets": 1300,
+    "tracking_tf": 320,
+    "commands": 344,
+    "control": 344,
+    "robot_estimates": 765,
+    "wheel_joints": 7826,
+    "estimation_diagnostics": 86,
+    "position_commands": 3548,
+    "odometry": 862,
+    "physical_base": 344,
+    "actuation": 172
+  },
+  "max_joint_position_violation_all_received_rad": 0.0,
+  "joint_names": [
+    "base_yaw",
+    "shoulder",
+    "elbow",
+    "wrist"
+  ],
+  "configured_joint_speed_limits_rad_s": [
+    1.0,
+    1.0,
+    1.0,
+    1.5
+  ],
+  "recovery_events": 0,
+  "position_guard_modes": [
+    "normal"
+  ],
+  "steady_invalid_control_reasons": {},
+  "estimator_final_diagnostics": {
+    "filter_time": 18.902,
+    "timing": {
+      "pending": 17,
+      "committed": 18.902,
+      "resets": 0,
+      "sources": {
+        "joints": {
+          "received": 7833,
+          "arrival_age_sum_s": 70.70600000000474,
+          "arrival_age_max_s": 0.020000000000003126,
+          "queued": 7833,
+          "accepted": 7817,
+          "buffer_delay_sum_s": 197.4480000000051,
+          "buffer_delay_max_s": 0.049999999999998934,
+          "processing_age_max_s": 0.05200000000000138,
+          "delayed": 2719
+        },
+        "wheel": {
+          "received": 946,
+          "arrival_age_sum_s": 3.098000000000575,
+          "arrival_age_max_s": 0.02400000000000091,
+          "queued": 946,
+          "accepted": 945,
+          "buffer_delay_sum_s": 26.465999999999983,
+          "buffer_delay_max_s": 0.045999999999999375,
+          "processing_age_max_s": 0.04800000000000182
+        }
+      }
+    },
+    "fusion_errors": 0,
+    "conditionings": 0,
+    "physical_violation_samples": 0
+  },
+  "notes": [
+    "Tracking uses Gazebo physical base plus measured joints, authoritative FK, target truth and configured optical axis.",
+    "Reported topic rates divide whole observer counts including startup by requested duration; trace cleanup windows differ.",
+    "Earlier phase-one results remain untouched; this is the final verification after semantic module moves.",
+    "No physics, PID, numerical algorithm, physical limit or safety tolerance changed."
+  ]
+}

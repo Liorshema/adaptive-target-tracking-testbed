@@ -5,8 +5,8 @@ import numpy as np
 from robot_models.base.differential_drive.kinematics import (
     DifferentialDriveKinematics,
 )
-from robot_models.common.rotations import rotation_z
-from robot_models.common.transforms import make_transform
+from robot_models.spatial.rotations import rotation_z
+from robot_models.spatial.transforms import make_transform
 from robot_models.interfaces.model_data import ModelData
 from robot_models.manipulator.serial_arm.model import (
     SerialArmModel,

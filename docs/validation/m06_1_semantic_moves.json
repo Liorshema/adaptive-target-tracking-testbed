@@ -1,0 +1,158 @@
+{
+  "module_moves": [
+    {
+      "old": "src/robot_models/robot_models/common/rotations.py",
+      "new": "src/robot_models/robot_models/spatial/rotations.py"
+    },
+    {
+      "old": "src/robot_models/robot_models/common/transforms.py",
+      "new": "src/robot_models/robot_models/spatial/transforms.py"
+    },
+    {
+      "old": "src/robot_models/robot_models/whole_body/factory.py",
+      "new": "src/robot_models/robot_models/factory/whole_body_factory.py"
+    },
+    {
+      "old": "src/robot_models/robot_models/reference/geometry/reference_geometry.py",
+      "new": "src/robot_models/robot_models/interfaces/reference_geometry.py"
+    },
+    {
+      "old": "src/robot_estimation/robot_estimation/common/estimator_interface.py",
+      "new": "src/robot_estimation/robot_estimation/interfaces/estimator_interface.py"
+    },
+    {
+      "old": "src/robot_estimation/robot_estimation/common/measurement.py",
+      "new": "src/robot_estimation/robot_estimation/measurement.py"
+    },
+    {
+      "old": "src/robot_estimation/robot_estimation/common/state.py",
+      "new": "src/robot_estimation/robot_estimation/state.py"
+    },
+    {
+      "old": "src/robot_estimation/robot_estimation/common/timestamp_buffer.py",
+      "new": "src/robot_estimation/robot_estimation/timestamp_buffer.py"
+    },
+    {
+      "old": "src/robot_estimation/robot_estimation/filters/filter_interface.py",
+      "new": "src/robot_estimation/robot_estimation/interfaces/filter_interface.py"
+    },
+    {
+      "old": "src/robot_estimation/robot_estimation/robot/sensors/sensor_interface.py",
+      "new": "src/robot_estimation/robot_estimation/interfaces/sensor_interface.py"
+    },
+    {
+      "old": "src/robot_control/robot_control/baseline/jacobian_controller.py",
+      "new": "src/robot_control/robot_control/controllers/jacobian_controller.py"
+    },
+    {
+      "old": "src/robot_control/robot_control/optimization/weighted_least_squares.py",
+      "new": "src/robot_control/robot_control/controllers/weighted_least_squares.py"
+    },
+    {
+      "old": "src/robot_prediction/robot_prediction/confidence/performance_monitor.py",
+      "new": "src/robot_prediction/robot_prediction/evaluation/performance_monitor.py"
+    },
+    {
+      "old": "src/robot_prediction/robot_prediction/confidence/prediction_confidence.py",
+      "new": "src/robot_prediction/robot_prediction/evaluation/prediction_confidence.py"
+    },
+    {
+      "old": "src/robot_prediction/robot_prediction/confidence/temporal_alignment.py",
+      "new": "src/robot_prediction/robot_prediction/temporal_alignment.py"
+    },
+    {
+      "old": "src/robot_prediction/robot_prediction/residuals/prediction_residual.py",
+      "new": "src/robot_prediction/robot_prediction/evaluation/prediction_residual.py"
+    },
+    {
+      "old": "src/robot_prediction/robot_prediction/residuals/residual_statistics.py",
+      "new": "src/robot_prediction/robot_prediction/evaluation/residual_statistics.py"
+    },
+    {
+      "old": "src/robot_simulation/robot_simulation/geometry/model_exporter.py",
+      "new": "src/robot_simulation/robot_simulation/gazebo/model_exporter.py"
+    },
+    {
+      "old": "src/robot_simulation/robot_simulation/geometry/sdf_generator.py",
+      "new": "src/robot_simulation/robot_simulation/gazebo/sdf_generator.py"
+    },
+    {
+      "old": "src/robot_simulation/robot_simulation/state/target_state.py",
+      "new": "src/robot_simulation/robot_simulation/adapters/target_state.py"
+    },
+    {
+      "old": "src/robot_description/robot_description/configuration.py",
+      "new": "src/robot_description/robot_description/adapters/configuration.py"
+    },
+    {
+      "classes": [
+        "TaskLinearization",
+        "VelocityTask"
+      ],
+      "old": "src/robot_control/robot_control/tracking/velocity_task.py",
+      "new": "src/robot_control/robot_control/interfaces/velocity_task.py"
+    },
+    {
+      "classes": [
+        "GeometryParameterPolicy"
+      ],
+      "old": "src/robot_control/robot_control/tracking/reference_selector.py",
+      "new": "src/robot_control/robot_control/interfaces/geometry_parameter_policy.py"
+    },
+    {
+      "classes": [
+        "RobotMeasurementModel"
+      ],
+      "old": "src/robot_estimation/robot_estimation/robot/models/measurement_model.py",
+      "new": "src/robot_estimation/robot_estimation/interfaces/robot_measurement_model.py"
+    }
+  ],
+  "domain_record_destinations": {
+    "robot_models.spatial.spatial_data": [
+      "Pose",
+      "Twist"
+    ],
+    "robot_models.whole_body.robot_state": [
+      "RobotState"
+    ],
+    "robot_models.target.target_state": [
+      "TargetState"
+    ],
+    "robot_models.constraints.constraint_set": [
+      "ConstraintSet"
+    ]
+  },
+  "removed_source_namespaces": [
+    "robot_models/robot_models/common",
+    "robot_estimation/robot_estimation/common",
+    "robot_control/robot_control/baseline",
+    "robot_control/robot_control/optimization",
+    "robot_prediction/robot_prediction/confidence",
+    "robot_prediction/robot_prediction/residuals",
+    "robot_simulation/robot_simulation/geometry",
+    "robot_models/robot_models/types.py"
+  ],
+  "module_import_replacements": {
+    "robot_models.common.rotations": "robot_models.spatial.rotations",
+    "robot_models.common.transforms": "robot_models.spatial.transforms",
+    "robot_models.whole_body.factory": "robot_models.factory.whole_body_factory",
+    "robot_models.reference.geometry.reference_geometry": "robot_models.interfaces.reference_geometry",
+    "robot_estimation.common.estimator_interface": "robot_estimation.interfaces.estimator_interface",
+    "robot_estimation.common.measurement": "robot_estimation.measurement",
+    "robot_estimation.common.state": "robot_estimation.state",
+    "robot_estimation.common.timestamp_buffer": "robot_estimation.timestamp_buffer",
+    "robot_estimation.filters.filter_interface": "robot_estimation.interfaces.filter_interface",
+    "robot_estimation.robot.sensors.sensor_interface": "robot_estimation.interfaces.sensor_interface",
+    "robot_control.baseline.jacobian_controller": "robot_control.controllers.jacobian_controller",
+    "robot_control.optimization.weighted_least_squares": "robot_control.controllers.weighted_least_squares",
+    "robot_prediction.confidence.performance_monitor": "robot_prediction.evaluation.performance_monitor",
+    "robot_prediction.confidence.prediction_confidence": "robot_prediction.evaluation.prediction_confidence",
+    "robot_prediction.confidence.temporal_alignment": "robot_prediction.temporal_alignment",
+    "robot_prediction.residuals.prediction_residual": "robot_prediction.evaluation.prediction_residual",
+    "robot_prediction.residuals.residual_statistics": "robot_prediction.evaluation.residual_statistics",
+    "robot_simulation.geometry.model_exporter": "robot_simulation.gazebo.model_exporter",
+    "robot_simulation.geometry.sdf_generator": "robot_simulation.gazebo.sdf_generator",
+    "robot_simulation.state.target_state": "robot_simulation.adapters.target_state",
+    "robot_description.configuration": "robot_description.adapters.configuration"
+  }
+}

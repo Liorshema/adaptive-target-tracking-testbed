@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from robot_models.types import TargetState
+from robot_models.target.target_state import TargetState
 
 
 @dataclass(frozen=True)

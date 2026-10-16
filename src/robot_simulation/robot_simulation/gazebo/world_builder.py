@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 import math
 
 from robot_configuration.yaml_loader import load_yaml
-from robot_simulation.geometry.sdf_generator import SDFGenerator
+from robot_simulation.gazebo.sdf_generator import SDFGenerator
 
 
 def build_world(

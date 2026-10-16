@@ -6,7 +6,7 @@ import numpy as np
 
 import pytest
 
-from robot_models.types import TargetState
+from robot_models.target.target_state import TargetState
 
 from robot_simulation.disturbances.sinusoidal_field import (
     SinusoidalAccelerationField, SinusoidalFieldParameters)

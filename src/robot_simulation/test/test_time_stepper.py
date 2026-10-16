@@ -4,7 +4,7 @@
 import numpy as np
 import pytest
 
-from robot_models.types import TargetState
+from robot_models.target.target_state import TargetState
 
 from robot_simulation.engine.simulation_engine import SimulationEngine
 from robot_simulation.integration.rk4 import RK4Integrator
@@ -132,7 +132,7 @@ def test_time_stepper_handles_floating_point_boundaries():
 
     import numpy as np
 
-    from robot_models.types import TargetState
+    from robot_models.target.target_state import TargetState
     from robot_simulation.integration.time_stepper import TimeStepper
     from robot_simulation.state.simulation_state import SimulationState
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from robot_models.reference.geometry.reference_geometry import (
+from robot_models.interfaces.reference_geometry import (
     ReferenceGeometry,
 )
 

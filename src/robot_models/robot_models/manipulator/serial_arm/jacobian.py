@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from robot_models.common.rotations import axis_angle_rotation
-from robot_models.common.transforms import make_transform
+from robot_models.spatial.rotations import axis_angle_rotation
+from robot_models.spatial.transforms import make_transform
 
 
 class ArmJacobian:

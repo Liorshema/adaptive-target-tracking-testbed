@@ -14,7 +14,7 @@ from rclpy.parameter import Parameter
 from rclpy.time import Time
 from rosgraph_msgs.msg import Clock
 
-from robot_models.types import TargetState
+from robot_models.target.target_state import TargetState
 
 from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.factory.simulation_factory import SimulationFactory
@@ -28,7 +28,7 @@ from robot_simulation.measurements.synthetic_measurement import (
     SyntheticMeasurementGenerator,
 )
 from robot_simulation.state.simulation_state import SimulationState
-from robot_simulation.state.target_state import state_to_vector
+from robot_simulation.adapters.target_state import state_to_vector
 
 
 def required_vector(node: Node, name: str) -> np.ndarray:

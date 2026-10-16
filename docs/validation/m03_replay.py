@@ -10,9 +10,9 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from robot_estimation.common.measurement import Measurement
-from robot_estimation.common.state import StateEstimate
-from robot_estimation.common.timestamp_buffer import TimestampBuffer
+from robot_estimation.measurement import Measurement
+from robot_estimation.state import StateEstimate
+from robot_estimation.timestamp_buffer import TimestampBuffer
 from robot_estimation.robot.joint_bounds import JointBoundsConditioner
 from robot_estimation.robot.models.measurement_model import (
     WheelOdometryMeasurementModel, JointEncoderMeasurementModel, ImuYawRateMeasurementModel)
@@ -20,6 +20,7 @@ from robot_estimation.robot.models.process_model import RobotProcessModel
 from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
 
 from m03_analysis import estimate_errors
+from archived_estimation_imports import canonicalize_imports
 
 HERE=Path(__file__).resolve().parent
 
@@ -27,7 +28,8 @@ HERE=Path(__file__).resolve().parent
 def archived(filename, name):
     spec=importlib.util.spec_from_file_location(name,HERE/'m03_before_source'/filename)
     module=importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    source = HERE / 'm03_before_source' / filename
+    exec(compile(canonicalize_imports(source.read_text()), str(source), 'exec'), module.__dict__)
     return module
 
 

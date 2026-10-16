@@ -4,7 +4,7 @@ import numpy as np
 
 import pytest
 
-from robot_estimation.common.timestamp_buffer import TimestampBuffer
+from robot_estimation.timestamp_buffer import TimestampBuffer
 
 
 def buffer(delay=.03):

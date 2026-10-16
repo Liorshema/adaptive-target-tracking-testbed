@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 from robot_prediction.baseline.imm import IMMPredictor
-from robot_prediction.confidence.performance_monitor import (
+from robot_prediction.evaluation.performance_monitor import (
     PerformanceMonitor,
 )
 from robot_prediction.configuration.prediction_config import PredictionConfig

@@ -5,7 +5,7 @@ import pytest
 
 from robot_prediction.baseline.constant_velocity import ConstantVelocityPredictor
 from robot_prediction.baseline.imm import IMMPredictor
-from robot_prediction.confidence.performance_monitor import PerformanceMonitor
+from robot_prediction.evaluation.performance_monitor import PerformanceMonitor
 from robot_prediction.interfaces.prediction_data import PredictionInput, TrajectoryPrediction
 from robot_prediction.interfaces.predictor import Predictor
 from robot_prediction.online_adaptation.classical.residual_adapter import ResidualAdapter

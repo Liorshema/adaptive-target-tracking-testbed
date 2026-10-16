@@ -6,7 +6,7 @@ import numpy as np
 from robot_simulation.interfaces.dynamics import Dynamics
 from robot_simulation.integration.rk4 import RK4Integrator
 from robot_simulation.state.simulation_state import SimulationState
-from robot_simulation.state.target_state import (
+from robot_simulation.adapters.target_state import (
     state_to_vector,
     vector_to_state,
 )

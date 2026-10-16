@@ -27,6 +27,7 @@ from tf2_ros import Buffer, TransformException, TransformListener
 from robot_control.adapters.control_config_adapter import (
     ControlConfigAdapter,
 )
+from robot_control.adapters.prediction_frame_transform import transform_target_trajectory
 from robot_control.adapters.prediction_message_adapter import (
     PredictionMessageAdapter,
 )
@@ -371,22 +372,7 @@ class ControlNode(Node):
             translation.z,
         ], dtype=float)
 
-        states = prediction.states.copy()
-
-        if states.shape[1] != 6:
-            raise ValueError(
-                "Frame conversion requires target state "
-                "[x, y, z, vx, vy, vz]"
-            )
-
-        states[:, :3] = states[:, :3] @ rotation.T + offset
-        states[:, 3:6] = states[:, 3:6] @ rotation.T
-
-        return PredictedTargetTrajectory(
-            states=states,
-            timestamps=prediction.timestamps,
-            frame_id=robot_frame,
-        )
+        return transform_target_trajectory(prediction, rotation, offset, robot_frame)
 
     @staticmethod
     def _stamp_to_seconds(stamp) -> float:
