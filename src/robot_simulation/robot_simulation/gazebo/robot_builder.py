@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 
 
 def _number(value, name, *, positive=False, nonnegative=False):
@@ -26,6 +26,7 @@ def _plugin(model, system, parameters):
         'JointPositionController': 'gz-sim-joint-position-controller-system',
         'JointStatePublisher': 'gz-sim-joint-state-publisher-system',
         'DiffDrive': 'gz-sim-diff-drive-system',
+        'OdometryPublisher': 'gz-sim-odometry-publisher-system',
     }
     plugin = ET.SubElement(model, 'plugin', filename=filenames[system],
                            name=f'gz::sim::systems::{system}')
@@ -158,6 +159,21 @@ def configure_robot_model(model, description, config, hold):
                 raise ValueError(f'Drive {key} must be nonempty')
             parameters.append((key, drive[key]))
         _plugin(model, 'DiffDrive', parameters)
+    truth = config.get('ground_truth_odometry', {})
+    if truth.get('enabled', False):
+        dimensions = truth['dimensions']
+        if dimensions not in [2, 3]:
+            raise ValueError('Ground-truth dimensions must be 2 or 3')
+        parameters = [('dimensions', dimensions),
+                      ('odom_publish_frequency', _number(
+                          truth['rate_hz'], 'ground-truth rate', positive=True))]
+        for source, destination in [
+                ('frame_id', 'odom_frame'), ('child_frame_id', 'robot_base_frame'),
+                ('topic', 'odom_topic'), ('tf_topic', 'tf_topic')]:
+            if not isinstance(truth[source], str) or not truth[source].strip():
+                raise ValueError(f'Ground-truth {source} must be nonempty')
+            parameters.append((destination, truth[source]))
+        _plugin(model, 'OdometryPublisher', parameters)
     return model
 
 

@@ -28,6 +28,8 @@ setup(
     install_requires=[
         "setuptools",
         "numpy",
+        "scipy",
+        "PyYAML",
     ],
     zip_safe=True,
     maintainer="Lior",
@@ -39,7 +41,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
     "console_scripts": [
-        "estimation_node = robot_estimation.estimation_node:main",
+        "estimation_node = robot_estimation.nodes.estimation_node:main",
     ],
 },
 )

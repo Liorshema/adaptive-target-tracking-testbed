@@ -22,7 +22,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from rosgraph_msgs.msg import Clock
 from std_msgs.msg import Float64
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 from robot_interfaces.msg import (ControlTelemetry, SafeVelocityCommand,
                                   StateEstimate, PredictedTrajectory)
 import yaml
@@ -92,7 +92,7 @@ def main():
             wrapper = args.output / 'actuation_counters.py'
             wrapper.write_text('''import atexit, collections, json, runpy, sys
 from pathlib import Path
-from robot_simulation.actuation.velocity_actuation import VelocityActuationNode as C
+from robot_simulation.nodes.velocity_actuation import VelocityActuationNode as C
 counts=collections.Counter()
 command=C._command_callback
 halt=C._halt
@@ -117,7 +117,7 @@ runpy.run_path(sys.argv[0],run_name='__main__')
         if args.estimator_cadence:
             wrapper = args.output / 'estimation_cadence.py'
             wrapper.write_text('''import runpy, sys
-from robot_estimation.estimation_node import EstimationNode as C
+from robot_estimation.nodes.estimation_node import EstimationNode as C
 original=C._joint_state_callback
 def gated(self,msg):
     timestamp=msg.header.stamp.sec+msg.header.stamp.nanosec*1e-9

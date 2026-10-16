@@ -12,7 +12,7 @@ from sensor_msgs.msg import JointState
 from sensor_msgs.msg import Imu
 import yaml
 
-from robot_estimation.estimation_node import EstimationNode
+from robot_estimation.nodes.estimation_node import EstimationNode
 
 
 @pytest.fixture
@@ -29,6 +29,8 @@ def node():
     parameters.setdefault('future_tolerance', 0.01)
     parameters.setdefault('max_wheel_odometry_age', 0.2)
     parameters.setdefault('max_joint_state_age', 0.2)
+    parameters['reorder_holdback'] = 0.0  # Legacy immediate-fusion cases.
+    estimate.test_parameters = parameters
     estimate.get_parameter = lambda name: SimpleNamespace(value=parameters[name])
     estimate.test_now = 10.05
     estimate.get_clock = lambda: SimpleNamespace(now=lambda: Time(seconds=estimate.test_now))
@@ -51,6 +53,7 @@ def node():
     estimate._target_frame_id = ''
     estimate._last_wheel_time = None
     estimate._last_joint_time = None
+    estimate._configure_robot_timing()
     return estimate
 
 
@@ -58,6 +61,8 @@ def wheel_message(timestamp=10.0, velocity=0.0):
     """Build a wheel velocity observation."""
     message = Odometry()
     message.header.stamp = Time(seconds=timestamp).to_msg()
+    message.header.frame_id = 'odom'
+    message.child_frame_id = 'base_link'
     message.twist.twist.linear.x = velocity
     return message
 
@@ -232,3 +237,68 @@ def test_one_sensor_cannot_hide_missing_updates_from_another(node, stale_sensor)
     else:
         node._joint_state_callback(joint_message(10.3))
     assert len(node.robot_messages) == count
+
+
+def test_interleaved_streams_commit_at_measurement_time_behind_the_clock(node):
+    """Wheel receipt must not force the joint update to the wrong epoch."""
+    node.test_parameters['reorder_holdback'] = .03
+    node._configure_robot_timing()
+    node._wheel_odometry_callback(wheel_message(10.02))
+    node._joint_state_callback(joint_message(10.01))
+    assert node._last_robot_time is None
+    node.test_now = 10.06
+    node._drain_robot()
+    assert node._last_robot_time == 10.02
+    assert node._last_joint_time == 10.01
+    assert len(node.robot_messages) == 1
+    assert node._robot_buffer.counters['joints']['accepted'] == 1
+    assert node.robot_messages[0].header.stamp == Time(seconds=10.02).to_msg()
+
+
+def test_raw_physical_excursion_blocks_full_output_instead_of_being_hidden(node):
+    """The high-level consumer must not receive a newly disguised legal state."""
+    node._wheel_odometry_callback(wheel_message())
+    message = joint_message()
+    message.position[message.name.index('shoulder_joint')] = -.001
+    node._joint_state_callback(message)
+    assert not node.robot_messages
+    assert not node._joint_constraint.physical_valid
+    assert node._joint_constraint.excess[1] == .001
+
+
+def test_malformed_stamp_cannot_advance_or_crash_filter(node):
+    message = wheel_message()
+    message.header.stamp.nanosec = 1_500_000_000
+    node._wheel_odometry_callback(message)
+    assert node._last_robot_time is None
+    assert node._robot_buffer.counters['wheel']['invalid'] == 1
+
+
+def test_wrong_odometry_frame_is_counted_without_filter_mutation(node):
+    message = wheel_message()
+    message.child_frame_id = 'wrong_body'
+    node._wheel_odometry_callback(message)
+    assert node._last_robot_time is None
+    assert node._robot_buffer.counters['wheel']['invalid'] == 1
+
+
+def test_optional_imu_with_explicit_body_frame_can_update_shared_state(node):
+    node._wheel_odometry_callback(wheel_message())
+    node._joint_state_callback(joint_message())
+    message = Imu()
+    message.header.frame_id = node.test_parameters['imu_frame']
+    message.header.stamp = Time(seconds=10.).to_msg()
+    message.angular_velocity.z = .2
+    node._imu_callback(message)
+    assert node._robot_estimator.state.mean[4] > .1
+
+
+def test_stale_bad_joint_observation_does_not_poison_current_physical_status(node):
+    node._wheel_odometry_callback(wheel_message())
+    node._joint_state_callback(joint_message())
+    message = joint_message(9.8)
+    message.position[message.name.index('shoulder_joint')] = -.1
+    node._joint_state_callback(message)
+    assert node._raw_joint_valid
+    assert node._joint_constraint.physical_valid
+    assert node._robot_buffer.counters['joints']['stale'] == 1

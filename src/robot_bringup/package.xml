@@ -3,7 +3,7 @@
 <package format="3">
   <name>robot_bringup</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>System launch composition and tracking-frame deployment adapters.</description>
   <maintainer email="liorshema@gmail.com">user</maintainer>
   <license>Apache-2.0</license>
 
@@ -27,9 +27,15 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>robot_interfaces</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>python3-scipy</exec_depend>
+
+
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>robot_configuration</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

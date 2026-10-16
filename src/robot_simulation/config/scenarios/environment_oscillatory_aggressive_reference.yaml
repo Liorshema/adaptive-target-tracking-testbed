@@ -1,0 +1,36 @@
+# Archived pre-wide aggressive experiment; the user's wide configuration stays unchanged.
+environment:
+  acceleration_fields:
+  - type: linear_restoring
+    enabled: true
+    parameters:
+      center:
+      - 2.2
+      - 0.0
+      - 0.85
+      gain_matrix:
+      - - 0.5
+        - 0.0
+        - 0.0
+      - - 0.0
+        - 0.5
+        - 0.0
+      - - 0.0
+        - 0.0
+        - 0.5
+  - type: sinusoidal
+    enabled: true
+    parameters:
+      amplitude:
+      - 0.0
+      - 0.55
+      - 0.45
+      frequency:
+      - 0.0
+      - 0.25
+      - 0.35
+      phase:
+      - 0.0
+      - 0.0
+      - 1.57079632679
+extends: environment_oscillatory.yaml

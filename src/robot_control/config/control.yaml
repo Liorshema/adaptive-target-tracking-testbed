@@ -79,8 +79,9 @@ control_node:
     # 7. Tracking-frame conventions
     # ============================================================
 
-    # Local axis of tracking_frame pointing toward the target.
-    tracking_forward_axis: [0.0, 0.0, 1.0]
+    # The tracking frame is wrist-aligned. This camera looks along wrist +X.
+    # A different camera mount may select another local forward axis.
+    tracking_forward_axis: [1.0, 0.0, 0.0]
 
     # Local axis defining the tracking frame's upward direction.
     tracking_up_axis: [0.0, -1.0, 0.0]

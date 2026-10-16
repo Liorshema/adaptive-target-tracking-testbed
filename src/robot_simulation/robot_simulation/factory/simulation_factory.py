@@ -9,9 +9,15 @@ import numpy as np
 from robot_simulation.dynamics.target.fight_flight import (
     FightFlightDynamics,
     FightFlightParameters,
+    SaturatedFightFlightParameters,
+    TangentialInteractionParameters,
 )
 from robot_simulation.disturbances.composite_field import (
     CompositeAccelerationField,
+)
+from robot_simulation.disturbances.sinusoidal_field import (
+    SinusoidalAccelerationField,
+    SinusoidalFieldParameters,
 )
 from robot_simulation.disturbances.vector_field import (
     RestoringVectorField,
@@ -24,12 +30,27 @@ from robot_simulation.integration.rk4 import RK4Integrator
 
 def make_fight_flight(
     environment_field=None,
+    tangential=None,
     **parameters: Any,
 ) -> FightFlightDynamics:
     """Construct Fight/Flight from parameter values."""
     return FightFlightDynamics(
         parameters=FightFlightParameters(**parameters),
         environment_field=environment_field,
+        tangential=None if tangential is None else TangentialInteractionParameters(**tangential),
+    )
+
+
+def make_saturated_fight_flight(
+    environment_field=None,
+    tangential=None,
+    **parameters: Any,
+) -> FightFlightDynamics:
+    """Select bounded radial interaction while reusing the dynamics engine."""
+    return FightFlightDynamics(
+        parameters=SaturatedFightFlightParameters(**parameters),
+        environment_field=environment_field,
+        tangential=None if tangential is None else TangentialInteractionParameters(**tangential),
     )
 
 
@@ -42,6 +63,22 @@ def make_restoring_field(
         parameters=VectorFieldParameters(
             center=np.asarray(center, dtype=float),
             gain_matrix=np.asarray(gain_matrix, dtype=float),
+        )
+    )
+
+
+
+def make_sinusoidal_field(
+    amplitude,
+    frequency,
+    phase,
+) -> SinusoidalAccelerationField:
+    """Construct a configurable periodic acceleration field."""
+    return SinusoidalAccelerationField(
+        SinusoidalFieldParameters(
+            amplitude=np.asarray(amplitude, dtype=float),
+            frequency=np.asarray(frequency, dtype=float),
+            phase=np.asarray(phase, dtype=float),
         )
     )
 
@@ -84,8 +121,14 @@ class SimulationFactory:
         factory.dynamics_registry.register(
             "fight_flight", make_fight_flight
         )
+        factory.dynamics_registry.register(
+            'saturated_fight_flight', make_saturated_fight_flight
+        )
         factory.field_registry.register(
             "linear_restoring", make_restoring_field
+        )
+        factory.field_registry.register(
+            "sinusoidal", make_sinusoidal_field
         )
         factory.integrator_registry.register(
             "rk4", make_rk4

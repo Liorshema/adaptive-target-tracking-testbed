@@ -41,7 +41,7 @@ setup(
     zip_safe=True,
     maintainer='user',
     maintainer_email='user@todo.todo',
-    description='ROS 2 agricultural robot package',
+    description='Authoritative robot geometry and physical configuration.',
     license='Apache-2.0',
     extras_require={
         'test': [

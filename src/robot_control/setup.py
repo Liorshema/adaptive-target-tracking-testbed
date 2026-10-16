@@ -39,7 +39,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'control_node = robot_control.ros.control_node:main',
+            'control_node = robot_control.nodes.control_node:main',
         ],
     },
 )

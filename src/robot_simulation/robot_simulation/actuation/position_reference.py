@@ -45,5 +45,8 @@ class PositionReference:
         upper = np.minimum(self.upper, measured + self.max_lead)
         if np.any(lower > upper):
             raise ValueError('Measured joints are outside the permitted physical envelope')
-        self.position = np.clip(self.position + dt * velocity, lower, upper)
+        candidate = np.clip(self.position + dt * velocity, lower, upper)
+        if np.any(np.abs(candidate - self.position) > dt * self.velocity_limit + 1e-9):
+            raise ValueError('Measured lead clipping would create a reference discontinuity')
+        self.position = candidate
         return self.position.copy()

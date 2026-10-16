@@ -1,0 +1,8 @@
+# Optional spatial circulation; original saturated parameters/geometry are inherited.
+extends: target_saturated.yaml
+target:
+  dynamics:
+    parameters:
+      tangential:
+        acceleration: 0.06  # m/s²; radial + tangential interaction <= hypot(0.15, 0.06)
+        axis_world: [0.3, -0.8, 0.5]  # normalized internally; positive right-hand circulation

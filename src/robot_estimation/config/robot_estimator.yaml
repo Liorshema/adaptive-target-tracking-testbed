@@ -2,8 +2,24 @@
 estimation_node:
   ros__parameters:
 
+    # Shared EKF watermark [s]; source stamps are never relabeled as receipt time.
+    reorder_holdback: 0.03
+    reorder_max_age: 0.2
+    reorder_rate_hz: 100.0
+    reorder_capacity: 256
+    diagnostic_topic: /estimation/diagnostics
+    diagnostic_rate_hz: 5.0
+    joint_bounds_enabled: true
+    joint_bounds_numerical_tolerance: 1.0e-9  # rad; only floating point contact noise
+    robot_description_file: ''  # Bringup resolves an explicit authoritative path.
+    robot_description_package: robot_description
+    robot_description_config: config/robot/robot.yaml
+
     # Robot structure
     joint_count: 4
+    wheel_odom_frame: odom
+    base_frame: base_link
+    imu_frame: base_link
 
     # Select and reorder arm joints from Gazebo messages, which may include wheels.
     # Order matches robot_description/robot.yaml manipulator.joints.
@@ -25,7 +41,9 @@ estimation_node:
        1.0, 1.0, 1.0, 1.0,
        1.0, 1.0, 1.0, 1.0]
 
-    # Process noise
+    # Continuous white acceleration-noise amplitudes:
+    # linear [m/s^(3/2)], angular and joints [rad/s^(3/2)].
+    # Magnitudes are preserved; Q now composes consistently across step sizes.
     linear_acceleration_noise_std: 0.1
     angular_acceleration_noise_std: 0.05
     joint_acceleration_noise_std: 0.1

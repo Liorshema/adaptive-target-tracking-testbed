@@ -23,10 +23,10 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PointStamped
 import yaml
 
-from robot_control.ros.control_node import ControlNode
-from robot_estimation.estimation_node import EstimationNode
-from robot_prediction.prediction_node import PredictionNode
-from robot_bringup.model_factory import create_robot_model
+from robot_control.nodes.control_node import ControlNode
+from robot_estimation.nodes.estimation_node import EstimationNode
+from robot_prediction.nodes.prediction_node import PredictionNode
+from robot_bringup.factory.model_factory import create_robot_model
 from robot_models.whole_body.kinematics import WholeBodyKinematics
 
 ROOT = Path(__file__).resolve().parents[2]

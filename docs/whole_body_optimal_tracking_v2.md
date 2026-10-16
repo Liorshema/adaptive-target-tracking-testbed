@@ -1,5 +1,11 @@
 # Whole-Body Optimal Tracking v2
 
+Historical validation note: the original results below used local +Z as the
+camera direction and inferred world pose from wheel odometry. The subsequently
+confirmed camera mounting is wrist +X; wheel odometry also differs from Gazebo's
+physical base pose. See [the optical-axis investigation](v2_optical_axis_investigation.md)
+for the correction, physical-pose validation and current reproduction commands.
+
 The independent moving-target deployment is implemented and passes the preset
 production-launch acceptance checks. The final run measured mean distance error
 **0.059 m**, mean optical pointing error **5.64°**,

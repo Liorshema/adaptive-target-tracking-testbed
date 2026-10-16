@@ -1,0 +1,28 @@
+# Experimental copy of whole_body.yaml: Control's strategy loader consumes plain
+# YAML, not scenario inheritance. A configuration regression checks that only
+# the base motion weights differ from the baseline.
+# Experimental only: increased measured wrist overspeed in the v3 comparison;
+# this configuration is not promoted to the default or the longer validation.
+controller:
+  type: weighted_least_squares
+  uses_safety_bounds: true
+  task:
+    type: distance_pointing
+    parameters:
+      minimum_distance: 0.001
+      antipodal_tolerance: 0.00001
+  parameters:
+    gains: [1.0, 3.0, 3.0]
+    task_weights: [4.0, 12.0, 12.0]
+    task_scales: [1.0, 1.0, 1.0]
+    # [base linear, base yaw, arm yaw, shoulder, elbow, wrist].
+    motion_weights: [2.0, 4.0, 3.0, 3.0, 3.0, 2.0]
+    damping: 0.08
+    posture_weight: 0.01
+    posture_gain: 0.3
+    smoothness_weight: 0.005
+    limit_avoidance_weight: 0.002
+tracking:
+  lookahead_time: 0.25
+  prediction_sampling: linear
+  target_velocity_feedforward: true

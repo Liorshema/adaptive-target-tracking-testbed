@@ -6,7 +6,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import math
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.geometry.sdf_generator import SDFGenerator
 
 

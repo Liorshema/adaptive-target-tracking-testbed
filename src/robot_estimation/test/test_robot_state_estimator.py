@@ -79,8 +79,8 @@ def test_prediction_propagates_robot_state() -> None:
     )
 
     expected = np.array([
-        1.0,
-        0.0,
+        np.sin(.2) / .2,
+        (1 - np.cos(.2)) / .2,
         0.2,
         1.0,
         0.2,

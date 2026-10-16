@@ -1,0 +1,23 @@
+Visualization Manager:
+  Global Options:
+    Fixed Frame: world
+    Background Color: 40; 40; 40
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Ground
+      Enabled: true
+      Plane Cell Count: 20
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Measured tracking axes
+      Enabled: true
+      Marker Topic:
+        Value: /tracking/markers
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 4
+      Pitch: 0.35
+      Yaw: 0.8
+      Focal Point: {X: 1.0, Y: 0.0, Z: 0.5}

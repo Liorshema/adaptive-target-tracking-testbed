@@ -1,0 +1,3 @@
+# Separate Fight/Flight experiment; the reactive baseline remains unchanged.
+extends: reactive_tracking.yaml
+simulation_config: config/scenarios/reactive_target_low_damping.yaml

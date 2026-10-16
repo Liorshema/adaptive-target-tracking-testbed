@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 
 
 def configure_model(*args):
@@ -60,12 +60,30 @@ def test_hold_uses_configured_names_targets_gains_and_authoritative_effort(input
     assert feedback.findtext('topic') == '/custom/joints'
 
 
-@pytest.mark.parametrize('bad', ['out_of_bounds', 'nonfinite', 'missing', 'unknown', 'pid'])
+def test_optional_ground_truth_is_observational_and_configuration_driven(inputs):
+    """The physical pose publisher must not replace DiffDrive or joint PID owners."""
+    model, description, config, hold = deepcopy(inputs)
+    config['ground_truth_odometry'] = {
+        'enabled': True, 'rate_hz': 20., 'dimensions': 3,
+        'frame_id': 'world', 'child_frame_id': 'base_link',
+        'topic': '/test/physical_pose', 'tf_topic': '/test/physical_tf'}
+    result = configure_model(model, description, config, hold)
+    plugin = result.find("plugin[@name='gz::sim::systems::OdometryPublisher']")
+    assert plugin is not None
+    assert plugin.findtext('odom_topic') == '/test/physical_pose'
+    assert plugin.findtext('dimensions') == '3'
+    assert len(result.findall("plugin[@name='gz::sim::systems::JointPositionController']")) == 4
+
+
+@pytest.mark.parametrize('bad', [
+    'out_of_bounds', 'below_horizontal', 'nonfinite', 'missing', 'unknown', 'pid'])
 def test_invalid_hold_configuration_rejected_before_world_launch(inputs, bad):
     """Invalid setpoints cannot silently launch an uncontrolled arm."""
     model, description, config, hold = deepcopy(inputs)
     if bad == 'out_of_bounds':
         hold['positions']['shoulder'] = 2.0
+    elif bad == 'below_horizontal':
+        hold['positions']['shoulder'] = -0.1
     elif bad == 'nonfinite':
         hold['positions']['shoulder'] = float('nan')
     elif bad == 'missing':
@@ -159,6 +177,7 @@ def test_robot_builder_generates_real_description_without_geometry_changes(tmp_p
         root / 'robot_description/config/robot/robot.yaml', robot, hold, tmp_path,
     )
     assert model.find("joint[@name='shoulder_joint']/axis/xyz").text == '0 -1 0'
+    assert float(model.findtext("joint[@name='shoulder_joint']/axis/limit/lower")) == 0.0
     assert model.find("link[@name='base_link']/inertial/mass").text == '10'
     drive = model.find("plugin[@name='gz::sim::systems::DiffDrive']")
     assert float(drive.findtext('wheel_radius')) == 0.15

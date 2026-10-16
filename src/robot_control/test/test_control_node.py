@@ -18,7 +18,7 @@ import yaml
 
 from robot_control.adapters.prediction_message_adapter import PredictionMessageAdapter
 from robot_control.adapters.robot_state_message_adapter import RobotStateMessageAdapter
-from robot_control.ros.control_node import ControlNode
+from robot_control.nodes.control_node import ControlNode
 from robot_control.safety.input_status import InputStatusTracker
 from robot_control.safety.input_validator import InputValidationConfig, InputValidator
 

@@ -14,12 +14,13 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
         ('share/' + package_name + '/config', glob('config/*.yaml')),
+        ('share/' + package_name + '/config', glob('config/*.rviz')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='user',
     maintainer_email='liorshema@gmail.com',
-    description='TODO: Package description',
+    description='System launch composition and tracking-frame deployment adapters.',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -28,7 +29,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'tracking_feedback_tf = robot_bringup.tracking_feedback_tf:main',
+            'tracking_feedback_tf = robot_bringup.nodes.tracking_feedback_tf:main',
+            'tracking_visualization = robot_bringup.nodes.tracking_visualization:main',
         ],
     },
 )

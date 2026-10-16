@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.factory.registry import ComponentRegistry
 
 
@@ -192,3 +192,37 @@ def test_reactive_target_scenario_uses_real_tracking_frame():
     assert config['target']['initial_velocity'] == [0.0, 0.0, 0.0]
     target = load_yaml(CONFIG_DIR.parent / config['target']['config'])
     assert target['target']['dynamics']['parameters']['alpha'] == 1.0
+
+
+def test_low_damping_experiment_preserves_reactive_tf_and_environment():
+    """The experiment changes target damping while retaining baseline resources."""
+    baseline = load_yaml(CONFIG_DIR / 'scenarios/reactive_target.yaml')
+    experiment = load_yaml(CONFIG_DIR / 'scenarios/reactive_target_low_damping.yaml')
+    assert experiment['tracking'] == baseline['tracking']
+    assert experiment['tracking']['source'] == 'tf'
+    assert experiment['simulation'] == baseline['simulation']
+    assert experiment['target']['initial_position'] == baseline['target']['initial_position']
+    assert experiment['target']['initial_velocity'] == baseline['target']['initial_velocity']
+    base_target = load_yaml(CONFIG_DIR.parent / baseline['target']['config'])
+    target = load_yaml(CONFIG_DIR.parent / experiment['target']['config'])
+    assert target['target']['dynamics']['parameters']['damping'] == 0.15
+    target['target']['dynamics']['parameters']['damping'] = 0.5
+    assert target == base_target
+
+
+def test_saturated_scenario_selects_shared_engine_without_inherited_alpha():
+    """A new interaction must retain visuals, external fields and live TF feedback."""
+    from robot_simulation.factory.simulation_factory import SimulationFactory
+    baseline = load_yaml(CONFIG_DIR / 'scenarios/reactive_target.yaml')
+    scenario = load_yaml(CONFIG_DIR / 'scenarios/reactive_target_saturated.yaml')
+    target = load_yaml(CONFIG_DIR.parent / scenario['target']['config'])
+    original = load_yaml(CONFIG_DIR / 'target.yaml')
+    assert scenario['tracking'] == baseline['tracking']
+    assert scenario['simulation'] == baseline['simulation']
+    assert target['target']['geometry'] == original['target']['geometry']
+    assert target['target']['physics'] == original['target']['physics']
+    assert 'alpha' not in target['target']['dynamics']['parameters']
+    engine, _ = SimulationFactory.with_defaults().create(
+        target, load_yaml(CONFIG_DIR.parent / scenario['simulation']['environment_config']),
+        load_yaml(CONFIG_DIR.parent / scenario['simulation']['config']))
+    assert engine.dynamics.parameters.a_max > 0.

@@ -4,7 +4,7 @@ from dataclasses import asdict, replace
 
 import numpy as np
 
-from robot_bringup.model_factory import create_robot_model
+from robot_bringup.factory.model_factory import create_robot_model
 from robot_description.model_parameters import load_robot_model_parameters
 from robot_models.base.differential_drive.kinematics import DifferentialDriveKinematics
 from robot_models.common.rotations import rotation_z

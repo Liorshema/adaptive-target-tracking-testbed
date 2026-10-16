@@ -1,0 +1,9 @@
+extends: target_3d.yaml
+
+target:
+  dynamics:
+    parameters:
+      damping: 0.35
+      tangential:
+        acceleration: 0.12
+        axis_world: [0.3, -0.8, 0.5]

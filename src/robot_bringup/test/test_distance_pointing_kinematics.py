@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from robot_bringup.model_factory import create_robot_model
+from robot_bringup.factory.model_factory import create_robot_model
 from robot_models.task_space.distance_pointing import DistancePointingGeometry
 from robot_models.whole_body.jacobian import WholeBodyJacobian
 from robot_models.whole_body.kinematics import WholeBodyKinematics
@@ -15,10 +15,11 @@ from scipy.spatial.transform import Rotation
     ([.3, .8, -.7, .4], 5),
     ([0., 1.4, -1.2, .8], 4),
 ])
-def test_actual_robot_task_rank_and_jacobian(joints, pose_rank):
+@pytest.mark.parametrize('forward', [[0., 0., 1.], [1., 0., 0.]])
+def test_actual_robot_task_rank_and_jacobian(joints, pose_rank, forward):
     """Six commands provide three tracking conditions, but only 4–5 pose DOFs."""
     model = create_robot_model()
-    task = DistancePointingGeometry(1., [0., 0., 1.], [0., -1., 0.])
+    task = DistancePointingGeometry(1., forward, [0., -1., 0.])
     transform = np.eye(4)
     transform[:3, :3] = Rotation.from_euler('z', .4).as_matrix()
     transform[:3, 3] = [.5, -.2, 0.]

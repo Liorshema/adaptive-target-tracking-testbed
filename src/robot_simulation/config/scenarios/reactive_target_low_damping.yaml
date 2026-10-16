@@ -1,0 +1,5 @@
+# The baseline's initial conditions, live TF input and centering field are inherited.
+extends: reactive_target.yaml
+
+target:
+  config: config/scenarios/target_fight_flight_low_damping.yaml

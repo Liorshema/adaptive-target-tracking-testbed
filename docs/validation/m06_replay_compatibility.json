@@ -1,0 +1,29 @@
+{
+  "before": {
+    "counters": {
+      "joints_accepted": 24931,
+      "wheel_accepted": 3239,
+      "rejected_late": 6439
+    },
+    "joint_rmse_rad": [
+      0.0011691798590555968,
+      0.002245025728321966,
+      0.004944262669829077,
+      0.020708631180890447
+    ],
+    "matches_saved_m03_replay": true
+  },
+  "after": {
+    "counters": {
+      "joints_accepted": 31351,
+      "wheel_accepted": 3242
+    },
+    "joint_rmse_rad": [
+      0.0002030784622572974,
+      0.00047020502245343946,
+      0.001031519734603198,
+      0.002280448783424414
+    ],
+    "matches_saved_m03_replay": true
+  }
+}

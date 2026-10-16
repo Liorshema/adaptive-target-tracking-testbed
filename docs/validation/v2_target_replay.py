@@ -22,9 +22,9 @@ from robot_estimation.filters.kalman_filter import KalmanFilter
 from robot_estimation.target.models.measurement_model import PositionMeasurementModel
 from robot_estimation.target.models.process_model import ConstantVelocityProcessModel
 from robot_estimation.target.target_state_estimator import TargetStateEstimator
-from robot_prediction.config_loader import PredictionConfig
+from robot_prediction.configuration.prediction_config import PredictionConfig
 from robot_prediction.interfaces.prediction_data import PredictionInput
-from robot_prediction.system_factory import PredictionSystemFactory
+from robot_prediction.factory.system_factory import PredictionSystemFactory
 from robot_simulation.measurements.synthetic_measurement import SyntheticMeasurementGenerator
 
 ROOT = Path(__file__).resolve().parents[2]

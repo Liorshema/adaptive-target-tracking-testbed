@@ -7,12 +7,33 @@ Projection is handled separately by ConstraintProjector.
 
 import numpy as np
 from numpy.typing import NDArray
+
 from robot_models.constraints.acceleration_limits import AccelerationLimits
 from robot_models.constraints.joint_limits import JointLimits
 from robot_models.constraints.velocity_limits import VelocityLimits
 
 Array = NDArray[np.float64]
 Bounds = tuple[Array, Array]
+
+
+class JointPositionViolation(ValueError):
+    """Carry exact model-order violations for optional named transport diagnostics."""
+
+    def __init__(self, positions, lower, upper):
+        """Retain only violated joints in authoritative model order."""
+        self.violations = [(i, float(q), float(lo), float(hi))
+                           for i, (q, lo, hi) in enumerate(zip(positions, lower, upper))
+                           if q < lo or q > hi]
+        super().__init__(self.describe())
+
+    def describe(self, names=None):
+        """Use externally supplied names; algorithms know only model joint order."""
+        details = []
+        for i, q, lo, hi in self.violations:
+            name = names[i] if names is not None and i < len(names) else f'joint[{i}]'
+            details.append(f'{name} q={q:.12g} rad bounds=[{lo:.12g},{hi:.12g}] rad '
+                           f'excess={max(lo - q, q - hi):.6g} rad')
+        return 'Current joint positions violate limits: ' + '; '.join(details)
 
 
 def _vector(value: Array, name: str) -> Array:
@@ -134,7 +155,7 @@ def joint_position_bounds(
     joint_upper = _vector(joint_limits.upper, "joint upper")
 
     if not joint_limits.contains(positions):
-        raise ValueError("Current joint positions violate limits")
+        raise JointPositionViolation(positions, joint_lower, joint_upper)
 
     lower[indices] = np.maximum(
         lower[indices],

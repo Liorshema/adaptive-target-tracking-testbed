@@ -127,17 +127,8 @@ class RobotProcessModel:
             joint_velocity_start:
         ]
 
-        next_state[0] += (
-            dt
-            * linear_velocity
-            * np.cos(theta)
-        )
-
-        next_state[1] += (
-            dt
-            * linear_velocity
-            * np.sin(theta)
-        )
+        travel, _, _ = self._base_increment(theta, linear_velocity, angular_velocity, dt)
+        next_state[:2] += travel
 
         next_state[2] += (
             dt
@@ -171,27 +162,11 @@ class RobotProcessModel:
         theta = state[2]
         linear_velocity = state[3]
 
-        F[0, 2] = (
-            -dt
-            * linear_velocity
-            * np.sin(theta)
-        )
-
-        F[0, 3] = (
-            dt
-            * np.cos(theta)
-        )
-
-        F[1, 2] = (
-            dt
-            * linear_velocity
-            * np.cos(theta)
-        )
-
-        F[1, 3] = (
-            dt
-            * np.sin(theta)
-        )
+        travel, velocity_column, angular_column = self._base_increment(
+            theta, linear_velocity, state[4], dt)
+        F[:2, 2] = [-travel[1], travel[0]]
+        F[:2, 3] = velocity_column
+        F[:2, 4] = angular_column
 
         F[2, 4] = dt
 
@@ -209,89 +184,54 @@ class RobotProcessModel:
 
         return F
 
-    def process_covariance(
-        self,
-        dt: float,
-    ) -> Matrix:
-        """
-        Return the process-noise covariance Q(dt).
+    @staticmethod
+    def _base_increment(theta, velocity, yaw_rate, dt):
+        """Exact constant-twist SE(2) travel and velocity/yaw-rate derivatives."""
+        a = yaw_rate * dt / 2
+        if abs(a) < 1e-4:
+            sinc = 1 - a * a / 6 + a**4 / 120
+            derivative = -a / 3 + a**3 / 30
+        else:
+            sinc = np.sin(a) / a
+            derivative = (a * np.cos(a) - np.sin(a)) / (a * a)
+        direction = np.array([np.cos(theta + a), np.sin(theta + a)])
+        tangent = np.array([-direction[1], direction[0]])
+        velocity_column = dt * sinc * direction
+        angular_column = velocity * dt**2 / 2 * (derivative * direction + sinc * tangent)
+        return velocity * velocity_column, velocity_column, angular_column
 
-        Independent acceleration disturbances are assumed for:
+    def process_covariance(self, dt: float, state=None) -> Matrix:
+        """Discretize continuous white acceleration noise about the current state.
 
-        - base linear motion,
-        - base angular motion,
-        - manipulator joints.
-
-        Noise parameters are provided externally through the
-        constructor.
+        Noise amplitudes are in m/s**(3/2) and rad/s**(3/2). The covariance is
+        the integral of the frozen continuous Jacobian, including base position
+        and yaw cross terms. At a stationary linearization it composes exactly
+        over arbitrary prediction-time partitions.
         """
         self._validate_dt(dt)
-
-        n = self.state_dimension
-
-        Q = np.zeros(
-            (n, n)
-        )
-
-        sigma_v_squared = (
-            self._linear_acceleration_noise_std ** 2
-        )
-
-        sigma_omega_squared = (
-            self._angular_acceleration_noise_std ** 2
-        )
-
-        sigma_joint_squared = (
-            self._joint_acceleration_noise_std ** 2
-        )
-
-        # Base linear velocity uncertainty.
-        Q[3, 3] = (
-            dt ** 2
-            * sigma_v_squared
-        )
-
-        # Base angular velocity uncertainty.
-        Q[4, 4] = (
-            dt ** 2
-            * sigma_omega_squared
-        )
-
-        joint_position_start = self.BASE_STATE_DIMENSION
-        joint_velocity_start = (
-            joint_position_start + self._joint_count
-        )
-
-        identity = np.eye(
-            self._joint_count
-        )
-
-        q_pp = (
-            dt ** 4 / 4.0
-        ) * identity
-
-        q_pv = (
-            dt ** 3 / 2.0
-        ) * identity
-
-        q_vv = (
-            dt ** 2
-        ) * identity
-
-        joint_covariance = (
-            sigma_joint_squared
-            * np.block([
-                [q_pp, q_pv],
-                [q_pv, q_vv],
-            ])
-        )
-
-        Q[
-            joint_position_start:,
-            joint_position_start:
-        ] = joint_covariance
-
-        return Q
+        theta, velocity = (0., 0.) if state is None else self._validate_state(state)[[2, 3]]
+        q = np.zeros((self.state_dimension, self.state_dimension))
+        direction = np.array([np.cos(theta), np.sin(theta)])
+        tangent = velocity * np.array([-direction[1], direction[0]])
+        linear_density = self._linear_acceleration_noise_std**2
+        angular_density = self._angular_acceleration_noise_std**2
+        q[:2, :2] = (
+            linear_density * dt**3 / 3 * np.outer(direction, direction) +
+            angular_density * dt**5 / 20 * np.outer(tangent, tangent))
+        q[:2, 3] = q[3, :2] = linear_density * dt**2 / 2 * direction
+        q[3, 3] = linear_density * dt
+        q[4, 4] = angular_density * dt
+        q[2, 2] = angular_density * dt**3 / 3
+        q[2, 4] = q[4, 2] = angular_density * dt**2 / 2
+        q[:2, 4] = q[4, :2] = angular_density * dt**3 / 6 * tangent
+        q[:2, 2] = q[2, :2] = angular_density * dt**4 / 8 * tangent
+        positions = self.BASE_STATE_DIMENSION + np.arange(self._joint_count)
+        speeds = positions + self._joint_count
+        density = self._joint_acceleration_noise_std**2
+        q[positions, positions] = density * dt**3 / 3
+        q[positions, speeds] = q[speeds, positions] = density * dt**2 / 2
+        q[speeds, speeds] = density * dt
+        return q
 
     def _validate_state(
         self,

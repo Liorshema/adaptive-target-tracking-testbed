@@ -12,15 +12,27 @@ It is designed so that robot models, estimators, predictors, adaptation methods,
 
 - `robot_description` — robot geometry and physical configuration
 - `robot_models` — reusable robot, camera, and whole-body models
-- `robot_perception` — target detection and measurement generation
+- `robot_configuration` — shared YAML mapping and inheritance loading
 - `robot_estimation` — robot and target state estimation
 - `robot_prediction` — target-motion prediction and online adaptation
 - `robot_control` — tracking and robot command generation
 - `robot_simulation` — target dynamics, disturbances, and Gazebo simulation
-- `robot_experiments` — experiments, logging, metrics, and comparison
 - `robot_bringup` — system configuration and launch files
 
 The workspace is organized into separate ROS 2 packages with clear responsibilities. 
+
+Synthetic target measurements currently belong to `robot_simulation`. Separate
+perception and experiment-management packages are planned, not implemented.
+Prediction deployment currently uses IMM with residual correction; the supported
+robot deployment is the planar mobile manipulator. Other robot families require
+matching model, state and actuator implementations.
+
+ROS adapters live in each Python package's `nodes/` directory. Assembly lives in
+`factory/`; mathematical domain directories retain their own structure. Existing
+ROS executable names are unchanged, and former Python paths remain temporary
+compatibility aliases. See [the M06 architecture audit](docs/m06_architecture_audit.md),
+[target design](docs/m06_target_architecture.md) and
+[migration results](docs/m06_structural_consolidation.md).
 
 ## Key Features
 

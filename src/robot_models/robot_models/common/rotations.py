@@ -130,23 +130,14 @@ def is_rotation_matrix(
     if rotation.shape != (3, 3):
         return False
 
+    # Fixed 3x3 finite geometry needs no generic isclose broadcasting machinery.
+    # Retain its original default rtol=1e-5, including diagonal tolerances.
     identity = np.eye(3)
-
-    orthogonal = np.allclose(
-        rotation.T @ rotation,
-        identity,
-        atol=atol,
-    )
-
-    determinant = np.isclose(
-        np.linalg.det(rotation),
-        1.0,
-        atol=atol,
-    )
-
-    return bool(
-        orthogonal and determinant
-    )
+    orthogonal = np.all(
+        np.abs(rotation.T @ rotation - identity) <= atol + 1e-5 * identity)
+    if not orthogonal:
+        return False
+    return bool(abs(np.linalg.det(rotation) - 1.0) <= atol + 1e-5)
 
 
 def rotation_x(

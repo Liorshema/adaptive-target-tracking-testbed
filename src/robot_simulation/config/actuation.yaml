@@ -7,6 +7,17 @@ actuation:
   future_tolerance: 0.01
   max_position_lead: 0.08
   max_integration_dt: 0.1
+  # Physical limits remain in robot_description. All angles below are radians.
+  position_recovery:
+    numerical_tolerance: 1.0e-9
+    recoverable_violation: 0.001
+    # PID-reference slew [rad/s], capped by description velocity; not a physical servo bound.
+    recovery_speed: 0.1
+    # Worst horizontal shoulder load: 9.73152 Nm. With existing P=200 Nm/rad,
+    # up to 1 Nm adverse integral and 0.005 rad release, need >0.05866 rad.
+    # This actuator policy offset stays below max_position_lead; no PID retuning.
+    recovery_inset: 0.06
+    release_margin: 0.005
   publish_diagnostics: true
   diagnostic_rate_hz: 10.0
   diagnostic_topic: /simulation/actuation/telemetry

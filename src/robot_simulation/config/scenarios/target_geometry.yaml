@@ -1,0 +1,5 @@
+# Reusable visual/physics template. Null replaces the inherited dynamics mapping
+# so future model parameter maps cannot accidentally inherit linear alpha.
+extends: ../target.yaml
+target:
+  dynamics: null

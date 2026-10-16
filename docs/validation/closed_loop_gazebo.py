@@ -24,7 +24,7 @@ from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import JointState
 import yaml
 
-from robot_bringup.model_factory import create_robot_model
+from robot_bringup.factory.model_factory import create_robot_model
 from robot_models.whole_body.kinematics import WholeBodyKinematics
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -6,13 +6,13 @@ from types import SimpleNamespace
 from nav_msgs.msg import Odometry
 import numpy as np
 from rclpy.time import Time
-from robot_bringup.model_factory import create_robot_model
+from robot_bringup.factory.model_factory import create_robot_model
 from sensor_msgs.msg import JointState
 
 
 def test_tracking_tf_uses_measured_named_joints_and_one_mount():
     """Reordering wheels/joints cannot replace measured motion with references."""
-    module = 'robot_bringup.tracking_feedback_tf'
+    module = 'robot_bringup.nodes.tracking_feedback_tf'
     assert importlib.util.find_spec(module), 'Measured tracking TF is missing'
     model = create_robot_model()
     names = ['base_yaw_joint', 'shoulder_joint', 'elbow_joint', 'wrist_joint']
@@ -28,7 +28,7 @@ def test_tracking_tf_uses_measured_named_joints_and_one_mount():
 
 def test_measured_tf_does_not_regress_a_sensor_timestamp():
     """Out-of-order packets cannot overwrite newer FK input within an epoch."""
-    module = importlib.import_module('robot_bringup.tracking_feedback_tf')
+    module = importlib.import_module('robot_bringup.nodes.tracking_feedback_tf')
     receiver = SimpleNamespace(_latest={}, _future_tolerance=.01,
                                get_clock=lambda: SimpleNamespace(
                                    now=lambda: Time(seconds=10.)))
@@ -45,7 +45,7 @@ def test_measured_tf_does_not_regress_a_sensor_timestamp():
 
 def test_future_feedback_cannot_poison_tracking_tf_after_reset():
     """A former epoch's queued packet must not block lower-time fresh feedback."""
-    module = importlib.import_module('robot_bringup.tracking_feedback_tf')
+    module = importlib.import_module('robot_bringup.nodes.tracking_feedback_tf')
     receiver = SimpleNamespace(_latest={}, _future_tolerance=.01,
                                get_clock=lambda: SimpleNamespace(
                                    now=lambda: Time(seconds=1.)))

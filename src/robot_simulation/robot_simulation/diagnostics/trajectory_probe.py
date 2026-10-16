@@ -9,7 +9,7 @@ import numpy as np
 
 from robot_models.types import TargetState
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.factory.simulation_factory import SimulationFactory
 from robot_simulation.integration.time_stepper import TimeStepper
 from robot_simulation.state.simulation_state import SimulationState

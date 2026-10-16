@@ -1,0 +1,4 @@
+extends: reactive_target_3d.yaml
+
+target:
+  config: config/scenarios/target_3d_aggressive.yaml

@@ -11,6 +11,15 @@ robot:
   joint_position_topic_template: '/model/{model}/joint/{joint}/cmd_pos'
   joint_states:
     topic: /joint_states
+  # Physical world pose for diagnostics only; never routed into Control/Estimation.
+  ground_truth_odometry:
+    enabled: false
+    dimensions: 3
+    rate_hz: 20.0
+    frame_id: world
+    child_frame_id: base_link
+    topic: /simulation/robot/ground_truth
+    tf_topic: /simulation/robot/ground_truth_tf
   differential_drive:
     enabled: true
     left_joints: [front_left_wheel_joint, rear_left_wheel_joint]

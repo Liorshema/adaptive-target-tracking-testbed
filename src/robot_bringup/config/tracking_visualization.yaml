@@ -1,0 +1,19 @@
+# Opt-in measured-FK overlay. Forward axis and physical mount come from Bringup.
+topic: /tracking/markers
+target_topic: /simulation/target_position  # Actual simulated target; perception is noisy.
+rate_hz: 5.0
+max_age: 0.2
+max_skew: 0.08
+future_tolerance: 0.01
+lifetime: 0.3
+axis_length: 0.3
+forward_length: 0.8
+width: 0.012
+origin_size: 0.035
+colors:
+  origin: [1.0, 1.0, 1.0, 1.0]
+  x: [1.0, 0.0, 0.0, 1.0]
+  y: [0.0, 1.0, 0.0, 1.0]
+  z: [0.0, 0.0, 1.0, 1.0]
+  optical: [1.0, 0.8, 0.0, 1.0]
+  target: [1.0, 0.0, 1.0, 0.8]

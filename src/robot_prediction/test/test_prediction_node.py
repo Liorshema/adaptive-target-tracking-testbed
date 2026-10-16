@@ -8,9 +8,9 @@ import pytest
 from rclpy.time import Time
 from robot_interfaces.msg import StateEstimate
 
-from robot_prediction.config_loader import PredictionConfig
-from robot_prediction.prediction_node import PredictionNode
-from robot_prediction.system_factory import PredictionSystemFactory
+from robot_prediction.configuration.prediction_config import PredictionConfig
+from robot_prediction.nodes.prediction_node import PredictionNode
+from robot_prediction.factory.system_factory import PredictionSystemFactory
 
 
 @pytest.fixture

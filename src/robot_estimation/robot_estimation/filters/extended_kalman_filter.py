@@ -73,6 +73,7 @@ class ExtendedKalmanFilter(FilterInterface):
         measurement_jacobian: Optional[
             MeasurementJacobian
         ] = None,
+        state_constraint: Optional[Callable[[StateEstimate], StateEstimate]] = None,
     ) -> None:
         self._state = initial_state.copy()
 
@@ -82,6 +83,7 @@ class ExtendedKalmanFilter(FilterInterface):
 
         self._measurement_function = measurement_function
         self._measurement_jacobian = measurement_jacobian
+        self._state_constraint = state_constraint
 
     @property
     def state(self) -> StateEstimate:
@@ -189,11 +191,13 @@ class ExtendedKalmanFilter(FilterInterface):
         if timestamp is not None:
             timestamp += dt
 
-        self._state = StateEstimate(
+        candidate = StateEstimate(
             mean=predicted_mean,
             covariance=predicted_covariance,
             timestamp=timestamp,
         )
+        self._state = (candidate if self._state_constraint is None
+                       else self._state_constraint(candidate))
 
         return self.state
 
@@ -339,10 +343,12 @@ class ExtendedKalmanFilter(FilterInterface):
             @ kalman_gain.T
         )
 
-        self._state = StateEstimate(
+        candidate = StateEstimate(
             mean=updated_mean,
             covariance=updated_covariance,
             timestamp=measurement.timestamp,
         )
+        self._state = (candidate if self._state_constraint is None
+                       else self._state_constraint(candidate))
 
         return self.state

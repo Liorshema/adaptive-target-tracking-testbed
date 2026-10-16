@@ -58,7 +58,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'prediction_node = robot_prediction.prediction_node:main',
+            'prediction_node = robot_prediction.nodes.prediction_node:main',
         ],
     },
 )

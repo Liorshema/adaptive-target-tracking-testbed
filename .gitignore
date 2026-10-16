@@ -23,3 +23,15 @@ rosbag2_*/
 # Test caches and local backups
 .pytest_cache/
 *.bak
+
+# Local migration snapshots
+docs/validation/m06_migration_before/
+
+# Generated experiment outputs and logs
+docs/validation/**/*.log
+docs/validation/*.log
+docs/validation/**/ros-log/
+docs/validation/**/samples.jsonl
+
+# Local workspace tree export
+project_tree.txt

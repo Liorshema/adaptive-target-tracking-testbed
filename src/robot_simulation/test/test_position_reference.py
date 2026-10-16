@@ -38,3 +38,20 @@ def test_missing_initialization_or_unsafe_velocity_is_rejected():
         reference.step([2.], [0.], .05)
     with pytest.raises(ValueError):
         reference.initialize([float('nan')])
+
+
+def test_lead_clipping_cannot_create_a_reference_speed_discontinuity():
+    """Delayed displaced feedback must not instantaneously project the reference."""
+    reference = PositionReference([-1.], [1.], [1.], .08, .1)
+    reference.initialize([0.])
+    with pytest.raises(ValueError, match='discontinuity'):
+        reference.step([0.], [.5], .02)
+    np.testing.assert_array_equal(reference.position, [0.])
+
+
+@pytest.mark.parametrize('position,velocity,expected', [(1., -1., .98), (-1., 1., -.98)])
+def test_command_reversal_at_a_limit_is_inward_and_continuous(position, velocity, expected):
+    """Legal boundary reversals must not stick or jump."""
+    reference = PositionReference([-1.], [1.], [1.], .08, .1)
+    reference.initialize([position])
+    np.testing.assert_allclose(reference.step([velocity], [position], .02), [expected])

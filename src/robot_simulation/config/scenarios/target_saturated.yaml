@@ -1,0 +1,11 @@
+extends: target_geometry.yaml
+
+target:
+  dynamics:
+    type: saturated_fight_flight
+    parameters:
+      a_max: 0.15             # m/s^2, bounded interaction only
+      transition_length: 0.15 # m; local slope a_max/length = 1 s^-2
+      preferred_distance: 1.0 # m
+      damping: 0.5           # s^-1
+      distance_epsilon: 1.0e-6 # m

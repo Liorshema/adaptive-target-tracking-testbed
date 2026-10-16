@@ -18,6 +18,7 @@ from rclpy.node import Node
 from robot_interfaces.msg import SafeVelocityCommand
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
+from visualization_msgs.msg import MarkerArray
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +30,7 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--config', default='')
     parser.add_argument('--strategy-config', default='')
+    parser.add_argument('--visualization', action='store_true')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault('ROS_DOMAIN_ID', '91')
@@ -45,6 +47,8 @@ def main():
         launch.append(f'config:={args.config}')
     if args.strategy_config:
         launch.append(f'strategy_config:={args.strategy_config}')
+    if args.visualization:
+        launch.append('visualize_tracking:=true')
     if args.case == 'smoke':
         launch.append('publish_commands:=false')
     log = (args.output / 'runtime.log').open('w')
@@ -58,6 +62,7 @@ def main():
     samples = []
     references = {}
     results = {}
+    marker_samples = []
     try:
         rclpy.init(args=['--ros-args', '-p', 'use_sim_time:=true'])
         node = Node('closed_loop_safety_observer')
@@ -78,6 +83,8 @@ def main():
         node.create_subscription(SafeVelocityCommand, control['command_topic'], commands.append, 100)
         node.create_subscription(Twist, robot['differential_drive']['topic'],
                                  lambda m: outputs.append((now(), m.linear.x, m.angular.z)), 100)
+        if args.visualization:
+            node.create_subscription(MarkerArray, '/tracking/markers', marker_samples.append, 10)
         for name in names:
             topic = robot['joint_position_topic_template'].format(model=robot['entity_name'], joint=name)
             node.create_subscription(Float64, topic,
@@ -187,6 +194,11 @@ def main():
             wait(lambda: now() < time_before, 'Clock reset observed')
             wait(lambda: commands and commands[-1].active and
                  commands[-1].session_id != session_before and flowing(), 'Reset recovered')
+            if args.visualization:
+                wait(lambda: marker_samples and len(marker_samples[-1].markers) == 12 and
+                     marker_samples[-1].markers[0].header.stamp.sec < time_before,
+                     'Physical and inferred tracking markers recovered after reset')
+                results['visualization_reset_recovered'] = True
             results['clock_reset'] = dict(recovered=True, new_session=commands[-1].session_id != session_before)
             # Replay an old session as the sole publisher, with a fresh stamp:
             # this exercises epoch identity rather than just freshness/arbitration.
@@ -237,6 +249,15 @@ def main():
             np.all(measured >= lower) and np.all(measured <= upper))
         assert results['physical_joint_positions_within_limits']
         results['launch_command'] = launch
+        if args.visualization:
+            valid = [message for message in marker_samples if len(message.markers) == 12]
+            results['visualization_samples'] = len(valid)
+            assert valid
+            (args.output / 'marker_sample.json').write_text(json.dumps([
+                {'name': marker.ns, 'frame': marker.header.frame_id,
+                 'origin': [marker.pose.position.x, marker.pose.position.y, marker.pose.position.z],
+                 'points': [[point.x, point.y, point.z] for point in marker.points]}
+                for marker in valid[-1].markers], indent=2) + '\n')
         (args.output / 'result.json').write_text(json.dumps(results, indent=2) + '\n')
         (args.output / 'base_commands.json').write_text(json.dumps(outputs))
         print(json.dumps(results, indent=2), flush=True)

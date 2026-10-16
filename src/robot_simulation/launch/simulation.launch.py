@@ -18,7 +18,7 @@ from launch.launch_description_sources import (
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.gazebo.world_builder import build_world
 from robot_simulation.gazebo.robot_builder import build_robot_model
 
@@ -86,6 +86,11 @@ def configure(context):
     robot_cfg = None
     if robot_launch['enabled']:
         robot_cfg = load_yaml(resolve_path(robot_launch['config']))['robot']
+        truth_override = LaunchConfiguration('publish_ground_truth').perform(context).lower()
+        if truth_override not in ['', 'true', 'false']:
+            raise ValueError('publish_ground_truth must be true or false')
+        if truth_override:
+            robot_cfg['ground_truth_odometry']['enabled'] = truth_override == 'true'
         hold_cfg = load_yaml(resolve_path(robot_launch['joint_position_hold']))['joint_position_hold']
         description = robot_cfg['description']
         description_share = Path(get_package_share_directory(description['package']))
@@ -149,6 +154,10 @@ def configure(context):
         ),
     ]
     if robot_cfg is not None:
+        truth = robot_cfg.get('ground_truth_odometry', {})
+        if truth.get('enabled', False):
+            bridge_arguments.append(
+                f'{truth["topic"]}@nav_msgs/msg/Odometry[gz.msgs.Odometry')
         bridge_arguments.append(
             f'{robot_cfg["joint_states"]["topic"]}'
             '@sensor_msgs/msg/JointState[gz.msgs.Model'
@@ -255,6 +264,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument('enable_actuation', default_value='false',
                                   description='Explicitly enable ROS-to-Gazebo commands'),
+            DeclareLaunchArgument('publish_ground_truth', default_value='',
+                                  description='Optional diagnostic physical-base odometry'),
             OpaqueFunction(function=configure),
         ]
     )

@@ -16,7 +16,7 @@ from rosgraph_msgs.msg import Clock
 
 from robot_models.types import TargetState
 
-from robot_simulation.factory.config_loader import load_yaml
+from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.factory.simulation_factory import SimulationFactory
 from robot_simulation.gazebo.pose_client import GazeboPoseClient
 from robot_simulation.gazebo.target_adapter import GazeboTargetAdapter

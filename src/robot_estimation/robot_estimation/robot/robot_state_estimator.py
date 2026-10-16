@@ -48,6 +48,7 @@ class RobotStateEstimator(EstimatorInterface):
         wheel_measurement_model: WheelOdometryMeasurementModel,
         imu_measurement_model: ImuYawRateMeasurementModel,
         joint_measurement_model: JointEncoderMeasurementModel,
+        state_constraint=None,
     ) -> None:
         if (
             initial_state.dimension
@@ -106,9 +107,11 @@ class RobotStateEstimator(EstimatorInterface):
             process_function=self._process_function,
             process_jacobian=self._process_jacobian,
             process_covariance=(
-                self._process_model.process_covariance
+                self._process_covariance
             ),
+            state_constraint=state_constraint,
         )
+        self._state_constraint = state_constraint
 
     @property
     def state(self) -> StateEstimate:
@@ -222,6 +225,9 @@ class RobotStateEstimator(EstimatorInterface):
             ),
             sensor_name="Joint encoder",
         )
+        if self._state_constraint is not None:
+            self._state_constraint.observe(
+                measurement.value[:self._process_model.joint_count], measurement.timestamp)
 
         return self._filter.update(
             measurement=measurement,
@@ -260,6 +266,10 @@ class RobotStateEstimator(EstimatorInterface):
             state=state,
             dt=dt,
         )
+
+    def _process_covariance(self, dt):
+        """Use the same state linearization as the nonlinear prediction step."""
+        return self._process_model.process_covariance(dt, self._filter.state.mean)
 
     @staticmethod
     def _validate_measurement_dimension(

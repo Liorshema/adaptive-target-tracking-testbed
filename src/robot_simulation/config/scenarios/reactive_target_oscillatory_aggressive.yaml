@@ -1,0 +1,3 @@
+extends: reactive_target_oscillatory.yaml
+simulation:
+  environment_config: config/scenarios/environment_oscillatory_aggressive.yaml

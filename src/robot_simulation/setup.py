@@ -35,13 +35,14 @@ def install_directory_tree(source_directory: str) -> list:
     for root, directories, filenames in os.walk(source_directory):
         directories[:] = sorted(
             directory for directory in directories
-            if not directory.startswith(".")
+            if not directory.startswith(".") and directory != "__pycache__"
         )
 
         files = [
             os.path.join(root, filename)
             for filename in sorted(filenames)
             if not filename.startswith(".")
+            and not filename.endswith((".bak", ".backup", ".orig", ".rej", ".pyc", ".pyo"))
         ]
 
         if not files:
@@ -137,7 +138,7 @@ setup(
         "console_scripts": [
             "simulation_node = "
             "robot_simulation.nodes.simulation_node:main",
-            "velocity_actuation = robot_simulation.actuation.velocity_actuation:main",
+            "velocity_actuation = robot_simulation.nodes.velocity_actuation:main",
         ],
     },
 )

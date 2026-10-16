@@ -10,8 +10,9 @@ from rclpy.time import Time
 
 from robot_interfaces.msg import SafeVelocityCommand
 
+from robot_simulation.actuation.position_guard import PositionGuard
 from robot_simulation.actuation.position_reference import PositionReference
-from robot_simulation.actuation.velocity_actuation import VelocityActuationNode
+from robot_simulation.nodes.velocity_actuation import VelocityActuationNode
 
 
 @pytest.fixture
@@ -22,6 +23,12 @@ def actuator():
     node._names = ['a', 'b']
     node._frame = 'body'
     node._reference = PositionReference([-1., -1.], [1., 1.], [1., 1.], .08, .1)
+    node._position_guard = PositionGuard(
+        [-1., -1.], [1., 1.], [1., 1.], numerical_tolerance=1e-9,
+        recoverable_violation=.001, recovery_speed=.1,
+        recovery_inset=.04, release_margin=.005)
+    node._recovery_heartbeat = None
+    node._last_recovery_tick = None
     node._lower = np.array([-.5, -1., -1., -1.])
     node._upper = -node._lower
     node._config = {'command_max_age': .25, 'feedback_max_age': .2,
@@ -178,3 +185,93 @@ def test_wall_watchdog_stops_even_when_simulation_time_pauses(actuator):
     actuator._watchdog_tick()
     assert actuator._command is None
     assert actuator.outputs[-1] is None
+
+
+def test_ordinary_resume_preserves_reference_continuity(actuator):
+    """A valid resumed source must not replace the held reference with measured q."""
+    actuator._command_callback(command())
+    actuator.test_now = 10.05
+    actuator._tick()
+    held = actuator._reference.position.copy()
+    actuator._halt('Test hold')
+    actuator._joint = (10., 10., np.array([.18, -.28]))
+    actuator._command_callback(command(sequence=2))
+    np.testing.assert_allclose(actuator._reference.position, held)
+
+
+def test_fresh_inactive_heartbeat_can_recover_only_violating_joint(actuator):
+    """Strict high-level rejection cannot deadlock a tiny physical excursion."""
+    actuator._joint = (10., 10., np.array([-1. - 1e-13, 0.]))
+    actuator._command_callback(command(active=False))
+    actuator._tick()
+    actuator.test_now += .02
+    actuator._tick()
+    np.testing.assert_allclose(actuator._reference.position, [-.998, 0.])
+    assert actuator._command is None
+    assert actuator.outputs[-1] is None  # base remains zero
+    actuator._joint = (10., 10., np.array([-.994, 0.]))
+    actuator._command_callback(command(sequence=2))
+    assert actuator._command is not None
+
+
+@pytest.mark.parametrize('failure', [
+    'stale_feedback', 'stale_command', 'missing_command',
+    'competing_outputs', 'invalid_command'])
+def test_recovery_requires_fresh_authenticated_transport(actuator, failure):
+    """Physical recovery never bypasses transport watchdogs or ownership."""
+    actuator._joint = (10., 10., np.array([-1.0001, 0.]))
+    actuator._reference.initialize([-1., 0.])
+    actuator._command_callback(command(active=False))
+    actuator._tick()
+    if failure == 'stale_feedback':
+        actuator._joint = (9., 10., np.array([-1.0001, 0.]))
+    elif failure == 'stale_command':
+        actuator._recovery_heartbeat = (9., 10.)
+    elif failure == 'missing_command':
+        actuator._recovery_heartbeat = None
+    elif failure == 'competing_outputs':
+        actuator._owns_outputs = lambda: False
+    else:
+        bad = command(sequence=2)
+        bad.velocity = [20., 0., 0., 0.]
+        actuator._command_callback(bad)
+    actuator.test_now += .02
+    actuator._tick()
+    np.testing.assert_array_equal(actuator._reference.position, [-1., 0.])
+
+
+def test_serious_fault_survives_clock_reset_and_fresh_source(actuator):
+    """New transport epochs are not an operator acknowledgement of physical faults."""
+    actuator._joint = (10., 10., np.array([-1.01, 0.]))
+    actuator._tick()
+    assert actuator._position_guard.mode == 'fault'
+    actuator._on_time_jump(None)
+    actuator._joint = (10., 10., np.zeros(2))
+    actuator._odom = (10., 10.)
+    actuator._command_callback(command('new'))
+    assert actuator._command is None
+    assert actuator._position_guard.mode == 'fault'
+
+
+def test_wall_watchdog_revokes_recovery_authority_without_resetting_reference(actuator):
+    """A paused clock cannot preserve physical recovery permission indefinitely."""
+    actuator._joint = (10., 10., np.array([-1.0001, 0.]))
+    actuator._reference.initialize([-1., 0.])
+    actuator._command_callback(command(active=False))
+    actuator._tick()
+    actuator.test_now += .02
+    actuator._tick()
+    held = actuator._reference.position.copy()
+    actuator._wall = lambda: 10.6
+    actuator._watchdog_tick()
+    assert actuator._recovery_heartbeat is None
+    assert actuator._timeout_events == 1
+    np.testing.assert_array_equal(actuator._reference.position, held)
+    assert actuator.outputs[-1] is None
+
+
+def test_first_active_command_keeps_the_configured_gazebo_startup_target(actuator):
+    """Measured sag must not create a position step at actuator handoff."""
+    actuator._reference.initialize([.3, -.2])
+    actuator._command_callback(command())
+    np.testing.assert_array_equal(actuator._reference.position, [.3, -.2])

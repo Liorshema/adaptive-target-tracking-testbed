@@ -9,10 +9,22 @@ from robot_models.constraints.velocity_limits import VelocityLimits
 
 from robot_control.interfaces.control_data import ControlMode, ControlOutput
 from robot_control.safety.constraint_bounds import (
+    JointPositionViolation,
     acceleration_bounds,
     joint_position_bounds,
     velocity_bounds,
 )
+
+
+def test_tiny_excursion_remains_invalid_and_reports_named_joint():
+    """Diagnostics preserve exact limits rather than silently accepting noise."""
+    with pytest.raises(JointPositionViolation) as raised:
+        joint_position_bounds(JointLimits(np.array([0.]), np.array([1.])),
+                              np.array([-1e-13]), np.array([2]),
+                              make_velocity_limits(3), .02)
+    detail = raised.value.describe(['test_joint'])
+    assert 'test_joint' in detail and 'excess=1e-13 rad' in detail
+    assert 'bounds=[0,1]' in detail
 from robot_control.safety.constraint_projector import ConstraintProjector
 
 
