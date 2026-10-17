@@ -1,9 +1,11 @@
 # Current architecture
 
-Authoritative navigation guide, updated 2026-10-16 by M06.1. The earlier M06 audit,
+Authoritative navigation guide, updated 2026-10-16 through M07. The earlier M06 audit,
 target tree and compatibility-migration report describe historical states. Current
 source has nine ROS packages, seven executable ROS adapters and no M06 Python
 compatibility aliases. See [hardening verification](m06_1_architecture_hardening.md).
+M07 selection and runtime validation are documented in
+[the unified configuration guide](m07_unified_system_configuration.md).
 
 ## Responsibilities and dependency direction
 
@@ -40,9 +42,11 @@ flowchart TD
  C --> D
  C --> M
  C --> I
+ C --> Q
  E --> I
  E -. physical bounds .-> D
  P --> I
+ P --> Q
 ```
 
 No lower-level package imports bringup. Models and configuration have no ROS or
@@ -74,6 +78,13 @@ The reactive target's tracking TF currently uses wheel odometry plus measured ar
 joints, so under skid drift it differs from the physical point. That is an explicit
 experiment limitation; there is no hidden static fallback or truth localization.
 
+Before starting process actions, optional `system_config` composition resolves
+resources and invokes actual owner factories to validate the selected deployment.
+Its pure implementation is `robot_bringup/factory/system_configuration.py`.
+It supplies merged, typed owner parameters to ROS; it does not store duplicate
+physics or implement algorithms. Legacy launch behavior remains available when
+no manifest is supplied. No second launch stack or experiment runner was added.
+
 Safe command publication requires explicit enablement. `publish_commands=false`
 retains compute-only behavior; Gazebo holding PIDs can remain active. Command
 session/sequence, freshness, reset recovery, raw-feedback gating, position guard
@@ -88,16 +99,20 @@ Python implementation root is `src/<package>/<package>/`:
 | ROS adapters | `nodes/`; executable names below are stable |
 | Construction | `factory/`, including pure `robot_estimation/factory/estimator_factory.py` |
 | YAML mapping loader | `robot_configuration/yaml_loader.py` |
+| Generic resource/type validation | `robot_configuration/{resources,parameter_validation}.py`, with injected package-share lookup |
+| System composition/preflight | `robot_bringup/factory/system_configuration.py`; examples in bringup `config/system_*.yaml` |
 | Prediction section validation | `robot_prediction/configuration/prediction_config.py` |
 | Physical parsing and normalization | `robot_description/model_parameters.py`; representation adaptation in `adapters/configuration.py` |
 | Model construction / runtime composition | `robot_models/factory/whole_body_factory.py` / `whole_body/composer.py` |
 | Spatial transforms and records | `robot_models/spatial/{rotations,transforms,spatial_data}.py` |
 | Estimator math | `robot_estimation/{filters,robot,target}/`; `state.py`, `measurement.py`, `timestamp_buffer.py` are explicit domain data/timing |
+| ROS parameter contracts | Owner `parameter_schema.py` modules in estimation/control, shared by declaration and preflight |
 | Prediction math | `robot_prediction/{baseline,history,evaluation,online_adaptation,fusion}/`; `temporal_alignment.py` is reusable interpolation |
 | Control math | `robot_control/{tracking,controllers,safety,pipeline}/` |
 | Transport/state conversion | Domain-local `adapters/`; control's fixed-frame numerical conversion is `adapters/prediction_frame_transform.py` |
 | Simulation components | `robot_simulation/{dynamics,disturbances,integration,engine,state,measurements}/` |
 | Gazebo and actuation | `robot_simulation/gazebo/`, pure guard/reference in `actuation/`, ROS transport in `nodes/velocity_actuation.py` |
+| Actuator startup construction | `robot_simulation/factory/actuation_factory.py`, reused by node and system preflight; guard/PID equations unchanged |
 | External resources | Package-root `config/`, `launch/`, `urdf/`, `models/`, `worlds/` as appropriate |
 | Tests | Package-root `test/`; cross-package architecture checks in bringup's `test_architecture.py` |
 
@@ -127,7 +142,7 @@ stubs have been removed. No aerial implementation is advertised.
 
 All architecture views use the actual filesystem through
 [`tools/show_architecture.py`](../tools/show_architecture.py). Generate the full
-current [canonical tree](validation/m06_1_final_tree.txt), or inspect one package:
+current [canonical tree](validation/m07_final_tree.txt), or inspect one package:
 
 ```bash
 python3 tools/show_architecture.py
@@ -212,7 +227,11 @@ configuration schema or source of physical truth was introduced by M06.1.
 merges mappings; lists/scalars/null replace. Resource values still resolve by the
 owning package or explicit simulation resource base. ROS parameter YAML, prediction
 sections and controller strategies keep their existing schemas and override order.
-The system does not yet provide unified YAML implementation selection.
+M07 composition references these owner files through relative paths or explicit
+`{package, path}` resources. Generic per-document transforms preserve declaring-file
+relative references through inheritance. Unknown selections and incompatible
+state/frame/joint/timing contracts fail before process creation. Explicit launch
+overrides win over manifest runtime settings; actuation remains an explicit opt-in.
 
 ## Adding a predictor: practical path
 
@@ -222,13 +241,15 @@ The system does not yet provide unified YAML implementation selection.
 2. Preserve common `[p,v]` output dimensions, absolute sample times and finite
    values. Richer acceleration/jerk state may stay internal. Add independent
    numerical, horizon, dimension, timestamp and observed-update tests in `test/`.
-3. Inspect `factory/system_factory.py`: it currently constructs IMM + residual
-   correction explicitly. Wiring a new deployed choice requires a focused factory
-   change and configuration tests. Dropping a file into baseline does not make it
-   selectable. Extending IMM's fixed CV/CA/CT ensemble is separate work.
+3. Inspect `factory/system_factory.py`: deployed choices are IMM and CV, with
+   residual/weighted-correction or none/none. Register a real new builder and
+   supported identifier there, then add contract and manifest-selection tests.
+   Dropping a file into baseline does not make it selectable. CA/CT require richer
+   input state and are rejected as standalone deployed choices; extending IMM's
+   existing internal CV/CA/CT ensemble is separate work.
 4. Change no controller, robot description or actuator for a predictor that
-   preserves the public contract. Full predictor/adapter YAML selection is M07,
-   not an implemented feature of this repository yet.
+   preserves the public contract. M07 covers the current six-state deployment;
+   arbitrary adapters, learned models and state dimensions remain future work.
 
 ## Selecting or adding control
 

@@ -11,11 +11,32 @@ from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
 from robot_estimation.target.models.measurement_model import PositionMeasurementModel
 from robot_estimation.target.models.process_model import ConstantVelocityProcessModel
 from robot_estimation.target.target_state_estimator import TargetStateEstimator
+from robot_estimation.timestamp_buffer import TimestampBuffer
 
-def create_robot_estimator(parameters, physical=None):
+
+def validate_runtime_parameters(parameters):
+    """Check the existing node's publication and causal-reordering budgets."""
+    rate = parameters.get('full_state_publish_rate', 0.)
+    period = parameters.get('diagnostic_log_period', 5.)
+    if not np.isfinite(rate) or rate < 0:
+        raise ValueError('full_state_publish_rate must be finite and nonnegative')
+    if not np.isfinite(period) or period <= 0:
+        raise ValueError('diagnostic_log_period must be finite and positive')
+    buffer = TimestampBuffer(parameters['reorder_holdback'], parameters['reorder_max_age'],
+                             parameters['future_tolerance'], parameters['reorder_capacity'])
+    for name in ['reorder_rate_hz', 'diagnostic_rate_hz', 'max_joint_state_age', 'max_wheel_odometry_age']:
+        if not np.isfinite(parameters[name]) or parameters[name] <= 0:
+            raise ValueError(f'{name} must be finite and positive')
+    if buffer.holdback + 1 / parameters['reorder_rate_hz'] >= min(
+            parameters['max_joint_state_age'], parameters['max_wheel_odometry_age']):
+        raise ValueError('Reorder latency must fit within component freshness budgets')
+
+def create_robot_estimator(parameters, physical=None, estimator_type='robot_ekf'):
     """
     Construct the configured robot EKF.
     """
+    if estimator_type != 'robot_ekf':
+        raise ValueError(f'estimation.robot.type={estimator_type!r}: supported: robot_ekf')
     joint_count = int(parameters['joint_count'])
     process_model = RobotProcessModel(joint_count=joint_count, linear_acceleration_noise_std=float(parameters['linear_acceleration_noise_std']), angular_acceleration_noise_std=float(parameters['angular_acceleration_noise_std']), joint_acceleration_noise_std=float(parameters['joint_acceleration_noise_std']))
     state_dimension = process_model.state_dimension
@@ -25,6 +46,8 @@ def create_robot_estimator(parameters, physical=None):
         raise ValueError(f'robot_initial_state has invalid dimension. Expected {state_dimension}, got {initial_mean.shape}.')
     if covariance_diagonal.shape != (state_dimension,):
         raise ValueError(f'robot_initial_covariance_diagonal has invalid dimension. Expected {state_dimension}, got {covariance_diagonal.shape}.')
+    if not np.all(np.isfinite(initial_mean)) or not np.all(np.isfinite(covariance_diagonal)):
+        raise ValueError('Robot initial distribution must be finite')
     if np.any(covariance_diagonal < 0.0):
         raise ValueError('robot_initial_covariance_diagonal must contain non-negative values.')
     initial_state = StateEstimate(mean=initial_mean, covariance=np.diag(covariance_diagonal), timestamp=None)
@@ -49,10 +72,12 @@ def create_robot_estimator(parameters, physical=None):
         state_constraint=constraint)
     return estimator, constraint
 
-def create_target_estimator(parameters):
+def create_target_estimator(parameters, estimator_type='kalman'):
     """
     Construct the configured target Kalman filter.
     """
+    if estimator_type != 'kalman':
+        raise ValueError(f'estimation.target.type={estimator_type!r}: supported: kalman')
     spatial_dimension = int(parameters['target_spatial_dimension'])
     process_model = ConstantVelocityProcessModel(spatial_dimension=spatial_dimension, acceleration_noise_std=float(parameters['target_acceleration_noise_std']))
     measurement_model = PositionMeasurementModel(spatial_dimension=spatial_dimension)
@@ -63,6 +88,8 @@ def create_target_estimator(parameters):
         raise ValueError(f'target_initial_state has invalid dimension. Expected {expected_state_dimension}, got {initial_mean.shape}.')
     if covariance_diagonal.shape != (expected_state_dimension,):
         raise ValueError(f'target_initial_covariance_diagonal has invalid dimension. Expected {expected_state_dimension}, got {covariance_diagonal.shape}.')
+    if not np.all(np.isfinite(initial_mean)) or not np.all(np.isfinite(covariance_diagonal)):
+        raise ValueError('Target initial distribution must be finite')
     if np.any(covariance_diagonal < 0.0):
         raise ValueError('target_initial_covariance_diagonal must contain non-negative values.')
     initial_state = StateEstimate(mean=initial_mean, covariance=np.diag(covariance_diagonal), timestamp=None)

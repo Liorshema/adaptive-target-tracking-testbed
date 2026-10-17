@@ -1,6 +1,8 @@
 from pathlib import Path
 
-import yaml
+from robot_configuration.yaml_loader import load_yaml
+from robot_configuration.parameter_validation import validate_parameters
+import math
 
 
 class PredictionConfig:
@@ -21,22 +23,36 @@ class PredictionConfig:
                 f'{self._config_path}'
             )
 
-        with self._config_path.open(
-            'r',
-            encoding='utf-8',
-        ) as file:
-            config = yaml.safe_load(file)
-
-        if config is None:
-            raise ValueError(
-                'configuration file is empty.'
-            )
-
-        if not isinstance(config, dict):
-            raise ValueError(
-                'configuration root must be a mapping.'
-            )
-
+        config = load_yaml(self._config_path)
+        allowed = {
+            'prediction': {'dt', 'horizon', 'type'},
+            'history': {'window_duration'}, 'confidence': {'residual_scale'},
+            'imm': {'model_probabilities', 'transition_matrix', 'likelihood_variance'},
+            'coordinated_turn': {'turn_rate_epsilon'},
+            'fusion': {'type', 'default_weights'},
+            'adaptation': {'type', 'residual', 'rls'},
+        }
+        if set(config) - set(allowed):
+            raise ValueError(f'{self._config_path}: unknown prediction sections {set(config)-set(allowed)}')
+        for section, value in config.items():
+            if not isinstance(value, dict) or set(value) - allowed[section]:
+                raise ValueError(f'{self._config_path}:{section}: unsupported keys or non-mapping section')
+        for section, keys in [('residual', {'correction_gain'}),
+                              ('rls', {'forgetting_factor', 'initial_covariance'})]:
+            value = config.get('adaptation', {}).get(section, {})
+            if not isinstance(value, dict) or set(value) - keys:
+                raise ValueError(f'{self._config_path}:adaptation.{section}: unsupported keys')
+        validate_parameters(config.get('prediction'),
+                            {'dt': 'DOUBLE', 'horizon': 'INTEGER', 'type': 'STRING'},
+                            required={'dt', 'horizon'}, path=f'{self._config_path}:prediction')
+        def finite(value):
+            if isinstance(value, dict):
+                return all(finite(v) for v in value.values())
+            if isinstance(value, list):
+                return all(finite(v) for v in value)
+            return not isinstance(value, (int, float)) or math.isfinite(value)
+        if not finite(config):
+            raise ValueError(f'{self._config_path}: prediction parameters must be finite')
         return config
 
     def get(

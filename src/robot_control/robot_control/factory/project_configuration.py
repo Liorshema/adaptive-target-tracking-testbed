@@ -13,6 +13,42 @@ from robot_models.spatial.transforms import make_transform
 from robot_control.factory.project_components import (
     robot_configuration_from_description,
 )
+from robot_control.adapters.control_config_adapter import ControlConfigAdapter
+from robot_control.safety.input_validator import InputValidationConfig
+
+
+def configured_control(parameters, description, strategy=None, *, lookahead='', feedforward=''):
+    """Assemble the existing project configuration for both node and preflight."""
+    if not parameters.get('safety_enabled', True):
+        raise ValueError('Compute-only mode requires safety_enabled=true')
+    lower, upper = parameters['base_velocity_lower'], parameters['base_velocity_upper']
+    if lower is None or upper is None or len(lower) != 2 or len(upper) != 2:
+        raise ValueError('Compute-only mode requires explicit base_velocity_lower and base_velocity_upper arrays in [v, omega] order')
+    if len(description['robot']['manipulator']['joints']) != parameters['joint_count']:
+        raise ValueError('ROS joint_count does not match robot description')
+    robot, safety, _ = project_control_configuration(description, lower, upper)
+    config = ControlConfigAdapter.convert(parameters, robot, safety)
+    if strategy is not None:
+        config = apply_strategy_configuration(config, strategy)
+    if feedforward:
+        if feedforward not in ['true', 'false']:
+            raise ValueError('feedforward_override must be true, false or empty')
+        config['tracking']['target_velocity_feedforward'] = feedforward == 'true'
+    if lookahead:
+        config['tracking']['lookahead_time'] = float(lookahead)
+    validate_runtime_parameters(parameters, config['tracking']['lookahead_time'])
+    return config
+
+
+def validate_runtime_parameters(parameters, lookahead_time):
+    """Use the same pure freshness and rate contracts before ROS startup."""
+    rate = parameters['validation_rate']
+    if not np.isfinite(rate) or rate <= 0:
+        raise ValueError('validation_rate must be finite and positive')
+    return InputValidationConfig(
+        max_robot_state_age=parameters['max_robot_state_age'],
+        max_prediction_age=parameters['max_prediction_age'],
+        future_tolerance=parameters['future_tolerance'], lookahead_time=lookahead_time)
 
 
 def apply_strategy_configuration(config, strategy):
@@ -21,8 +57,13 @@ def apply_strategy_configuration(config, strategy):
         raise ValueError('Strategy may configure controller and tracking only')
     result = deepcopy(config)
     controller = deepcopy(strategy['controller'])
+    if (not isinstance(controller, Mapping) or
+            set(controller) - {'type', 'parameters', 'task', 'uses_safety_bounds', 'task_selection'}):
+        raise ValueError('Unsupported controller strategy keys')
     task = controller.get('task')
     if task is not None:
+        if not isinstance(task, Mapping) or set(task) - {'type', 'parameters'}:
+            raise ValueError('Unsupported controller task keys')
         parameters = task.setdefault('parameters', {})
         if task['type'] == 'distance_pointing':
             pose = result['tracking']['pose']

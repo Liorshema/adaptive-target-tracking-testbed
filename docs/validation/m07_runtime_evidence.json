@@ -1,0 +1,390 @@
+{
+  "purpose": "Bounded deployment integration; separate runs are not performance or algorithm benchmarks.",
+  "physical_joint_order": [
+    "base_yaw",
+    "shoulder",
+    "elbow",
+    "wrist"
+  ],
+  "configured_physical_joint_speed_limits": [
+    1.0,
+    1.0,
+    1.0,
+    1.5
+  ],
+  "runs": {
+    "unified": {
+      "launch": [
+        "ros2",
+        "launch",
+        "robot_bringup",
+        "closed_loop.launch.py",
+        "system_config:=config/system_nominal.yaml",
+        "gui:=false",
+        "enable_actuation:=true",
+        "publish_ground_truth:=true",
+        "visualize_tracking:=false"
+      ],
+      "samples": 159,
+      "mean_distance_error": 0.1192982267133532,
+      "max_distance_error": 0.31295747407611907,
+      "mean_pointing_degrees": 6.986989179817732,
+      "max_pointing_degrees": 17.52725699962557,
+      "mean_rtf": 0.9235007990117039,
+      "mean_compute_ms": 9.706675408798425,
+      "p95_compute_ms": 20.42731369992907,
+      "joint_velocity_peaks": [
+        0.2327886188204199,
+        0.9659423153095215,
+        1.9380952689380546,
+        2.142861851274841
+      ],
+      "minimum_joint_limit_margin": 0.49514198915458546,
+      "checks": {
+        "physical_limits": true,
+        "watchdog": true,
+        "measured_joint_velocity_limits": false,
+        "safe_velocity_limits": true,
+        "shoulder_all_feedback": true,
+        "first_link_horizontal": true,
+        "first_link_base_clearance": true,
+        "live_tracking_tf": true
+      },
+      "actuation_active_fraction": 1.0,
+      "watchdog_timeouts_after_settling": 0,
+      "counters": {
+        "accepted_commands": 239,
+        "rejected_commands": 0,
+        "timeout_events": 55,
+        "reference_limit_events": 7,
+        "inactive_commands": 58,
+        "feedback_rejections": 0
+      },
+      "observed_topic_rates_sim_hz": {
+        "joint": 546.1666666666666,
+        "odom": 55.416666666666664,
+        "physical": 22.166666666666668,
+        "robot_estimate": 52.333333333333336,
+        "control_telemetry": 24.833333333333332,
+        "base_command": 60.5,
+        "actuation": 10.333333333333334,
+        "target": 84.25,
+        "target_estimate": 17.166666666666668,
+        "prediction": 17.166666666666668
+      },
+      "base_excursion": 0.7424283924660648,
+      "joint_excursions": [
+        0.20074065988317125,
+        0.191026689739816,
+        0.1326070299971161,
+        0.39207223259990415
+      ],
+      "artifacts": "results/m07_unified_verified",
+      "evaluation_window_sim_seconds": [
+        5.318,
+        13.318
+      ],
+      "observed_sample_time_range": [
+        1.35,
+        13.3
+      ],
+      "stream_counts": {
+        "joints": 6554,
+        "targets": 1011,
+        "tracking_tf": 243,
+        "commands": 298,
+        "control": 298,
+        "robot_estimates": 628,
+        "wheel_joints": 6554,
+        "estimation_diagnostics": 66,
+        "position_commands": 2904,
+        "odometry": 665,
+        "physical_base": 266,
+        "actuation": 124
+      },
+      "actual_runtime_component_types": {
+        "predictor": "robot_prediction.baseline.imm.IMMPredictor",
+        "adaptation": "robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter",
+        "fusion": "robot_prediction.fusion.weighted_correction.WeightedCorrection",
+        "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+        "model": "robot_models.whole_body.composer.WholeBodyComposer",
+        "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+        "robot_estimator": "RobotStateEstimator",
+        "target_estimator": "TargetStateEstimator",
+        "dynamics": "FightFlightDynamics",
+        "integrator": "RK4Integrator"
+      },
+      "actual_runtime_identity_log_lines": [
+        "[prediction_node-6] [INFO] [1792169854.480734810] [prediction_node]: Prediction node started: {'predictor': 'robot_prediction.baseline.imm.IMMPredictor', 'adaptation': 'robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter', 'fusion': 'robot_prediction.fusion.weighted_correction.WeightedCorrection'}",
+        "[simulation_node-3] [INFO] [1792169854.886205541] [simulation_node]: Simulation components: dynamics=FightFlightDynamics, integrator=RK4Integrator",
+        "[control_node-7] [INFO] [1792169855.018200747] [control_node]: Control components: {'controller': 'robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController', 'model': 'robot_models.whole_body.composer.WholeBodyComposer', 'safety': 'robot_control.safety.safe_control_pipeline.SafeControlPipeline'}",
+        "[estimation_node-5] [INFO] [1792169855.191253555] [estimation_node]: Estimation node initialized: robot=RobotStateEstimator, target=TargetStateEstimator."
+      ],
+      "max_joint_position_violation_all_received_rad": 0.0,
+      "finite_recorded_robot_means_covariances_and_commands": true,
+      "valid_control_messages_in_evaluation_window": 160,
+      "invalid_control_messages_in_evaluation_window": 0,
+      "observer_exit_code": 1,
+      "failed_observer_checks": [
+        "measured_joint_velocity_limits"
+      ],
+      "topic_rate_note": "Counts include startup divided by requested 12 simulated seconds; not steady-state frequencies.",
+      "physical_posture": {
+        "minimum_shoulder": 0.0006396314507949644,
+        "maximum_shoulder": 0.6868700486127034,
+        "minimum_link_elevation": 0.009818442196759331,
+        "minimum_first_link_box_base_clearance": 0.0400019361476569,
+        "tracking_tf_samples": 243
+      }
+    },
+    "legacy": {
+      "launch": [
+        "ros2",
+        "launch",
+        "robot_bringup",
+        "closed_loop.launch.py",
+        "gui:=false",
+        "config:=config/reactive_tracking_oscillatory.yaml",
+        "enable_actuation:=true",
+        "strategy_config:=config/whole_body.yaml",
+        "publish_ground_truth:=true",
+        "visualize_tracking:=false"
+      ],
+      "samples": 159,
+      "mean_distance_error": 0.09229569575690975,
+      "max_distance_error": 0.28644862234806623,
+      "mean_pointing_degrees": 7.488977539188175,
+      "max_pointing_degrees": 14.14410171449102,
+      "mean_rtf": 0.9914946152980539,
+      "mean_compute_ms": 5.9304655345956565,
+      "p95_compute_ms": 9.661223399950813,
+      "joint_velocity_peaks": [
+        0.31386685448382246,
+        0.5290830426953128,
+        1.000000000082609,
+        1.5777789735903092
+      ],
+      "minimum_joint_limit_margin": 0.44236370126065194,
+      "checks": {
+        "physical_limits": true,
+        "watchdog": true,
+        "measured_joint_velocity_limits": false,
+        "safe_velocity_limits": true,
+        "shoulder_all_feedback": true,
+        "first_link_horizontal": true,
+        "first_link_base_clearance": true,
+        "live_tracking_tf": true
+      },
+      "actuation_active_fraction": 1.0,
+      "watchdog_timeouts_after_settling": 0,
+      "counters": {
+        "accepted_commands": 238,
+        "rejected_commands": 0,
+        "timeout_events": 73,
+        "reference_limit_events": 5,
+        "inactive_commands": 80,
+        "feedback_rejections": 0
+      },
+      "observed_topic_rates_sim_hz": {
+        "joint": 551.6666666666666,
+        "odom": 58.5,
+        "physical": 23.583333333333332,
+        "robot_estimate": 55.333333333333336,
+        "control_telemetry": 26.583333333333332,
+        "base_command": 60.333333333333336,
+        "actuation": 10.083333333333334,
+        "target": 84.5,
+        "target_estimate": 17.0,
+        "prediction": 17.0
+      },
+      "base_excursion": 0.6518705032768939,
+      "joint_excursions": [
+        0.18536197017948974,
+        0.1532260238909836,
+        0.11157820031717033,
+        0.25653721806240276
+      ],
+      "artifacts": "results/m07_legacy_verified",
+      "evaluation_window_sim_seconds": [
+        6.154,
+        14.154
+      ],
+      "observed_sample_time_range": [
+        2.2,
+        14.1
+      ],
+      "stream_counts": {
+        "joints": 6620,
+        "targets": 1014,
+        "tracking_tf": 277,
+        "commands": 319,
+        "control": 319,
+        "robot_estimates": 664,
+        "wheel_joints": 6620,
+        "estimation_diagnostics": 70,
+        "position_commands": 2896,
+        "odometry": 702,
+        "physical_base": 283,
+        "actuation": 121
+      },
+      "actual_runtime_component_types": {
+        "predictor": "robot_prediction.baseline.imm.IMMPredictor",
+        "adaptation": "robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter",
+        "fusion": "robot_prediction.fusion.weighted_correction.WeightedCorrection",
+        "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+        "model": "robot_models.whole_body.composer.WholeBodyComposer",
+        "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+        "robot_estimator": "RobotStateEstimator",
+        "target_estimator": "TargetStateEstimator",
+        "dynamics": "FightFlightDynamics",
+        "integrator": "RK4Integrator"
+      },
+      "actual_runtime_identity_log_lines": [
+        "[simulation_node-3] [INFO] [1792169952.699896050] [simulation_node]: Simulation components: dynamics=FightFlightDynamics, integrator=RK4Integrator",
+        "[prediction_node-6] [INFO] [1792169952.870444399] [prediction_node]: Prediction node started: {'predictor': 'robot_prediction.baseline.imm.IMMPredictor', 'adaptation': 'robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter', 'fusion': 'robot_prediction.fusion.weighted_correction.WeightedCorrection'}",
+        "[control_node-7] [INFO] [1792169952.901403489] [control_node]: Control components: {'controller': 'robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController', 'model': 'robot_models.whole_body.composer.WholeBodyComposer', 'safety': 'robot_control.safety.safe_control_pipeline.SafeControlPipeline'}",
+        "[estimation_node-5] [INFO] [1792169952.946354889] [estimation_node]: Estimation node initialized: robot=RobotStateEstimator, target=TargetStateEstimator."
+      ],
+      "max_joint_position_violation_all_received_rad": 0.0,
+      "finite_recorded_robot_means_covariances_and_commands": true,
+      "valid_control_messages_in_evaluation_window": 159,
+      "invalid_control_messages_in_evaluation_window": 0,
+      "observer_exit_code": 1,
+      "failed_observer_checks": [
+        "measured_joint_velocity_limits"
+      ],
+      "topic_rate_note": "Counts include startup divided by requested 12 simulated seconds; not steady-state frequencies.",
+      "physical_posture": {
+        "minimum_shoulder": 0.2863478329538309,
+        "maximum_shoulder": 0.5962033954347346,
+        "minimum_link_elevation": 0.009818442196759331,
+        "minimum_first_link_box_base_clearance": 0.0400019361476569,
+        "tracking_tf_samples": 277
+      }
+    },
+    "cv": {
+      "launch": [
+        "ros2",
+        "launch",
+        "robot_bringup",
+        "closed_loop.launch.py",
+        "system_config:=config/system_cv.yaml",
+        "gui:=false",
+        "enable_actuation:=true",
+        "publish_ground_truth:=true",
+        "visualize_tracking:=false"
+      ],
+      "samples": 160,
+      "mean_distance_error": 0.09380008519740897,
+      "max_distance_error": 0.32938661888338505,
+      "mean_pointing_degrees": 9.601802804829466,
+      "max_pointing_degrees": 16.267604996415727,
+      "mean_rtf": 0.9444213451370279,
+      "mean_compute_ms": 9.509027531252912,
+      "p95_compute_ms": 17.24638094995611,
+      "joint_velocity_peaks": [
+        0.253323750075224,
+        0.6358140976891158,
+        0.77055741540012,
+        1.5307175228718626
+      ],
+      "minimum_joint_limit_margin": 0.5105035554885109,
+      "checks": {
+        "physical_limits": true,
+        "watchdog": true,
+        "measured_joint_velocity_limits": false,
+        "safe_velocity_limits": true,
+        "shoulder_all_feedback": true,
+        "first_link_horizontal": true,
+        "first_link_base_clearance": true,
+        "live_tracking_tf": true
+      },
+      "actuation_active_fraction": 1.0,
+      "watchdog_timeouts_after_settling": 0,
+      "counters": {
+        "accepted_commands": 238,
+        "rejected_commands": 0,
+        "timeout_events": 64,
+        "reference_limit_events": 0,
+        "inactive_commands": 81,
+        "feedback_rejections": 0
+      },
+      "observed_topic_rates_sim_hz": {
+        "joint": 566.5833333333334,
+        "odom": 59.0,
+        "physical": 23.583333333333332,
+        "base_command": 62.0,
+        "robot_estimate": 55.416666666666664,
+        "control_telemetry": 26.75,
+        "actuation": 10.25,
+        "target": 84.33333333333333,
+        "target_estimate": 16.916666666666668,
+        "prediction": 16.916666666666668
+      },
+      "base_excursion": 0.7100886905275446,
+      "joint_excursions": [
+        0.18066993471990733,
+        0.1320531078317705,
+        0.14166662165863136,
+        0.2917584499111076
+      ],
+      "artifacts": "results/m07_cv_verified",
+      "evaluation_window_sim_seconds": [
+        6.168,
+        14.168
+      ],
+      "observed_sample_time_range": [
+        2.2,
+        14.15
+      ],
+      "stream_counts": {
+        "joints": 6799,
+        "targets": 1012,
+        "tracking_tf": 279,
+        "commands": 321,
+        "control": 321,
+        "robot_estimates": 665,
+        "wheel_joints": 6799,
+        "estimation_diagnostics": 70,
+        "position_commands": 3000,
+        "odometry": 708,
+        "physical_base": 283,
+        "actuation": 123
+      },
+      "actual_runtime_component_types": {
+        "predictor": "robot_prediction.baseline.constant_velocity.ConstantVelocityPredictor",
+        "adaptation": "builtins.NoneType",
+        "fusion": "builtins.NoneType",
+        "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+        "model": "robot_models.whole_body.composer.WholeBodyComposer",
+        "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+        "robot_estimator": "RobotStateEstimator",
+        "target_estimator": "TargetStateEstimator",
+        "dynamics": "FightFlightDynamics",
+        "integrator": "RK4Integrator"
+      },
+      "actual_runtime_identity_log_lines": [
+        "[prediction_node-6] [INFO] [1792170002.490573217] [prediction_node]: Prediction node started: {'predictor': 'robot_prediction.baseline.constant_velocity.ConstantVelocityPredictor', 'adaptation': 'builtins.NoneType', 'fusion': 'builtins.NoneType'}",
+        "[simulation_node-3] [INFO] [1792170002.829229741] [simulation_node]: Simulation components: dynamics=FightFlightDynamics, integrator=RK4Integrator",
+        "[control_node-7] [INFO] [1792170002.956184968] [control_node]: Control components: {'controller': 'robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController', 'model': 'robot_models.whole_body.composer.WholeBodyComposer', 'safety': 'robot_control.safety.safe_control_pipeline.SafeControlPipeline'}",
+        "[estimation_node-5] [INFO] [1792170003.032620154] [estimation_node]: Estimation node initialized: robot=RobotStateEstimator, target=TargetStateEstimator."
+      ],
+      "max_joint_position_violation_all_received_rad": 0.0,
+      "finite_recorded_robot_means_covariances_and_commands": true,
+      "valid_control_messages_in_evaluation_window": 160,
+      "invalid_control_messages_in_evaluation_window": 0,
+      "observer_exit_code": 1,
+      "failed_observer_checks": [
+        "measured_joint_velocity_limits"
+      ],
+      "topic_rate_note": "Counts include startup divided by requested 12 simulated seconds; not steady-state frequencies.",
+      "physical_posture": {
+        "minimum_shoulder": 0.062347832899562985,
+        "maximum_shoulder": 0.6425854446482746,
+        "minimum_link_elevation": 0.009818442196759331,
+        "minimum_first_link_box_base_clearance": 0.0400019361476569,
+        "tracking_tf_samples": 279
+      }
+    }
+  }
+}

@@ -57,6 +57,15 @@ class ControlExecutionPipeline:
         self._kinematics_adapter = kinematics_adapter
         self._controller = controller
 
+    @property
+    def component_types(self) -> dict[str, str]:
+        """Expose actual constructed components without bypassing safety."""
+        tracking = self._controller._tracking
+        return {name: type(component).__module__ + '.' + type(component).__name__
+                for name, component in [('controller', tracking._controller),
+                                        ('model', tracking._model),
+                                        ('safety', self._controller._safety)]}
+
     def compute(
         self,
         robot_state: RobotState,

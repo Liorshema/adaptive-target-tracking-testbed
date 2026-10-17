@@ -25,6 +25,7 @@
   <test_depend>python3-pytest</test_depend>
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>robot_interfaces</exec_depend>
+  <exec_depend>robot_configuration</exec_depend>
 
 
   <buildtool_depend>ament_python</buildtool_depend>

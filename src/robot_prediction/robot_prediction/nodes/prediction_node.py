@@ -40,6 +40,18 @@ class PredictionNode(Node):
             / 'config'
             / 'prediction.yaml'
         )
+        self.declare_parameter('configuration_file', '')
+        configured = self.get_parameter('configuration_file').value
+        if configured:
+            config_path = Path(configured)
+            if not config_path.is_absolute():
+                config_path = Path(get_package_share_directory('robot_prediction')) / config_path
+        self._selection = {}
+        for name in ['predictor_type', 'adaptation_type', 'fusion_type']:
+            self.declare_parameter(name, '')
+            value = self.get_parameter(name).value
+            if value:
+                self._selection[name] = value
 
         self._config = PredictionConfig(
             config_path
@@ -60,7 +72,7 @@ class PredictionNode(Node):
         self._system = (
             PredictionSystemFactory(
                 config=self._config
-            ).create()
+            ).create(**self._selection)
         )
 
         self._last_timestamp = None
@@ -124,12 +136,12 @@ class PredictionNode(Node):
         )
 
         self.get_logger().info(
-            'Prediction node started.'
+            f'Prediction node started: {self._system.component_types}'
         )
 
     def _on_time_jump(self, _jump) -> None:
         """Discard prediction/adaptation history when ROS time changes epoch."""
-        self._system = PredictionSystemFactory(config=self._config).create()
+        self._system = PredictionSystemFactory(config=self._config).create(**getattr(self, '_selection', {}))
         self._last_timestamp = None
         self._state_dimension = None
         self._frame_id = None

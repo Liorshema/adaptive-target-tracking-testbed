@@ -44,6 +44,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--config', default='config/optimal_tracking.yaml')
     parser.add_argument('--strategy-config', default='config/whole_body.yaml')
+    parser.add_argument('--system-config', default='',
+                        help='Exercise the existing bringup unified-manifest entry point')
     parser.add_argument('--gui', action='store_true')
     parser.add_argument('--without-markers', action='store_true',
                         help='Retain physical ground truth without the optional RViz marker node')
@@ -101,7 +103,11 @@ def main():
                f'gui:={str(args.gui).lower()}',
                f'config:={args.config}',
                f'enable_actuation:={str(enabled).lower()}']
-    if args.case not in ['hold', 'v1']:
+    if args.system_config:
+        command = ['ros2', 'launch', 'robot_bringup', 'closed_loop.launch.py',
+                   f'system_config:={args.system_config}', f'gui:={str(args.gui).lower()}',
+                   f'enable_actuation:={str(enabled).lower()}']
+    elif args.case not in ['hold', 'v1']:
         command.append(f'strategy_config:={args.strategy_config}')
     if args.case == 'no_feedforward':
         command.append('feedforward:=false')
@@ -113,6 +119,14 @@ def main():
     if args.drive_fixture:
         command.append('publish_commands:=false')
     master = load_yaml(ROOT / 'src/robot_bringup' / args.config)
+    if args.system_config:
+        from robot_bringup.factory.system_configuration import load_system_configuration
+        manifest = Path(args.system_config)
+        if not manifest.is_absolute():
+            manifest = ROOT / 'src/robot_bringup' / manifest
+        plan = load_system_configuration(manifest, lambda package: ROOT / 'src' / package)
+        master = {key: str(value) if isinstance(value, Path) else value
+                  for key, value in plan['profile'].items()}
     snapshot = {'bringup': master, 'robot': robot,
                 'simulation': load_yaml(ROOT / 'src/robot_simulation' / master['simulation_config']),
                 'description': description, 'actuation': actuator, 'control': control,
@@ -120,6 +134,10 @@ def main():
                 'estimation_overrides': load_yaml(
                     ROOT / 'src/robot_bringup' / master['estimation_overrides']),
                 'launch': command}
+    if args.system_config:
+        snapshot['system_manifest'] = args.system_config
+        snapshot['selected_components'] = plan['identities']
+        snapshot['prediction_configuration'] = load_yaml(plan['prediction_path'])
     simulation_resource = ROOT / 'src/robot_simulation'
     sim_cfg = snapshot['simulation']
     snapshot['target'] = load_yaml(simulation_resource / sim_cfg['target']['config'])

@@ -9,11 +9,13 @@ from time import perf_counter
 import numpy as np
 import rclpy
 import yaml
+from robot_configuration.yaml_loader import load_yaml
 from ament_index_python.packages import get_package_share_directory
 from rclpy.clock import JumpThreshold
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from robot_control.parameter_schema import REQUIRED_PARAMETERS, CONTROL_PARAMETERS
 from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
 from robot_interfaces.msg import (
@@ -24,9 +26,6 @@ from robot_interfaces.msg import ControlTelemetry, SafeVelocityCommand
 from scipy.spatial.transform import Rotation
 from tf2_ros import Buffer, TransformException, TransformListener
 
-from robot_control.adapters.control_config_adapter import (
-    ControlConfigAdapter,
-)
 from robot_control.adapters.prediction_frame_transform import transform_target_trajectory
 from robot_control.adapters.prediction_message_adapter import (
     PredictionMessageAdapter,
@@ -39,8 +38,7 @@ from robot_control.factory.project_components import (
     create_project_registries,
 )
 from robot_control.factory.project_configuration import (
-    apply_strategy_configuration,
-    project_control_configuration,
+    configured_control,
 )
 from robot_control.interfaces.control_data import (
     PredictedTargetTrajectory,
@@ -60,34 +58,9 @@ from robot_control.safety.input_validator import (
 class ControlNode(Node):
     """Validate ROS inputs and optionally compute safe tracking commands."""
 
-    _REQUIRED_PARAMETERS = {
-        "joint_count": Parameter.Type.INTEGER,
-        "robot_state_topic": Parameter.Type.STRING,
-        "prediction_topic": Parameter.Type.STRING,
-        "max_robot_state_age": Parameter.Type.DOUBLE,
-        "max_prediction_age": Parameter.Type.DOUBLE,
-        "future_tolerance": Parameter.Type.DOUBLE,
-        "validation_rate": Parameter.Type.DOUBLE,
-    }
+    _REQUIRED_PARAMETERS = {name: getattr(Parameter.Type, kind) for name, kind in REQUIRED_PARAMETERS.items()}
 
-    _CONTROL_PARAMETERS = {
-        "base_model_type": Parameter.Type.STRING,
-        "manipulator_model_type": Parameter.Type.STRING,
-        "kinematics_adapter_type": Parameter.Type.STRING,
-        "controller_type": Parameter.Type.STRING,
-        "controller_damping": Parameter.Type.DOUBLE,
-        "controller_task_axes": Parameter.Type.INTEGER_ARRAY,
-        "controller_task_gains": Parameter.Type.DOUBLE_ARRAY,
-        "reference_geometry_type": Parameter.Type.STRING,
-        "reference_policy_type": Parameter.Type.STRING,
-        "tracking_radius": Parameter.Type.DOUBLE,
-        "tracking_lookahead_time": Parameter.Type.DOUBLE,
-        "tracking_forward_axis": Parameter.Type.DOUBLE_ARRAY,
-        "tracking_up_axis": Parameter.Type.DOUBLE_ARRAY,
-        "world_up_axis": Parameter.Type.DOUBLE_ARRAY,
-        "base_velocity_lower": Parameter.Type.DOUBLE_ARRAY,
-        "base_velocity_upper": Parameter.Type.DOUBLE_ARRAY,
-    }
+    _CONTROL_PARAMETERS = {name: getattr(Parameter.Type, kind) for name, kind in CONTROL_PARAMETERS.items()}
 
     def __init__(self) -> None:
         """Initialize ROS inputs and optional compute-only pipeline."""
@@ -252,86 +225,28 @@ class ControlNode(Node):
         joint_count: int,
     ) -> ControlExecutionPipeline:
         """Construct real-model tracking with physical safety limits."""
-        if not self.get_parameter("safety_enabled").value:
-            raise ValueError(
-                "Compute-only mode requires safety_enabled=true"
-            )
-
-        parameters = {
-            name: self.get_parameter(name).value
-            for name in (
-                *self._REQUIRED_PARAMETERS,
-                *self._CONTROL_PARAMETERS,
-            )
-        }
-
-        base_lower = parameters["base_velocity_lower"]
-        base_upper = parameters["base_velocity_upper"]
-
-        if (
-            base_lower is None
-            or base_upper is None
-            or len(base_lower) != 2
-            or len(base_upper) != 2
-        ):
-            raise ValueError(
-                "Compute-only mode requires explicit "
-                "base_velocity_lower and base_velocity_upper "
-                "arrays in [v, omega] order"
-            )
-
-        configured_description = self.get_parameter('robot_description_file').value
-        description_path = (
-            Path(configured_description).expanduser() if configured_description else
-            Path(get_package_share_directory("robot_description")) / 'config/robot/robot.yaml')
-
-        with description_path.open(encoding="utf-8") as stream:
-            description = yaml.safe_load(stream)
-
-        robot_config, safety_config, transform_et = (
-            project_control_configuration(
-                description=description,
-                base_velocity_lower=base_lower,
-                base_velocity_upper=base_upper,
-            )
-        )
-
-        description_joint_count = len(
-            description["robot"]["manipulator"]["joints"]
-        )
-
-        if description_joint_count != joint_count:
-            raise ValueError(
-                "ROS joint_count does not match robot description"
-            )
-
-        factory_config = ControlConfigAdapter.convert(
-            ros_parameters=parameters,
-            robot_configuration=robot_config,
-            safety_configuration=safety_config,
-        )
+        parameters = {name: self.get_parameter(name).value
+                      for name in (*self._REQUIRED_PARAMETERS, *self._CONTROL_PARAMETERS)}
+        parameters['safety_enabled'] = self.get_parameter('safety_enabled').value
+        configured = self.get_parameter('robot_description_file').value
+        description_path = (Path(configured).expanduser() if configured else
+                            Path(get_package_share_directory('robot_description')) / 'config/robot/robot.yaml')
+        description = yaml.safe_load(description_path.read_text())
         strategy_path = self.get_parameter('strategy_config_file').value
+        strategy = None
         if strategy_path:
             strategy_path = Path(strategy_path)
             if not strategy_path.is_absolute():
                 strategy_path = Path(get_package_share_directory('robot_control')) / strategy_path
-            strategy = yaml.safe_load(strategy_path.read_text())
-            factory_config = apply_strategy_configuration(factory_config, strategy)
-        feedforward = self.get_parameter('feedforward_override').value
-        if feedforward:
-            if feedforward not in ['true', 'false']:
-                raise ValueError('feedforward_override must be true, false or empty')
-            factory_config['tracking']['target_velocity_feedforward'] = feedforward == 'true'
-        lookahead = self.get_parameter('lookahead_override').value
-        if lookahead:
-            factory_config['tracking']['lookahead_time'] = float(lookahead)
+            strategy = load_yaml(strategy_path)
+        factory_config = configured_control(
+            parameters, description, strategy,
+            feedforward=self.get_parameter('feedforward_override').value,
+            lookahead=self.get_parameter('lookahead_override').value)
         self._tracking_lookahead = factory_config['tracking']['lookahead_time']
-
-        factory = ControlFactory(
-            registries=create_project_registries(),
-        )
-
-        return factory.build(factory_config)
+        pipeline = ControlFactory(registries=create_project_registries()).build(factory_config)
+        self.get_logger().info(f'Control components: {pipeline.component_types}')
+        return pipeline
 
     def _prediction_in_robot_frame(
         self,

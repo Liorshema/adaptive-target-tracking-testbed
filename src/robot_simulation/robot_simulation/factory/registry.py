@@ -38,7 +38,7 @@ class ComponentRegistry:
 
         if component_type not in self._factories:
             raise ValueError(
-                f"Unknown component type: {component_type}"
+                f"Unknown component type: {component_type}; supported: {', '.join(self.registered_types)}"
             )
 
         parameters = config.get("parameters", {})

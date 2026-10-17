@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 
-def load_yaml(path: str | Path) -> dict[str, Any]:
+def load_yaml(path: str | Path, *, transform=None) -> dict[str, Any]:
     """
     Load a mapping, optionally inheriting one file with ``extends``.
 
@@ -17,13 +17,18 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
     inherited value. The top-level ``extends`` key is consumed, and ordinary
     documents retain their existing loading behavior. Cycles and non-mapping
     documents are rejected.
+
+    A caller may transform each document with ``transform(mapping, source_path)``
+    before inheritance merging, for example to preserve relative resource origins.
+    The loader itself has no knowledge of resource schemas or package policies.
     """
-    return _load_yaml(Path(path).resolve(), ())
+    return _load_yaml(Path(path).resolve(), (), transform)
 
 
 def _load_yaml(
     config_path: Path,
     ancestors: tuple[Path, ...],
+    transform=None,
 ) -> dict[str, Any]:
     """Resolve one inheritance chain while detecting canonical-path cycles."""
     if config_path in ancestors:
@@ -47,17 +52,21 @@ def _load_yaml(
         )
 
     _reject_recursive_aliases(data, set())
-    if 'extends' not in data:
+    has_parent = 'extends' in data
+    parent = data.pop('extends', None)
+    if transform is not None:
+        data = transform(data, config_path)
+        if not isinstance(data, dict):
+            raise ValueError(f'Document transform must return a mapping: {config_path}')
+    if not has_parent:
         return data
-
-    parent = data.pop('extends')
     if not isinstance(parent, str) or not parent.strip():
         raise ValueError(
             f'Configuration extends must name one file: {config_path}'
         )
 
     parent_path = (config_path.parent / parent).resolve()
-    inherited = _load_yaml(parent_path, (*ancestors, config_path))
+    inherited = _load_yaml(parent_path, (*ancestors, config_path), transform)
     return _merge_mappings(inherited, data)
 
 

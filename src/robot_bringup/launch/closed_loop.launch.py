@@ -1,17 +1,19 @@
 """Compose the permanent simulation and existing tracking pipeline."""
 
 from pathlib import Path
+import json
 
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 from launch_ros.actions import Node
 
 from robot_configuration.yaml_loader import load_yaml
+from robot_bringup.factory.system_configuration import load_system_configuration
 
 
 def configure(context):
@@ -22,16 +24,35 @@ def configure(context):
     def load(path):
         return load_yaml(path)
 
-    def flag(name):
-        value = LaunchConfiguration(name).perform(context).lower()
-        if value not in ['true', 'false']:
-            raise ValueError(f'{name} must be true or false')
-        return value == 'true'
+    raw = {name: LaunchConfiguration(name).perform(context)
+           for name in ['config', 'gui', 'enable_actuation', 'visualize_tracking',
+                        'publish_ground_truth', 'publish_commands', 'strategy_config',
+                        'lookahead', 'feedforward']}
+    manifest = LaunchConfiguration('system_config', default='').perform(context)
+    plan = None
+    if manifest:
+        path = Path(manifest).expanduser()
+        if not path.is_absolute():
+            path = share('robot_bringup') / path
+        plan = load_system_configuration(path, share, overrides=raw)
 
-    config = Path(LaunchConfiguration('config').perform(context)).expanduser()
+    def value(name):
+        if raw[name] != '':
+            return raw[name]
+        if plan and name in plan['runtime']:
+            return str(plan['runtime'][name]).lower()
+        return 'false' if name in ['gui', 'enable_actuation', 'visualize_tracking'] else ''
+
+    def flag(name):
+        selected = value(name).lower()
+        if selected not in ['true', 'false']:
+            raise ValueError(f'{name} must be true or false')
+        return selected == 'true'
+
+    config = Path(raw['config'] or 'config/closed_loop.yaml').expanduser()
     if not config.is_absolute():
         config = share('robot_bringup') / config
-    cfg = load(config)
+    cfg = plan['profile'] if plan else load(config)
     simulation_path = share('robot_simulation') / cfg['simulation_config']
     simulation_cfg = load(simulation_path)
     if simulation_cfg['paths']['base'] == 'package':
@@ -53,12 +74,12 @@ def configure(context):
     estimation_overrides = (load(share('robot_bringup') / cfg['estimation_overrides'])
                             if 'estimation_overrides' in cfg else {})
     enabled = flag('enable_actuation')
-    publish_arg = LaunchConfiguration('publish_commands').perform(context).lower()
+    publish_arg = value('publish_commands').lower()
     publish = enabled if publish_arg == '' else flag('publish_commands')
     if publish and not enabled:
         raise ValueError('Command publishing requires explicit enable_actuation=true')
     visualize = flag('visualize_tracking')
-    ground_truth = LaunchConfiguration('publish_ground_truth').perform(context).lower()
+    ground_truth = value('publish_ground_truth').lower()
     if ground_truth not in ['', 'true', 'false']:
         raise ValueError('publish_ground_truth must be true, false or empty')
     if visualize:
@@ -72,7 +93,7 @@ def configure(context):
             PythonLaunchDescriptionSource(str(share('robot_simulation') /
                                               'launch/simulation.launch.py')),
             launch_arguments={'config': str(simulation_path),
-                              'gui': LaunchConfiguration('gui').perform(context),
+                              'gui': value('gui'),
                               'publish_ground_truth': ground_truth,
                               'enable_actuation': str(enabled).lower()}.items()),
         Node(package='tf2_ros', executable='static_transform_publisher',
@@ -81,30 +102,36 @@ def configure(context):
                         '--frame-id', simulation_cfg['tracking']['reference_frame'],
                         '--child-frame-id', drive['frame_id']], parameters=[common]),
         Node(package='robot_estimation', executable='estimation_node', output='screen',
-             parameters=[str(share('robot_estimation') / cfg['robot_estimator_config']),
-                         str(share('robot_estimation') / cfg['target_estimator_config']), common,
-                         estimation_overrides,
+             parameters=[plan['estimation_parameters'] if plan else str(share('robot_estimation') / cfg['robot_estimator_config']),
+                         {} if plan else str(share('robot_estimation') / cfg['target_estimator_config']), common,
+                         {} if plan else estimation_overrides,
                          {'joint_count': len(names), 'joint_names': names,
                           'robot_description_file': str(description_path),
                           'wheel_odometry_topic': drive['odom_topic'],
                           'wheel_odom_frame': drive['frame_id'],
                           'base_frame': drive['child_frame_id'],
                           'joint_states_topic': robot['joint_states']['topic'],
-                          'robot_state_frame_id': drive['frame_id']}]),
+                          'robot_state_frame_id': drive['frame_id']},
+                         ({key: plan['selection'][key] for key in
+                           ['robot_estimator_type', 'target_estimator_type']} if plan else {})]),
         Node(package='robot_prediction', executable='prediction_node', output='screen',
-             parameters=[common]),
+             parameters=[common, ({'configuration_file': str(plan['prediction_path']),
+                                   **plan['prediction_topics'],
+                                   **{key: plan['selection'][key] for key in
+                                      ['predictor_type', 'adaptation_type', 'fusion_type']}}
+                                  if plan else {})]),
         Node(package='robot_control', executable='control_node', output='screen',
-             parameters=[str(control_path), common,
+             parameters=[plan['control_parameters'] if plan else str(control_path), common,
                          {'publish_commands': publish, 'command_joint_names': names,
                           'command_frame_id': drive['child_frame_id'],
                           'command_topic': actuator['command_topic'],
                           'joint_count': len(names),
                           'robot_description_file': str(description_path),
-                          'strategy_config_file': (
-                              LaunchConfiguration('strategy_config').perform(context)),
-                          'lookahead_override': LaunchConfiguration('lookahead').perform(context),
-                          'feedforward_override': (
-                              LaunchConfiguration('feedforward').perform(context)),
+                          'strategy_config_file': (str(plan['strategy_path']) if plan and plan['strategy_path']
+                                                   else '' if plan or raw['strategy_config'] == 'none'
+                                                   else raw['strategy_config']),
+                          'lookahead_override': value('lookahead'),
+                          'feedforward_override': value('feedforward'),
                           'publish_telemetry': True}]),
         Node(package='robot_simulation', executable='velocity_actuation', output='screen',
              parameters=[common, {'enabled': enabled,
@@ -138,16 +165,24 @@ def configure(context):
                                'odom_topic': drive['odom_topic'],
                                'parent_frame': drive['frame_id'],
                                'child_frame': simulation_cfg['tracking']['tracking_frame']}]))
+    if plan:
+        nodes.insert(0, LogInfo(msg='System assembly: ' + json.dumps({
+            'identities': plan['identities'], 'manifest': str(plan['source']),
+            'profile': str(plan['profile_path']), 'description': str(plan['description_path']),
+            'prediction': str(plan['prediction_path']), 'runtime': plan['runtime']}, sort_keys=True)))
     return nodes
 
 
 def generate_launch_description():
     """Keep Compute Only and the separate GUI workflow as launch defaults."""
     return LaunchDescription([
-        DeclareLaunchArgument('config', default_value='config/closed_loop.yaml'),
-        DeclareLaunchArgument('gui', default_value='false'),
-        DeclareLaunchArgument('enable_actuation', default_value='false'),
-        DeclareLaunchArgument('visualize_tracking', default_value='false',
+        DeclareLaunchArgument('system_config', default_value='',
+                              description='Unified composition manifest; empty keeps legacy workflow'),
+        DeclareLaunchArgument('config', default_value='',
+                              description='Profile override; legacy default config/closed_loop.yaml'),
+        DeclareLaunchArgument('gui', default_value='', description='Default false'),
+        DeclareLaunchArgument('enable_actuation', default_value='', description='Default false'),
+        DeclareLaunchArgument('visualize_tracking', default_value='',
                               description='Publish measured frame axes and optical/target arrows'),
         DeclareLaunchArgument('publish_ground_truth', default_value='',
                               description=(

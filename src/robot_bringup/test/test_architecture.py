@@ -12,8 +12,8 @@ SRC = Path(__file__).resolve().parents[2]
 ALLOWED = {
     'robot_configuration': set(), 'robot_description': set(), 'robot_interfaces': set(),
     'robot_models': set(), 'robot_estimation': {'robot_description', 'robot_interfaces'},
-    'robot_prediction': {'robot_interfaces'},
-    'robot_control': {'robot_description', 'robot_models', 'robot_interfaces'},
+    'robot_prediction': {'robot_interfaces', 'robot_configuration'},
+    'robot_control': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
     'robot_simulation': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
     'robot_bringup': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration',
                       'robot_simulation', 'robot_estimation', 'robot_prediction', 'robot_control'},

@@ -26,7 +26,8 @@ from sensor_msgs.msg import JointState
 
 from std_msgs.msg import Float64
 
-import yaml
+from robot_configuration.yaml_loader import load_yaml
+from robot_simulation.factory.actuation_factory import create_actuation_components
 
 
 class VelocityActuationNode(Node):
@@ -45,53 +46,23 @@ class VelocityActuationNode(Node):
         self._enabled = self.get_parameter('enabled').value
 
         def load(parameter):
-            return yaml.safe_load(Path(self.get_parameter(parameter).value).read_text())
+            return load_yaml(Path(self.get_parameter(parameter).value))
 
         self._config = load('configuration_file')['actuation']
         robot = load('robot_configuration_file')['robot']
         physical = load('description_file')['robot']['manipulator']['joints']
-        self._names = [robot['joint_name_template'].format(key=key) for key in physical]
-        if not self._names or len(set(self._names)) != len(self._names):
-            raise ValueError('Actuation joint names must be unique')
-        self._reference = PositionReference(
-            [j['lower'] for j in physical.values()],
-            [j['upper'] for j in physical.values()],
-            [j['velocity'] for j in physical.values()],
-            self._config['max_position_lead'], self._config['max_integration_dt'])
-        self._position_guard = PositionGuard(
-            self._reference.lower, self._reference.upper, self._reference.velocity_limit,
-            **self._config['position_recovery'])
-        if self._position_guard.inset > self._reference.max_lead:
-            raise ValueError('Recovery inset must not exceed max_position_lead')
+        holding_path = self.get_parameter('holding_configuration_file').value
+        holding = load_yaml(holding_path)['joint_position_hold'] if holding_path else None
+        components = create_actuation_components(
+            self._config, robot, physical, holding,
+            self.get_parameter('base_velocity_lower').value,
+            self.get_parameter('base_velocity_upper').value, enabled=self._enabled)
+        self._names = components.names
+        self._reference = components.reference
+        self._position_guard = components.guard
+        self._lower, self._upper = components.lower, components.upper
         self._recovery_heartbeat = None
         self._last_recovery_tick = None
-        holding_path = self.get_parameter('holding_configuration_file').value
-        if holding_path:
-            holding = yaml.safe_load(Path(holding_path).read_text())['joint_position_hold']
-            if self._enabled and not holding['enabled']:
-                raise ValueError('Position actuation requires the configured holding PIDs')
-            if set(holding['positions']) != set(physical):
-                raise ValueError('Startup reference must cover the authoritative joints')
-            initial = np.array([holding['positions'][key] for key in physical], dtype=float)
-            if (np.any(initial < self._reference.lower) or
-                    np.any(initial > self._reference.upper)):
-                raise ValueError('Startup reference violates physical joint limits')
-            # Continue the target already held by Gazebo, without a measured-q handoff step.
-            self._reference.initialize(initial)
-        base_lower = self.get_parameter('base_velocity_lower').value
-        base_upper = self.get_parameter('base_velocity_upper').value
-        if len(base_lower) != 2 or len(base_upper) != 2:
-            raise ValueError('Base limits must be explicit [v, omega] arrays')
-        self._lower = np.r_[base_lower, -self._reference.velocity_limit]
-        self._upper = np.r_[base_upper, self._reference.velocity_limit]
-        if (not np.all(np.isfinite(np.r_[self._lower, self._upper])) or
-                np.any(self._lower >= self._upper) or
-                np.any(self._lower > 0) or np.any(self._upper < 0)):
-            raise ValueError('Actuation limits must be finite and contain a safe zero')
-        for name in ['rate_hz', 'command_max_age', 'feedback_max_age',
-                     'wall_timeout', 'future_tolerance']:
-            if not np.isfinite(self._config[name]) or self._config[name] <= 0:
-                raise ValueError(f'Invalid actuation {name}')
         drive = robot['differential_drive']
         self._frame = drive['child_frame_id']
         self._odom_frame = drive['frame_id']

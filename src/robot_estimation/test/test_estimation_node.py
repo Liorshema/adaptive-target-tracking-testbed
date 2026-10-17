@@ -29,6 +29,8 @@ def node():
     parameters.setdefault('future_tolerance', 0.01)
     parameters.setdefault('max_wheel_odometry_age', 0.2)
     parameters.setdefault('max_joint_state_age', 0.2)
+    parameters.setdefault('robot_estimator_type', 'robot_ekf')
+    parameters.setdefault('target_estimator_type', 'kalman')
     parameters['reorder_holdback'] = 0.0  # Legacy immediate-fusion cases.
     estimate.test_parameters = parameters
     estimate.get_parameter = lambda name: SimpleNamespace(value=parameters[name])

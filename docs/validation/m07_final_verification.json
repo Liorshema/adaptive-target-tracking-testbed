@@ -1,0 +1,49 @@
+{
+  "baseline": "421b7736c6d9558e7ccddfd63ffc9c43024eb0f0",
+  "branch": "feature/m07-unified-configuration",
+  "verdict": "CONDITIONAL",
+  "functional_tests": {
+    "passed": 986,
+    "deselected_existing_style_checks": 18,
+    "log": "m07_verified_regression.log"
+  },
+  "focused_tests": {
+    "passed": 128,
+    "includes_architecture_tests": 52,
+    "log": "m07_completed_focused.log"
+  },
+  "builds": {
+    "symlink": {
+      "packages": 9,
+      "exit_code": 0,
+      "log": "m07_completed_build.log"
+    },
+    "copied": {
+      "packages": 9,
+      "exit_code": 0,
+      "log": "m07_completed_copy_build.log"
+    }
+  },
+  "installation": {
+    "console_entries": 7,
+    "resources": 68,
+    "systems": [
+      "system_nominal",
+      "system_cv",
+      "system_dls"
+    ],
+    "negative_rejected": true,
+    "evidence": "m07_completed_installed_checks.json"
+  },
+  "real_negative_launch": "m07_negative_launch.json",
+  "live_runs": "m07_runtime_evidence.json",
+  "preservation": "m07_preservation.json",
+  "remaining_limitations": [
+    "M02 measured physical joint overspeed",
+    "M03 skid-turn localization and covariance limitations",
+    "Short smoke windows do not establish long-duration/hardware safety",
+    "No final clean independent reviewer verdict; reviewer usage limit"
+  ],
+  "no_commit_or_push": true,
+  "remaining_ros_gazebo_validation_processes": []
+}

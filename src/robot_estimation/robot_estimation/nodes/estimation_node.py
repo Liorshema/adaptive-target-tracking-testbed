@@ -17,10 +17,12 @@ from rclpy.clock import JumpThreshold
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
+from robot_estimation.parameter_schema import PARAMETERS
 
 from robot_estimation.measurement import Measurement
 from robot_estimation.timestamp_buffer import TimestampBuffer
-from robot_estimation.factory.estimator_factory import create_robot_estimator, create_target_estimator
+from robot_estimation.factory.estimator_factory import (
+    create_robot_estimator, create_target_estimator, validate_runtime_parameters)
 from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
 from robot_estimation.target.target_state_estimator import TargetStateEstimator
 
@@ -58,8 +60,12 @@ class EstimationNode(Node):
     def __init__(self) -> None:
         super().__init__('estimation_node')
         self._declare_parameters()
+        self.declare_parameter('robot_estimator_type', 'robot_ekf')
+        self.declare_parameter('target_estimator_type', 'kalman')
         self.declare_parameter('full_state_publish_rate', 0.)
         self.declare_parameter('diagnostic_log_period', 5.)
+        validate_runtime_parameters({name: self.get_parameter(name).value for name in
+                                     [*self._PARAMETERS, 'full_state_publish_rate', 'diagnostic_log_period']})
         rate = float(self.get_parameter('full_state_publish_rate').value)
         period = float(self.get_parameter('diagnostic_log_period').value)
         if not np.isfinite(rate) or rate < 0 or not np.isfinite(period) or period <= 0:
@@ -93,54 +99,12 @@ class EstimationNode(Node):
         self._diagnostic_timer = self.create_timer(
             1 / self.get_parameter('diagnostic_rate_hz').value, self._publish_diagnostics)
         self._create_subscriptions()
-        self.get_logger().info('Estimation node initialized.')
+        self.get_logger().info(
+            f'Estimation node initialized: robot={type(self._robot_estimator).__name__}, '
+            f'target={type(self._target_estimator).__name__}.')
 
     # Parameter schemas define types, never experiment-specific values.
-    _PARAMETERS = {
-        "reorder_holdback": Parameter.Type.DOUBLE,
-        "reorder_max_age": Parameter.Type.DOUBLE,
-        "reorder_rate_hz": Parameter.Type.DOUBLE,
-        "reorder_capacity": Parameter.Type.INTEGER,
-        "diagnostic_topic": Parameter.Type.STRING,
-        "diagnostic_rate_hz": Parameter.Type.DOUBLE,
-        "joint_bounds_enabled": Parameter.Type.BOOL,
-        "joint_bounds_numerical_tolerance": Parameter.Type.DOUBLE,
-        "robot_description_file": Parameter.Type.STRING,
-        "robot_description_package": Parameter.Type.STRING,
-        "robot_description_config": Parameter.Type.STRING,
-        "joint_count": Parameter.Type.INTEGER,
-        "wheel_odom_frame": Parameter.Type.STRING,
-        "base_frame": Parameter.Type.STRING,
-        "imu_frame": Parameter.Type.STRING,
-        "joint_names": Parameter.Type.STRING_ARRAY,
-        "future_tolerance": Parameter.Type.DOUBLE,
-        "max_wheel_odometry_age": Parameter.Type.DOUBLE,
-        "max_joint_state_age": Parameter.Type.DOUBLE,
-        "robot_initial_state": Parameter.Type.DOUBLE_ARRAY,
-        "robot_initial_covariance_diagonal": Parameter.Type.DOUBLE_ARRAY,
-        "linear_acceleration_noise_std": Parameter.Type.DOUBLE,
-        "angular_acceleration_noise_std": Parameter.Type.DOUBLE,
-        "joint_acceleration_noise_std": Parameter.Type.DOUBLE,
-        "wheel_linear_velocity_variance": Parameter.Type.DOUBLE,
-        "wheel_angular_velocity_variance": Parameter.Type.DOUBLE,
-        "imu_yaw_rate_variance": Parameter.Type.DOUBLE,
-        "joint_position_variance": Parameter.Type.DOUBLE,
-        "joint_velocity_variance": Parameter.Type.DOUBLE,
-        "target_spatial_dimension": Parameter.Type.INTEGER,
-        "target_initial_state": Parameter.Type.DOUBLE_ARRAY,
-        "target_initial_covariance_diagonal": Parameter.Type.DOUBLE_ARRAY,
-        "target_acceleration_noise_std": Parameter.Type.DOUBLE,
-        "target_position_variance": Parameter.Type.DOUBLE_ARRAY,
-        "imu_topic": Parameter.Type.STRING,
-        "wheel_odometry_topic": Parameter.Type.STRING,
-        "joint_states_topic": Parameter.Type.STRING,
-        "target_measurement_topic": Parameter.Type.STRING,
-        "robot_state_topic": Parameter.Type.STRING,
-        "robot_state_full_topic": Parameter.Type.STRING,
-        "robot_state_frame_id": Parameter.Type.STRING,
-        "target_state_topic": Parameter.Type.STRING,
-        "target_state_full_topic": Parameter.Type.STRING,
-    }
+    _PARAMETERS = {name: getattr(Parameter.Type, kind) for name, kind in PARAMETERS.items()}
 
     def _declare_parameters(self) -> None:
         """Declare strictly typed parameters supplied by ROS YAML overrides."""
@@ -181,13 +145,15 @@ class EstimationNode(Node):
                 path = Path(get_package_share_directory(
                     parameters['robot_description_package'])) / parameters['robot_description_config']
             physical = yaml.safe_load(Path(path).read_text())['robot']['manipulator']['joints']
-        estimator, self._joint_constraint = create_robot_estimator(parameters, physical)
+        estimator, self._joint_constraint = create_robot_estimator(
+            parameters, physical, self.get_parameter('robot_estimator_type').value)
         return estimator
 
     def _create_target_estimator(self) -> TargetStateEstimator:
         """Delegate target-filter assembly without moving ROS resource policy."""
         return create_target_estimator({
-            name: self.get_parameter(name).value for name in self._PARAMETERS})
+            name: self.get_parameter(name).value for name in self._PARAMETERS},
+            self.get_parameter('target_estimator_type').value)
 
     def _create_publishers(self) -> None:
         """

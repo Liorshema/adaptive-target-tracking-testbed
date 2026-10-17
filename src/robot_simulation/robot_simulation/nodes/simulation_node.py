@@ -102,6 +102,9 @@ class SimulationNode(Node):
             environment_config,
             simulation_config,
         )
+        self.get_logger().info(
+            f'Simulation components: dynamics={type(engine.dynamics).__name__}, '
+            f'integrator={type(engine.integrator).__name__}')
 
         integration_config = simulation_config["simulation"][
             "integration"

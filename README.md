@@ -7,8 +7,8 @@ The platform follows a complete closed-loop pipeline:
 **Measurement → Estimation → Prediction → Reference → Control → Robot Motion**
 
 Pure numerical components are separated from ROS deployment. Supported components
-can be extended through their domain interfaces; full YAML selection and additional
-robot families are not yet implemented.
+can be selected through a validated system manifest and extended through their
+domain interfaces. The deployed robot family remains the planar mobile manipulator.
 
 ## Main Components
 
@@ -26,8 +26,8 @@ The workspace is organized into separate ROS 2 packages with clear responsibilit
 
 Synthetic target measurements currently belong to `robot_simulation`. Separate
 perception and experiment-management packages are planned, not implemented.
-Prediction deployment currently uses IMM with residual correction; the supported
-robot deployment is the planar mobile manipulator. Other robot families require
+Prediction deployment supports IMM or constant velocity, with residual correction
+or no adaptation. Other robot families require
 matching model, state and actuator implementations.
 
 ROS adapters live in each Python package's `nodes/` directory. Assembly lives in
@@ -41,6 +41,21 @@ The [M06.1 hardening report](docs/m06_1_architecture_hardening.md) records verif
 and intentional internal API removals. Earlier M06 documents describe historical states.
 
 ## Key Features
+
+M07 adds one composition entry point to the existing launch:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_nominal.yaml
+```
+
+Actuation is disabled by default. Add `enable_actuation:=true` explicitly for
+physical closed-loop commands. Select `config/system_cv.yaml` for CV prediction
+or `config/system_dls.yaml` for the existing DLS controller. Existing `config` and
+`strategy_config` launch commands continue to work. See the
+[M07 configuration guide and verification](docs/m07_unified_system_configuration.md)
+for supported combinations, overrides, errors and measured limitations.
 
 The current Control Compute Only milestone, verified behavior, and local
 reproduction commands are documented in [docs/control_compute_only.md](docs/control_compute_only.md).

@@ -1,0 +1,5 @@
+extends: system_nominal.yaml
+prediction:
+  type: constant_velocity
+  adaptation: none
+  fusion: none

@@ -1,0 +1,4 @@
+# A library CA model needs [p,v,a]; the deployed estimator publishes [p,v].
+extends: system_nominal.yaml
+prediction:
+  type: constant_acceleration

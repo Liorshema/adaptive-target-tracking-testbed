@@ -243,6 +243,17 @@ def test_shipped_configuration_computes_with_real_model(node):
     assert np.all(result.safe_output.command <= upper)
 
 
+def test_inherited_strategy_uses_same_loader_at_preflight_and_runtime(node, tmp_path):
+    parameters = yaml.safe_load(
+        (Path(__file__).parents[1] / 'config/control.yaml').read_text()
+    )['control_node']['ros__parameters']
+    parent = Path(__file__).resolve().parents[1] / 'config/whole_body.yaml'
+    child = tmp_path / 'strategy.yaml'; child.write_text(f'extends: {parent}\n')
+    parameters['strategy_config_file'] = str(child)
+    node.get_parameter = lambda name: SimpleNamespace(value=parameters[name])
+    assert node._build_pipeline(4).component_types['controller'].endswith('.WeightedLeastSquaresController')
+
+
 def test_delayed_cycle_enforces_joint_limits_for_elapsed_interval(node):
     """A late timer cannot shorten the safety interval and cross a joint limit."""
     node._robot_callback(robot_message(shoulder=1.565))

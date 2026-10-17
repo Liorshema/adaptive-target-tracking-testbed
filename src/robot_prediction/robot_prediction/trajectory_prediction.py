@@ -35,7 +35,7 @@ class TrajectoryPredictionSystem:
         self._predictor = predictor
         self._performance_monitor = performance_monitor
         self._residual_adapter = residual_adapter
-        self._weighted_correction = WeightedCorrection()
+        self._weighted_correction = WeightedCorrection() if residual_adapter is not None else None
 
         self._last_prediction: TrajectoryPrediction | None = None
         self._last_baseline_prediction: TrajectoryPrediction | None = None
@@ -167,6 +167,14 @@ class TrajectoryPredictionSystem:
 
         self._last_performance = performance
         return performance
+
+    @property
+    def component_types(self) -> dict[str, str]:
+        """Report actual constructed types for deployment verification."""
+        return {name: type(component).__module__ + '.' + type(component).__name__
+                for name, component in [('predictor', self._predictor),
+                                        ('adaptation', self._residual_adapter),
+                                        ('fusion', self._weighted_correction)]}
 
     @property
     def last_prediction(self) -> TrajectoryPrediction | None:
