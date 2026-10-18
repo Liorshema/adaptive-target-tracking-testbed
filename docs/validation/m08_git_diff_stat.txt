@@ -1,0 +1,6 @@
+ README.md                                        | 19 ++++++++++++++++++-
+ docs/ARCHITECTURE.md                             | 18 ++++++++++++++----
+ src/robot_bringup/test/test_architecture.py      |  2 ++
+ src/robot_bringup/test/test_architecture_tree.py |  9 +++++++++
+ tools/show_architecture.py                       |  1 +
+ 5 files changed, 44 insertions(+), 5 deletions(-)

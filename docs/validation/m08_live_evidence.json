@@ -1,0 +1,3478 @@
+{
+  "schema_version": 1,
+  "primary_study": "seed917",
+  "runs": {
+    "seed42": {
+      "source_summary": "results/experiments/m08_verified_final/paired_prediction_20261017T035322_605496Z_mykcu7wt/summary.json",
+      "comparable": true,
+      "incomparability_reasons": [],
+      "runs": {
+        "imm": {
+          "directory": "results/experiments/m08_verified_final/paired_prediction_20261017T035322_605496Z_mykcu7wt/runs/imm_seed42",
+          "seed": 42,
+          "execution_status": "completed",
+          "acceptance": false,
+          "error": null,
+          "cleanup": {
+            "returncode": 0,
+            "survivors": [],
+            "signals": [
+              "SIGINT"
+            ],
+            "elapsed": 0.4762524420000318
+          },
+          "window": {
+            "origin": 1.634,
+            "window_start": 4.634,
+            "window_end": 10.634,
+            "stop_clock": 10.634,
+            "monotonic_elapsed": 14.865701417999844
+          },
+          "acceptance_gates": {
+            "physical_joint_limits": false,
+            "invalid_commands": true,
+            "watchdog_events": true,
+            "rejected_commands": true,
+            "feedback_rejections": true,
+            "tracking_distance_available": true,
+            "pointing_error_available": true,
+            "prediction_rmse_available": true,
+            "target_position_error_available": true
+          },
+          "actual_component_types": {
+            "predictor": "robot_prediction.baseline.imm.IMMPredictor",
+            "adaptation": "robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter",
+            "fusion": "robot_prediction.fusion.weighted_correction.WeightedCorrection",
+            "dynamics": "FightFlightDynamics",
+            "integrator": "RK4Integrator",
+            "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+            "model": "robot_models.whole_body.composer.WholeBodyComposer",
+            "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+            "robot_estimator": "RobotStateEstimator",
+            "target_estimator": "TargetStateEstimator"
+          },
+          "available_streams": {
+            "clock": {
+              "topic": "/clock",
+              "record_count": 5316,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.634
+            },
+            "target_truth": {
+              "topic": "/simulation/target_position",
+              "record_count": 766,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.63
+            },
+            "target_measurement": {
+              "topic": "/perception/target_position",
+              "record_count": 154,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.594
+            },
+            "joints": {
+              "topic": "/joint_states",
+              "record_count": 5275,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.634
+            },
+            "base_truth": {
+              "topic": "/simulation/robot/ground_truth",
+              "record_count": 212,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.6
+            },
+            "odometry": {
+              "topic": "/wheel/odometry",
+              "record_count": 531,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.62
+            },
+            "robot_estimate": {
+              "topic": "/estimation/robot_state_full",
+              "record_count": 513,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.6
+            },
+            "target_estimate": {
+              "topic": "/estimation/target_state_full",
+              "record_count": 154,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.594
+            },
+            "prediction": {
+              "topic": "/prediction/trajectory",
+              "record_count": 154,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.594
+            },
+            "control": {
+              "topic": "/control/telemetry",
+              "record_count": 253,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.6
+            },
+            "command": {
+              "topic": "/control/safe_velocity",
+              "record_count": 253,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.6
+            },
+            "actuation": {
+              "topic": "/simulation/actuation/telemetry",
+              "record_count": 93,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.6
+            },
+            "diagnostics": {
+              "topic": "/estimation/diagnostics",
+              "record_count": 53,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            }
+          },
+          "seed_consumers": {
+            "measurements.target_position.random_seed": 42
+          },
+          "metrics": {
+            "tracking_distance": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 507,
+              "weighting": "equal per valid sample",
+              "mean": 0.08554261160340226,
+              "max": 0.2554698819906709,
+              "rmse": 0.11656518059642312,
+              "p95": 0.24419934844962507
+            },
+            "pointing_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 507,
+              "weighting": "equal per valid sample",
+              "mean": 0.12572084904917782,
+              "max": 0.2637109793018023,
+              "rmse": 0.13667074130712475,
+              "p95": 0.22892602694706685
+            },
+            "target_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 101,
+              "weighting": "equal per valid sample",
+              "mean": 0.07465442004918285,
+              "max": 0.15186010590010732,
+              "rmse": 0.07876235916976652,
+              "p95": 0.11557258314483362
+            },
+            "robot_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 293,
+              "weighting": "equal per valid sample",
+              "mean": 0.08538393513756277,
+              "max": 0.10608125185419885,
+              "rmse": 0.08639171417394541,
+              "p95": 0.10370515177720888
+            },
+            "robot_yaw_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 293,
+              "weighting": "equal per valid sample",
+              "mean": 0.09677405237875089,
+              "max": 0.16992840513803006,
+              "rmse": 0.10720747675715195,
+              "p95": 0.16168406073438496
+            },
+            "robot_joint_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 293,
+              "weighting": "equal per valid sample",
+              "mean": 0.0004376076983756287,
+              "max": 0.0027492544435100356,
+              "rmse": 0.0006789189926052164,
+              "p95": 0.0016016331834292875
+            },
+            "control_compute_time": {
+              "available": true,
+              "unit": "s",
+              "sample_count": 120,
+              "weighting": "equal per valid sample",
+              "mean": 0.005787573200005151,
+              "max": 0.02689691900013713,
+              "rmse": 0.006345616707380987,
+              "p95": 0.009068836899916732
+            },
+            "realtime_factor": {
+              "available": true,
+              "unit": "1",
+              "sample_count": 12,
+              "weighting": "mean is total simulation delta / total monotonic delta; other stats use >=0.5s bins with >=0.1s final tail",
+              "mean": 0.987757422700945,
+              "max": 1.003563479992864,
+              "rmse": 0.9879028376862015,
+              "p95": 1.0019803603089872,
+              "overall_ratio": 0.987757422700945,
+              "wall_duration": 6.074365894000039,
+              "simulation_duration": 6.0
+            },
+            "prediction_rmse": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 1668,
+              "weighting": "equal per valid sample",
+              "mean": 0.45642163506809585,
+              "max": 1.743077647335649,
+              "rmse": 0.5647154439992945,
+              "p95": 1.1429025018049308,
+              "horizons": {
+                "0.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 97,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.0912922337180884,
+                  "max": 0.17792749036003236,
+                  "rmse": 0.09653901549970402,
+                  "p95": 0.1432002510812683
+                },
+                "0.100000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.11638348764723475,
+                  "max": 0.14699725577253842,
+                  "rmse": 0.12034250701960593,
+                  "p95": 0.14393587896000803
+                },
+                "0.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 96,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.11787050189008619,
+                  "max": 0.22204882038222348,
+                  "rmse": 0.12393851859969217,
+                  "p95": 0.18678146072485985
+                },
+                "0.200000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.14972760343814603,
+                  "max": 0.196653057260658,
+                  "rmse": 0.15690874241985187,
+                  "p95": 0.1919605118784068
+                },
+                "0.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 94,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.14778312456562392,
+                  "max": 0.2685644275444947,
+                  "rmse": 0.15505175523382198,
+                  "p95": 0.23350430434346162
+                },
+                "0.300000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.18947490345906348,
+                  "max": 0.252789220044455,
+                  "rmse": 0.19977347603097018,
+                  "p95": 0.2464577883859158
+                },
+                "0.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 92,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.18024384654687223,
+                  "max": 0.31646067709067804,
+                  "rmse": 0.1890440567778853,
+                  "p95": 0.27773285921311763
+                },
+                "0.400000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2353625756299224,
+                  "max": 0.3149947748574236,
+                  "rmse": 0.24846897021752914,
+                  "p95": 0.3070315549346735
+                },
+                "0.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 91,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2148127301480742,
+                  "max": 0.3647938604256289,
+                  "rmse": 0.2253327517865373,
+                  "p95": 0.32863435843254624
+                },
+                "0.500000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.28681975255523445,
+                  "max": 0.3827974617227418,
+                  "rmse": 0.30245213028327067,
+                  "p95": 0.3731996908059911
+                },
+                "0.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 89,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2514258431076909,
+                  "max": 0.41272141797674267,
+                  "rmse": 0.2639919595378103,
+                  "p95": 0.3792635725066449
+                },
+                "0.600000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.34322120539305956,
+                  "max": 0.4557344497315153,
+                  "rmse": 0.3611925054358545,
+                  "p95": 0.4444831252976697
+                },
+                "0.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 87,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2912257610516575,
+                  "max": 0.45956310860479554,
+                  "rmse": 0.3061589696318939,
+                  "p95": 0.4383230303432237
+                },
+                "0.700000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4038598760583289,
+                  "max": 0.5332531685983936,
+                  "rmse": 0.42408185960284545,
+                  "p95": 0.5203138393443871
+                },
+                "0.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 86,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3317915964244638,
+                  "max": 0.5308700146337799,
+                  "rmse": 0.34930488143185207,
+                  "p95": 0.5008358915902656
+                },
+                "0.800000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.46802805989507634,
+                  "max": 0.6147202560696389,
+                  "rmse": 0.49047820060392644,
+                  "p95": 0.6000510364521826
+                },
+                "0.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 84,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.37905619294395193,
+                  "max": 0.6105847046153166,
+                  "rmse": 0.3982289061030344,
+                  "p95": 0.5603000695652754
+                },
+                "0.900000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.535067346778024,
+                  "max": 0.6995081918219973,
+                  "rmse": 0.5597658949121948,
+                  "p95": 0.6830641073175999
+                },
+                "1.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 82,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4246905190344925,
+                  "max": 0.6937884228403359,
+                  "rmse": 0.4467086986502854,
+                  "p95": 0.6268318322582653
+                },
+                "1.000000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.604406055518028,
+                  "max": 0.7870972511841327,
+                  "rmse": 0.6314132980233884,
+                  "p95": 0.7688281316175222
+                },
+                "1.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 81,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.46927673854489577,
+                  "max": 0.77997076560292,
+                  "rmse": 0.4943110911034195,
+                  "p95": 0.6948560189778442
+                },
+                "1.100000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6755373488451963,
+                  "max": 0.8770567449208645,
+                  "rmse": 0.7049544500742573,
+                  "p95": 0.8569048053132977
+                },
+                "1.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 79,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5238726423696617,
+                  "max": 0.8685892895219911,
+                  "rmse": 0.5510683938564848,
+                  "p95": 0.7892578881167005
+                },
+                "1.200000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7480101982300739,
+                  "max": 0.9689603970311085,
+                  "rmse": 0.7799604137431663,
+                  "p95": 0.946865377151005
+                },
+                "1.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 77,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5789829159839414,
+                  "max": 0.9590626973248227,
+                  "rmse": 0.6093456641842822,
+                  "p95": 0.8811433560082751
+                },
+                "1.300000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.821539070336397,
+                  "max": 1.062423591635108,
+                  "rmse": 0.8561260401894691,
+                  "p95": 1.0383351395052367
+                },
+                "1.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 76,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6342041334123172,
+                  "max": 1.0508080563468283,
+                  "rmse": 0.668022764678611,
+                  "p95": 0.961020000388332
+                },
+                "1.400000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8960124969817763,
+                  "max": 1.1571744218682667,
+                  "rmse": 0.9332973512005349,
+                  "p95": 1.1310582293796176
+                },
+                "1.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 74,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6870513558046036,
+                  "max": 1.1432295342071996,
+                  "rmse": 0.7253032107167889,
+                  "p95": 1.0546562699437727
+                },
+                "1.500000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.971435219283609,
+                  "max": 1.2530578935483765,
+                  "rmse": 1.011433495552047,
+                  "p95": 1.2248956261218997
+                },
+                "1.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 72,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7473016841568013,
+                  "max": 1.2356773115867303,
+                  "rmse": 0.7898804254267147,
+                  "p95": 1.151016228960376
+                },
+                "1.600000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.0478584088123992,
+                  "max": 1.3498755490198227,
+                  "rmse": 1.090514373081769,
+                  "p95": 1.3196738349990802
+                },
+                "1.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 70,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8068359147829711,
+                  "max": 1.331548050960008,
+                  "rmse": 0.8530314856606965,
+                  "p95": 1.2350321090582443
+                },
+                "1.700000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.125437028986407,
+                  "max": 1.4474441718605324,
+                  "rmse": 1.1705969017025923,
+                  "p95": 1.4152434575731199
+                },
+                "1.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 69,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8675972829186653,
+                  "max": 1.4456238419710863,
+                  "rmse": 0.9182207703045071,
+                  "p95": 1.3226459119741214
+                },
+                "1.800000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.2044101396537337,
+                  "max": 1.5455973160060306,
+                  "rmse": 1.251803688206733,
+                  "p95": 1.5114785983708008
+                },
+                "1.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 67,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9384704188250278,
+                  "max": 1.5601079838349785,
+                  "rmse": 0.9921672474409325,
+                  "p95": 1.4470360068265105
+                },
+                "1.900000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.2849787096207228,
+                  "max": 1.6441825987052638,
+                  "rmse": 1.3342405023503061,
+                  "p95": 1.6082622097968098
+                },
+                "2.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 65,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.003219793361212,
+                  "max": 1.6746014956007291,
+                  "rmse": 1.0623232020152182,
+                  "p95": 1.577885717633745
+                },
+                "2.000000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.3673300546781098,
+                  "max": 1.743077647335649,
+                  "rmse": 1.41801894621122,
+                  "p95": 1.705502888069895
+                }
+              },
+              "rejected_samples": 352,
+              "horizon_unit": "s",
+              "alignment": "absolute future timestamp; bounded bracket interpolation"
+            },
+            "joint_position_violation": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 3002,
+              "weighting": "equal per valid sample",
+              "mean": 0.0,
+              "max": 0.0,
+              "rmse": 0.0,
+              "p95": 0.0,
+              "violation_samples": 0,
+              "violation_duration": 0,
+              "observed_duration": 6.0,
+              "duration_unit": "s",
+              "window_duration": 6.0,
+              "coverage_fraction": 1.0,
+              "max_gap": 0.002000000000000668,
+              "coverage_complete": true,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad",
+              "max_overshoot": 0.0,
+              "rejected_samples": 0
+            },
+            "joint_speed_violation": {
+              "available": true,
+              "unit": "rad/s",
+              "sample_count": 3002,
+              "weighting": "equal per valid sample",
+              "mean": 2.803831951365572e-05,
+              "max": 0.05082203616789882,
+              "rmse": 0.0011094397744285819,
+              "p95": 0.0,
+              "violation_samples": 2,
+              "violation_duration": 0.0039999999999995595,
+              "observed_duration": 6.0,
+              "duration_unit": "s",
+              "window_duration": 6.0,
+              "coverage_fraction": 1.0,
+              "max_gap": 0.002000000000000668,
+              "coverage_complete": true,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad/s",
+              "max_overshoot": 0.05082203616789882,
+              "rejected_samples": 0
+            },
+            "invalid_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 120,
+              "count": 0,
+              "reason": null
+            },
+            "watchdog_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "rejected_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "feedback_rejections": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "reference_limit_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "nees": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            },
+            "nis": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            }
+          },
+          "safety": {
+            "accepted": false,
+            "observations_accepted": false,
+            "coverage_complete": true,
+            "coverage": {
+              "joint_position_violation": {
+                "observed_duration": 6.0,
+                "window_duration": 6.0,
+                "coverage_fraction": 1.0,
+                "max_gap": 0.002000000000000668,
+                "coverage_complete": true,
+                "duration_unit": "s"
+              },
+              "joint_speed_violation": {
+                "observed_duration": 6.0,
+                "window_duration": 6.0,
+                "coverage_fraction": 1.0,
+                "max_gap": 0.002000000000000668,
+                "coverage_complete": true,
+                "duration_unit": "s"
+              }
+            },
+            "failed_checks": [
+              "joint_speed_violation"
+            ],
+            "unavailable_checks": [],
+            "policy": "physical position and speed gates; missing or incompletely covered evidence is unknown"
+          },
+          "physical_speed_peaks_rad_s": [
+            0.2456765439418149,
+            0.6394179638829774,
+            1.0000000017482298,
+            1.5508220361678988
+          ],
+          "physical_speed_limits_rad_s": [
+            1.0,
+            1.0,
+            1.0,
+            1.5
+          ],
+          "safe_command_count": 120,
+          "max_safe_command_bound_violation": 0.0
+        },
+        "cv": {
+          "directory": "results/experiments/m08_verified_final/paired_prediction_20261017T035322_605496Z_mykcu7wt/runs/cv_seed42",
+          "seed": 42,
+          "execution_status": "completed",
+          "acceptance": false,
+          "error": null,
+          "cleanup": {
+            "returncode": -15,
+            "survivors": [],
+            "signals": [
+              "SIGINT",
+              "SIGTERM",
+              "SIGKILL"
+            ],
+            "elapsed": 4.537002484999903
+          },
+          "window": {
+            "origin": 1.528,
+            "window_start": 4.5280000000000005,
+            "window_end": 10.528,
+            "stop_clock": 10.53,
+            "monotonic_elapsed": 14.573950854000032
+          },
+          "acceptance_gates": {
+            "physical_joint_limits": false,
+            "invalid_commands": true,
+            "watchdog_events": true,
+            "rejected_commands": true,
+            "feedback_rejections": true,
+            "tracking_distance_available": true,
+            "pointing_error_available": true,
+            "prediction_rmse_available": true,
+            "target_position_error_available": true
+          },
+          "actual_component_types": {
+            "predictor": "robot_prediction.baseline.constant_velocity.ConstantVelocityPredictor",
+            "adaptation": "builtins.NoneType",
+            "fusion": "builtins.NoneType",
+            "dynamics": "FightFlightDynamics",
+            "integrator": "RK4Integrator",
+            "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+            "model": "robot_models.whole_body.composer.WholeBodyComposer",
+            "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+            "robot_estimator": "RobotStateEstimator",
+            "target_estimator": "TargetStateEstimator"
+          },
+          "available_streams": {
+            "clock": {
+              "topic": "/clock",
+              "record_count": 5264,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.53
+            },
+            "target_truth": {
+              "topic": "/simulation/target_position",
+              "record_count": 767,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.56
+            },
+            "target_measurement": {
+              "topic": "/perception/target_position",
+              "record_count": 156,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.536
+            },
+            "joints": {
+              "topic": "/joint_states",
+              "record_count": 4985,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.374
+            },
+            "base_truth": {
+              "topic": "/simulation/robot/ground_truth",
+              "record_count": 211,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.55
+            },
+            "odometry": {
+              "topic": "/wheel/odometry",
+              "record_count": 528,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.56
+            },
+            "robot_estimate": {
+              "topic": "/estimation/robot_state_full",
+              "record_count": 505,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.53
+            },
+            "target_estimate": {
+              "topic": "/estimation/target_state_full",
+              "record_count": 156,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.536
+            },
+            "prediction": {
+              "topic": "/prediction/trajectory",
+              "record_count": 156,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.536
+            },
+            "control": {
+              "topic": "/control/telemetry",
+              "record_count": 253,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.55
+            },
+            "command": {
+              "topic": "/control/safe_velocity",
+              "record_count": 253,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.55
+            },
+            "actuation": {
+              "topic": "/simulation/actuation/telemetry",
+              "record_count": 92,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.5
+            },
+            "diagnostics": {
+              "topic": "/estimation/diagnostics",
+              "record_count": 52,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            }
+          },
+          "seed_consumers": {
+            "measurements.target_position.random_seed": 42
+          },
+          "metrics": {
+            "tracking_distance": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 499,
+              "weighting": "equal per valid sample",
+              "mean": 0.12368566656632249,
+              "max": 0.3293927357165588,
+              "rmse": 0.16122607283467777,
+              "p95": 0.314719476602871
+            },
+            "pointing_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 499,
+              "weighting": "equal per valid sample",
+              "mean": 0.17046716098018713,
+              "max": 0.30476160678942393,
+              "rmse": 0.18654329611579587,
+              "p95": 0.2804528653633173
+            },
+            "target_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 102,
+              "weighting": "equal per valid sample",
+              "mean": 0.07380074315396455,
+              "max": 0.14941801019735082,
+              "rmse": 0.07782228839950352,
+              "p95": 0.1126661192789665
+            },
+            "robot_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 289,
+              "weighting": "equal per valid sample",
+              "mean": 0.09430678238828118,
+              "max": 0.11720414097287025,
+              "rmse": 0.09549306570646428,
+              "p95": 0.11105729273933332
+            },
+            "robot_yaw_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 289,
+              "weighting": "equal per valid sample",
+              "mean": 0.09207052798596571,
+              "max": 0.1914810576006835,
+              "rmse": 0.10705944903438536,
+              "p95": 0.18745423454824758
+            },
+            "robot_joint_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 286,
+              "weighting": "equal per valid sample",
+              "mean": 0.0007382965967297371,
+              "max": 0.014233877373506877,
+              "rmse": 0.001410681422302819,
+              "p95": 0.0022755057589929325
+            },
+            "control_compute_time": {
+              "available": true,
+              "unit": "s",
+              "sample_count": 120,
+              "weighting": "equal per valid sample",
+              "mean": 0.007786500541667843,
+              "max": 0.02070675800018762,
+              "rmse": 0.008352895907619569,
+              "p95": 0.013084237100008523
+            },
+            "realtime_factor": {
+              "available": true,
+              "unit": "1",
+              "sample_count": 13,
+              "weighting": "mean is total simulation delta / total monotonic delta; other stats use >=0.5s bins with >=0.1s final tail",
+              "mean": 0.9747760178065201,
+              "max": 1.2663684325845956,
+              "rmse": 0.995579919883428,
+              "p95": 1.108086674960523,
+              "overall_ratio": 0.9747760178065201,
+              "wall_duration": 6.155260172999988,
+              "simulation_duration": 6.0
+            },
+            "prediction_rmse": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 1686,
+              "weighting": "equal per valid sample",
+              "mean": 0.46825277647416413,
+              "max": 1.4491747027497497,
+              "rmse": 0.5705270965065147,
+              "p95": 1.1154713728569436,
+              "horizons": {
+                "0.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 100,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.09621995384128257,
+                  "max": 0.19040799752504622,
+                  "rmse": 0.1017006089460741,
+                  "p95": 0.14691281418212182
+                },
+                "0.100000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.0852156180881139,
+                  "max": 0.0852156180881139,
+                  "rmse": 0.0852156180881139,
+                  "p95": 0.0852156180881139
+                },
+                "0.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 98,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.12359269863851949,
+                  "max": 0.23546048760502894,
+                  "rmse": 0.13037980316493342,
+                  "p95": 0.18622154402001315
+                },
+                "0.200000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.12388813294888126,
+                  "max": 0.12388813294888126,
+                  "rmse": 0.12388813294888126,
+                  "p95": 0.12388813294888126
+                },
+                "0.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 96,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.15520148369406686,
+                  "max": 0.28388690855405474,
+                  "rmse": 0.16322053118876284,
+                  "p95": 0.23216436963112158
+                },
+                "0.300000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.16820015673128796,
+                  "max": 0.16820015673128796,
+                  "rmse": 0.16820015673128796,
+                  "p95": 0.16820015673128796
+                },
+                "0.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 94,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.18950315274555204,
+                  "max": 0.3349554702985653,
+                  "rmse": 0.19921485626112612,
+                  "p95": 0.28839358920327324
+                },
+                "0.400000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.21788811803642474,
+                  "max": 0.21788811803642474,
+                  "rmse": 0.21788811803642474,
+                  "p95": 0.21788811803642474
+                },
+                "0.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 93,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.22638325155147887,
+                  "max": 0.38998752544300935,
+                  "rmse": 0.23784516499634956,
+                  "p95": 0.34828655876155873
+                },
+                "0.500000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2726033151580584,
+                  "max": 0.2726033151580584,
+                  "rmse": 0.2726033151580584,
+                  "p95": 0.2726033151580584
+                },
+                "0.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 91,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2656372907477696,
+                  "max": 0.4511469638144185,
+                  "rmse": 0.2791279823965238,
+                  "p95": 0.41234718340297294
+                },
+                "0.600000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.33189937972313616,
+                  "max": 0.33189937972313616,
+                  "rmse": 0.33189937972313616,
+                  "p95": 0.33189937972313616
+                },
+                "0.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 89,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3084868089662482,
+                  "max": 0.5139909588524907,
+                  "rmse": 0.32393716314693755,
+                  "p95": 0.4782932821254507
+                },
+                "0.700000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3952759155723709,
+                  "max": 0.3952759155723709,
+                  "rmse": 0.3952759155723709,
+                  "p95": 0.3952759155723709
+                },
+                "0.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 87,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3532362701087973,
+                  "max": 0.5778756606435935,
+                  "rmse": 0.37090967810652137,
+                  "p95": 0.5477640723502414
+                },
+                "0.800000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.46216355390932967,
+                  "max": 0.46216355390932967,
+                  "rmse": 0.46216355390932967,
+                  "p95": 0.46216355390932967
+                },
+                "0.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 86,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4000142243072558,
+                  "max": 0.6421984091113404,
+                  "rmse": 0.4197471531105468,
+                  "p95": 0.6094022633124779
+                },
+                "0.900000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5318830135818315,
+                  "max": 0.5318830135818315,
+                  "rmse": 0.5318830135818315,
+                  "p95": 0.5318830135818315
+                },
+                "1.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 84,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4495162159052984,
+                  "max": 0.7063731231422513,
+                  "rmse": 0.47156336284770284,
+                  "p95": 0.6724440029466457
+                },
+                "1.000000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6037452615853045,
+                  "max": 0.6037452615853045,
+                  "rmse": 0.6037452615853045,
+                  "p95": 0.6037452615853045
+                },
+                "1.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 82,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4995646562967724,
+                  "max": 0.779781698021052,
+                  "rmse": 0.524469380522829,
+                  "p95": 0.7374678731845039
+                },
+                "1.100000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6770745453134763,
+                  "max": 0.6770745453134763,
+                  "rmse": 0.6770745453134763,
+                  "p95": 0.6770745453134763
+                },
+                "1.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 81,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5509315452229413,
+                  "max": 0.85822089163078,
+                  "rmse": 0.5783602686976949,
+                  "p95": 0.8020841323559451
+                },
+                "1.200000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7512638110047802,
+                  "max": 0.7512638110047802,
+                  "rmse": 0.7512638110047802,
+                  "p95": 0.7512638110047802
+                },
+                "1.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 79,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6050023564181322,
+                  "max": 0.9367006849038002,
+                  "rmse": 0.6351162458232756,
+                  "p95": 0.8676992170964158
+                },
+                "1.300000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8257195555658285,
+                  "max": 0.8257195555658285,
+                  "rmse": 0.8257195555658285,
+                  "p95": 0.8257195555658285
+                },
+                "1.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 77,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6591721244279042,
+                  "max": 1.014673463320944,
+                  "rmse": 0.6923271134988459,
+                  "p95": 0.9384660107970054
+                },
+                "1.400000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8998674134332372,
+                  "max": 0.8998674134332372,
+                  "rmse": 0.8998674134332372,
+                  "p95": 0.8998674134332372
+                },
+                "1.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 76,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7122832111680312,
+                  "max": 1.0916719202211962,
+                  "rmse": 0.7484103432532972,
+                  "p95": 1.009305187939441
+                },
+                "1.500000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9731829746099419,
+                  "max": 0.9731829746099419,
+                  "rmse": 0.9731829746099419,
+                  "p95": 0.9731829746099419
+                },
+                "1.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 74,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7701788646981034,
+                  "max": 1.1672954416084116,
+                  "rmse": 0.8088658647656487,
+                  "p95": 1.0776308395665815
+                },
+                "1.600000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.0452361634614566,
+                  "max": 1.0452361634614566,
+                  "rmse": 1.0452361634614566,
+                  "p95": 1.0452361634614566
+                },
+                "1.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 72,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8267278475611006,
+                  "max": 1.2411718314928053,
+                  "rmse": 0.8685637309686969,
+                  "p95": 1.1522031184433006
+                },
+                "1.700000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.115632668107653,
+                  "max": 1.115632668107653,
+                  "rmse": 1.115632668107653,
+                  "p95": 1.115632668107653
+                },
+                "1.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 71,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.879086813645842,
+                  "max": 1.3129676963869008,
+                  "rmse": 0.9243691498641392,
+                  "p95": 1.2213480738501556
+                },
+                "1.800000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.1840346703563827,
+                  "max": 1.1840346703563827,
+                  "rmse": 1.1840346703563827,
+                  "p95": 1.1840346703563827
+                },
+                "1.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 69,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9268786223310986,
+                  "max": 1.3823739797104295,
+                  "rmse": 0.976395172292461,
+                  "p95": 1.290454717331156
+                },
+                "1.900000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.2501232076622222,
+                  "max": 1.2501232076622222,
+                  "rmse": 1.2501232076622222,
+                  "p95": 1.2501232076622222
+                },
+                "2.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 67,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9710845666178132,
+                  "max": 1.4491747027497497,
+                  "rmse": 1.0247236015067935,
+                  "p95": 1.3614319055986628
+                },
+                "2.000000001": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 1,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.3136457896124438,
+                  "max": 1.3136457896124438,
+                  "rmse": 1.3136457896124438,
+                  "p95": 1.3136457896124438
+                }
+              },
+              "rejected_samples": 354,
+              "horizon_unit": "s",
+              "alignment": "absolute future timestamp; bounded bracket interpolation"
+            },
+            "joint_position_violation": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 2771,
+              "weighting": "equal per valid sample",
+              "mean": 0.0,
+              "max": 0.0,
+              "rmse": 0.0,
+              "p95": 0.0,
+              "violation_samples": 0,
+              "violation_duration": 0,
+              "observed_duration": 5.926,
+              "duration_unit": "s",
+              "window_duration": 6.0,
+              "coverage_fraction": 0.9876666666666667,
+              "max_gap": 0.15399999999999991,
+              "coverage_complete": false,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad",
+              "max_overshoot": 0.0,
+              "rejected_samples": 0
+            },
+            "joint_speed_violation": {
+              "available": true,
+              "unit": "rad/s",
+              "sample_count": 2771,
+              "weighting": "equal per valid sample",
+              "mean": 0.0001279818905268861,
+              "max": 0.13122740999835725,
+              "rmse": 0.0037592084966125328,
+              "p95": 0.0,
+              "violation_samples": 5,
+              "violation_duration": 0.009999999999999787,
+              "observed_duration": 5.926,
+              "duration_unit": "s",
+              "window_duration": 6.0,
+              "coverage_fraction": 0.9876666666666667,
+              "max_gap": 0.15399999999999991,
+              "coverage_complete": false,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad/s",
+              "max_overshoot": 0.13122740999835725,
+              "rejected_samples": 0
+            },
+            "invalid_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 120,
+              "count": 0,
+              "reason": null
+            },
+            "watchdog_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "rejected_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "feedback_rejections": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "reference_limit_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "nees": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            },
+            "nis": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            }
+          },
+          "safety": {
+            "accepted": false,
+            "observations_accepted": false,
+            "coverage_complete": false,
+            "coverage": {
+              "joint_position_violation": {
+                "observed_duration": 5.926,
+                "window_duration": 6.0,
+                "coverage_fraction": 0.9876666666666667,
+                "max_gap": 0.15399999999999991,
+                "coverage_complete": false,
+                "duration_unit": "s"
+              },
+              "joint_speed_violation": {
+                "observed_duration": 5.926,
+                "window_duration": 6.0,
+                "coverage_fraction": 0.9876666666666667,
+                "max_gap": 0.15399999999999991,
+                "coverage_complete": false,
+                "duration_unit": "s"
+              }
+            },
+            "failed_checks": [
+              "joint_speed_violation"
+            ],
+            "unavailable_checks": [],
+            "policy": "physical position and speed gates; missing or incompletely covered evidence is unknown"
+          },
+          "physical_speed_peaks_rad_s": [
+            0.21484184989602179,
+            0.742155960111754,
+            1.1312274099983572,
+            1.503528134771344
+          ],
+          "physical_speed_limits_rad_s": [
+            1.0,
+            1.0,
+            1.0,
+            1.5
+          ],
+          "safe_command_count": 120,
+          "max_safe_command_bound_violation": 0.0
+        }
+      }
+    },
+    "seed917": {
+      "source_summary": "results/experiments/m08_final_seed917/paired_seed917_20261018T061032_929053Z_750v4ffu/summary.json",
+      "comparable": true,
+      "incomparability_reasons": [],
+      "runs": {
+        "imm": {
+          "directory": "results/experiments/m08_final_seed917/paired_seed917_20261018T061032_929053Z_750v4ffu/runs/imm_seed917",
+          "seed": 917,
+          "execution_status": "completed",
+          "acceptance": false,
+          "error": null,
+          "cleanup": {
+            "returncode": 0,
+            "survivors": [],
+            "signals": [
+              "SIGINT"
+            ],
+            "elapsed": 0.9267832100013038
+          },
+          "window": {
+            "origin": 1.738,
+            "window_start": 4.7379999999999995,
+            "window_end": 10.738,
+            "stop_clock": 10.74,
+            "monotonic_elapsed": 18.373626515998694
+          },
+          "acceptance_gates": {
+            "physical_joint_limits": false,
+            "invalid_commands": true,
+            "watchdog_events": true,
+            "rejected_commands": true,
+            "feedback_rejections": true,
+            "tracking_distance_available": true,
+            "pointing_error_available": true,
+            "prediction_rmse_available": true,
+            "target_position_error_available": true
+          },
+          "actual_component_types": {
+            "predictor": "robot_prediction.baseline.imm.IMMPredictor",
+            "adaptation": "robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter",
+            "fusion": "robot_prediction.fusion.weighted_correction.WeightedCorrection",
+            "dynamics": "FightFlightDynamics",
+            "integrator": "RK4Integrator",
+            "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+            "model": "robot_models.whole_body.composer.WholeBodyComposer",
+            "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+            "robot_estimator": "RobotStateEstimator",
+            "target_estimator": "TargetStateEstimator"
+          },
+          "available_streams": {
+            "clock": {
+              "topic": "/clock",
+              "record_count": 4770,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.74
+            },
+            "target_truth": {
+              "topic": "/simulation/target_position",
+              "record_count": 706,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.9
+            },
+            "target_measurement": {
+              "topic": "/perception/target_position",
+              "record_count": 158,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.888
+            },
+            "joints": {
+              "topic": "/joint_states",
+              "record_count": 3549,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.736
+            },
+            "base_truth": {
+              "topic": "/simulation/robot/ground_truth",
+              "record_count": 218,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.9
+            },
+            "odometry": {
+              "topic": "/wheel/odometry",
+              "record_count": 546,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.92
+            },
+            "robot_estimate": {
+              "topic": "/estimation/robot_state_full",
+              "record_count": 474,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.892
+            },
+            "target_estimate": {
+              "topic": "/estimation/target_state_full",
+              "record_count": 158,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.888
+            },
+            "prediction": {
+              "topic": "/prediction/trajectory",
+              "record_count": 158,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.888
+            },
+            "control": {
+              "topic": "/control/telemetry",
+              "record_count": 249,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.902
+            },
+            "command": {
+              "topic": "/control/safe_velocity",
+              "record_count": 248,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.85
+            },
+            "actuation": {
+              "topic": "/simulation/actuation/telemetry",
+              "record_count": 97,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.904
+            },
+            "diagnostics": {
+              "topic": "/estimation/diagnostics",
+              "record_count": 54,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            }
+          },
+          "seed_consumers": {
+            "measurements.target_position.random_seed": 917
+          },
+          "metrics": {
+            "tracking_distance": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 446,
+              "weighting": "equal per valid sample",
+              "mean": 0.11122034721316917,
+              "max": 0.29249372820872366,
+              "rmse": 0.1351178331894593,
+              "p95": 0.2637516820454838
+            },
+            "pointing_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 446,
+              "weighting": "equal per valid sample",
+              "mean": 0.11035650527146336,
+              "max": 0.23165405113562398,
+              "rmse": 0.12521911004953484,
+              "p95": 0.20762769330618847
+            },
+            "target_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 102,
+              "weighting": "equal per valid sample",
+              "mean": 0.0877084530034345,
+              "max": 0.18005496031717222,
+              "rmse": 0.0941142550368426,
+              "p95": 0.14461154299243417
+            },
+            "robot_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 250,
+              "weighting": "equal per valid sample",
+              "mean": 0.10991894544579627,
+              "max": 0.16485378595597114,
+              "rmse": 0.11960431817022768,
+              "p95": 0.16359633035042526
+            },
+            "robot_yaw_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 250,
+              "weighting": "equal per valid sample",
+              "mean": 0.0990211559348018,
+              "max": 0.19446606770499184,
+              "rmse": 0.11608953964657087,
+              "p95": 0.18896610020860094
+            },
+            "robot_joint_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 250,
+              "weighting": "equal per valid sample",
+              "mean": 0.004804671507938595,
+              "max": 0.03498233303880339,
+              "rmse": 0.00698260560116719,
+              "p95": 0.014903798074142478
+            },
+            "control_compute_time": {
+              "available": true,
+              "unit": "s",
+              "sample_count": 120,
+              "weighting": "equal per valid sample",
+              "mean": 0.021565875250068225,
+              "max": 0.06036219099951268,
+              "rmse": 0.024301240922339904,
+              "p95": 0.0419844620011645
+            },
+            "realtime_factor": {
+              "available": true,
+              "unit": "1",
+              "sample_count": 18,
+              "weighting": "mean is total simulation delta / total monotonic delta; other stats use >=0.5s bins with >=0.1s final tail",
+              "mean": 0.660768863314818,
+              "max": 0.9349143979699742,
+              "rmse": 0.676312250840324,
+              "p95": 0.894595672520998,
+              "overall_ratio": 0.660768863314818,
+              "wall_duration": 9.080331010000009,
+              "simulation_duration": 5.999999999999999
+            },
+            "prediction_rmse": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 1671,
+              "weighting": "equal per valid sample",
+              "mean": 0.4734964818400237,
+              "max": 1.9487874784479167,
+              "rmse": 0.5834265129706973,
+              "p95": 1.1434450454420646,
+              "horizons": {
+                "0.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 100,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.10398874076830715,
+                  "max": 0.22278840515504664,
+                  "rmse": 0.11099032449570889,
+                  "p95": 0.16752912838797437
+                },
+                "0.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 98,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.13009465194297207,
+                  "max": 0.27962666319434526,
+                  "rmse": 0.13821385463493754,
+                  "p95": 0.20216672482508516
+                },
+                "0.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 96,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.1598366414201308,
+                  "max": 0.34214482457046147,
+                  "rmse": 0.16902198549226602,
+                  "p95": 0.2429687253135495
+                },
+                "0.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 95,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.19264131933259074,
+                  "max": 0.40993417231969626,
+                  "rmse": 0.2028945380610379,
+                  "p95": 0.28696319929151826
+                },
+                "0.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 93,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.22793936332908626,
+                  "max": 0.4825717410240685,
+                  "rmse": 0.23960010476704452,
+                  "p95": 0.34029148410467075
+                },
+                "0.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 91,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.26705608904538225,
+                  "max": 0.5596746476019698,
+                  "rmse": 0.28017544682623924,
+                  "p95": 0.3976124390044865
+                },
+                "0.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 89,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3099801816735039,
+                  "max": 0.6408866327165713,
+                  "rmse": 0.32446503998276505,
+                  "p95": 0.45197684846839614
+                },
+                "0.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 88,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3521627596970145,
+                  "max": 0.7258650087450844,
+                  "rmse": 0.3687954367856887,
+                  "p95": 0.5164119529651917
+                },
+                "0.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 86,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.39826627278397675,
+                  "max": 0.8142834452327447,
+                  "rmse": 0.4174351198737212,
+                  "p95": 0.5875671371403774
+                },
+                "1.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 85,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4442615573196033,
+                  "max": 0.9058164165030693,
+                  "rmse": 0.46654171262465916,
+                  "p95": 0.6596691954643311
+                },
+                "1.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 83,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.49338362409950964,
+                  "max": 1.000203842879811,
+                  "rmse": 0.5189026843196008,
+                  "p95": 0.7260813353431377
+                },
+                "1.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 81,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5465108875407068,
+                  "max": 1.0972275508000728,
+                  "rmse": 0.5757715947620374,
+                  "p95": 0.8162351114838747
+                },
+                "1.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 79,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6039519198888676,
+                  "max": 1.1967328502009766,
+                  "rmse": 0.6362997662848076,
+                  "p95": 0.896043227611228
+                },
+                "1.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 78,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6512763487771419,
+                  "max": 1.2985508989427852,
+                  "rmse": 0.6885231676711979,
+                  "p95": 0.9833757880172664
+                },
+                "1.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 76,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7116219441166504,
+                  "max": 1.4025142543439402,
+                  "rmse": 0.7529176975845249,
+                  "p95": 1.0795613589813815
+                },
+                "1.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 74,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7772477065434558,
+                  "max": 1.5085022171592515,
+                  "rmse": 0.82142065849213,
+                  "p95": 1.184170357201145
+                },
+                "1.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 72,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.842385210982196,
+                  "max": 1.6163120712380268,
+                  "rmse": 0.8913551829312731,
+                  "p95": 1.3041538145349736
+                },
+                "1.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 71,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9093075280430348,
+                  "max": 1.7257673655812937,
+                  "rmse": 0.9622050964321883,
+                  "p95": 1.4255300247706861
+                },
+                "1.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 69,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9780571671318209,
+                  "max": 1.8366332497732765,
+                  "rmse": 1.0372450367911927,
+                  "p95": 1.5658277396642706
+                },
+                "2.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 67,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.049238518060631,
+                  "max": 1.9487874784479167,
+                  "rmse": 1.11548636380033,
+                  "p95": 1.707895724857304
+                }
+              },
+              "rejected_samples": 369,
+              "horizon_unit": "s",
+              "horizon_reporting_resolution": 1e-07,
+              "alignment": "absolute future timestamp; bounded bracket interpolation"
+            },
+            "joint_position_violation": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 1367,
+              "weighting": "equal per valid sample",
+              "mean": 0.0,
+              "max": 0.0,
+              "rmse": 0.0,
+              "p95": 0.0,
+              "violation_samples": 0,
+              "violation_duration": 0,
+              "observed_duration": 6.0,
+              "duration_unit": "s",
+              "window_duration": 6.0,
+              "coverage_fraction": 1.0,
+              "max_gap": 0.05599999999999916,
+              "coverage_complete": true,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad",
+              "max_overshoot": 0.0,
+              "rejected_samples": 0
+            },
+            "joint_speed_violation": {
+              "available": true,
+              "unit": "rad/s",
+              "sample_count": 1367,
+              "weighting": "equal per valid sample",
+              "mean": 0.001371698537857255,
+              "max": 0.5744248447483389,
+              "rmse": 0.02444194833519783,
+              "p95": 0.0,
+              "violation_samples": 6,
+              "violation_duration": 0.07000000000000206,
+              "observed_duration": 6.0,
+              "duration_unit": "s",
+              "window_duration": 6.0,
+              "coverage_fraction": 1.0,
+              "max_gap": 0.05599999999999916,
+              "coverage_complete": true,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad/s",
+              "max_overshoot": 0.5744248447483389,
+              "rejected_samples": 0
+            },
+            "invalid_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 120,
+              "count": 0,
+              "reason": null
+            },
+            "watchdog_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "rejected_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "feedback_rejections": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "reference_limit_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 5,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "nees": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            },
+            "nis": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            }
+          },
+          "safety": {
+            "accepted": false,
+            "observations_accepted": false,
+            "coverage_complete": true,
+            "coverage": {
+              "joint_position_violation": {
+                "observed_duration": 6.0,
+                "window_duration": 6.0,
+                "coverage_fraction": 1.0,
+                "max_gap": 0.05599999999999916,
+                "coverage_complete": true,
+                "duration_unit": "s"
+              },
+              "joint_speed_violation": {
+                "observed_duration": 6.0,
+                "window_duration": 6.0,
+                "coverage_fraction": 1.0,
+                "max_gap": 0.05599999999999916,
+                "coverage_complete": true,
+                "duration_unit": "s"
+              }
+            },
+            "failed_checks": [
+              "joint_speed_violation"
+            ],
+            "unavailable_checks": [],
+            "policy": "physical position and speed gates; missing or incompletely covered evidence is unknown"
+          },
+          "physical_speed_peaks_rad_s": [
+            0.3028309234067751,
+            1.000000000563337,
+            1.5744248447483389,
+            1.5688942019746057
+          ],
+          "physical_speed_limits_rad_s": [
+            1.0,
+            1.0,
+            1.0,
+            1.5
+          ],
+          "safe_command_count": 120,
+          "max_safe_command_bound_violation": 0.0
+        },
+        "cv": {
+          "directory": "results/experiments/m08_final_seed917/paired_seed917_20261018T061032_929053Z_750v4ffu/runs/cv_seed917",
+          "seed": 917,
+          "execution_status": "completed",
+          "acceptance": false,
+          "error": null,
+          "cleanup": {
+            "returncode": 0,
+            "survivors": [],
+            "signals": [
+              "SIGINT"
+            ],
+            "elapsed": 1.1397525779993884
+          },
+          "window": {
+            "origin": 1.344,
+            "window_start": 4.344,
+            "window_end": 10.344000000000001,
+            "stop_clock": 10.352,
+            "monotonic_elapsed": 22.33205913799975
+          },
+          "acceptance_gates": {
+            "physical_joint_limits": false,
+            "invalid_commands": true,
+            "watchdog_events": true,
+            "rejected_commands": true,
+            "feedback_rejections": false,
+            "tracking_distance_available": true,
+            "pointing_error_available": true,
+            "prediction_rmse_available": true,
+            "target_position_error_available": true
+          },
+          "actual_component_types": {
+            "predictor": "robot_prediction.baseline.constant_velocity.ConstantVelocityPredictor",
+            "adaptation": "builtins.NoneType",
+            "fusion": "builtins.NoneType",
+            "dynamics": "FightFlightDynamics",
+            "integrator": "RK4Integrator",
+            "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+            "model": "robot_models.whole_body.composer.WholeBodyComposer",
+            "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+            "robot_estimator": "RobotStateEstimator",
+            "target_estimator": "TargetStateEstimator"
+          },
+          "available_streams": {
+            "clock": {
+              "topic": "/clock",
+              "record_count": 3473,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.352
+            },
+            "target_truth": {
+              "topic": "/simulation/target_position",
+              "record_count": 624,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.468
+            },
+            "target_measurement": {
+              "topic": "/perception/target_position",
+              "record_count": 158,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.444
+            },
+            "joints": {
+              "topic": "/joint_states",
+              "record_count": 1843,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.35
+            },
+            "base_truth": {
+              "topic": "/simulation/robot/ground_truth",
+              "record_count": 210,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.5
+            },
+            "odometry": {
+              "topic": "/wheel/odometry",
+              "record_count": 527,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.54
+            },
+            "robot_estimate": {
+              "topic": "/estimation/robot_state_full",
+              "record_count": 426,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.488
+            },
+            "target_estimate": {
+              "topic": "/estimation/target_state_full",
+              "record_count": 158,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.444
+            },
+            "prediction": {
+              "topic": "/prediction/trajectory",
+              "record_count": 158,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.444
+            },
+            "control": {
+              "topic": "/control/telemetry",
+              "record_count": 242,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.45
+            },
+            "command": {
+              "topic": "/control/safe_velocity",
+              "record_count": 240,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.35
+            },
+            "actuation": {
+              "topic": "/simulation/actuation/telemetry",
+              "record_count": 92,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 10.304
+            },
+            "diagnostics": {
+              "topic": "/estimation/diagnostics",
+              "record_count": 51,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            }
+          },
+          "seed_consumers": {
+            "measurements.target_position.random_seed": 917
+          },
+          "metrics": {
+            "tracking_distance": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 362,
+              "weighting": "equal per valid sample",
+              "mean": 0.1679356728663514,
+              "max": 0.3805549889641734,
+              "rmse": 0.1991121954051276,
+              "p95": 0.367145331876175
+            },
+            "pointing_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 362,
+              "weighting": "equal per valid sample",
+              "mean": 0.15995189073176244,
+              "max": 0.3703151477867079,
+              "rmse": 0.1724176322335334,
+              "p95": 0.3062937823572861
+            },
+            "target_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 102,
+              "weighting": "equal per valid sample",
+              "mean": 0.08536637783754952,
+              "max": 0.1537346503259185,
+              "rmse": 0.0914922570733695,
+              "p95": 0.1431749134472723
+            },
+            "robot_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 239,
+              "weighting": "equal per valid sample",
+              "mean": 0.1290040030741534,
+              "max": 0.175397058134267,
+              "rmse": 0.13471562878000498,
+              "p95": 0.1737648625394678
+            },
+            "robot_yaw_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 239,
+              "weighting": "equal per valid sample",
+              "mean": 0.08346772750242415,
+              "max": 0.15733838185977975,
+              "rmse": 0.0969936710665518,
+              "p95": 0.15361754998942848
+            },
+            "robot_joint_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 223,
+              "weighting": "equal per valid sample",
+              "mean": 0.00450395000957477,
+              "max": 0.015408105933544781,
+              "rmse": 0.005573262264438419,
+              "p95": 0.011089829805448018
+            },
+            "control_compute_time": {
+              "available": true,
+              "unit": "s",
+              "sample_count": 120,
+              "weighting": "equal per valid sample",
+              "mean": 0.03660065537493817,
+              "max": 0.12910400699911406,
+              "rmse": 0.04225415079906586,
+              "p95": 0.07362125190011283
+            },
+            "realtime_factor": {
+              "available": true,
+              "unit": "1",
+              "sample_count": 25,
+              "weighting": "mean is total simulation delta / total monotonic delta; other stats use >=0.5s bins with >=0.1s final tail",
+              "mean": 0.465411388883913,
+              "max": 0.84160147913048,
+              "rmse": 0.49731250189115206,
+              "p95": 0.8274140649714805,
+              "overall_ratio": 0.465411388883913,
+              "wall_duration": 12.870333951999783,
+              "simulation_duration": 5.989999999999999
+            },
+            "prediction_rmse": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 1665,
+              "weighting": "equal per valid sample",
+              "mean": 0.4986426104657601,
+              "max": 1.6733856003763221,
+              "rmse": 0.6029098528625868,
+              "p95": 1.144206102550906,
+              "horizons": {
+                "0.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 100,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.10777761917976438,
+                  "max": 0.1928063676681921,
+                  "rmse": 0.11563614509701409,
+                  "p95": 0.17756912579470105
+                },
+                "0.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 98,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.13398352512180564,
+                  "max": 0.24408214965936254,
+                  "rmse": 0.14402027650500385,
+                  "p95": 0.21316005206947522
+                },
+                "0.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 96,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.16463568012503396,
+                  "max": 0.30016797492015235,
+                  "rmse": 0.1768223679771417,
+                  "p95": 0.26070057813607705
+                },
+                "0.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 95,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.19767803591219474,
+                  "max": 0.36079696097919844,
+                  "rmse": 0.21231391628773424,
+                  "p95": 0.3100287273268246
+                },
+                "0.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 93,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.23419822400488619,
+                  "max": 0.4256935273747229,
+                  "rmse": 0.25149782789590436,
+                  "p95": 0.3597733364669349
+                },
+                "0.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 91,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.27453488638462326,
+                  "max": 0.49460849180222205,
+                  "rmse": 0.2943538659853203,
+                  "p95": 0.4154929304778324
+                },
+                "0.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 89,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.31949440553153524,
+                  "max": 0.5672020850978995,
+                  "rmse": 0.3412864601114567,
+                  "p95": 0.4770742793999985
+                },
+                "0.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 87,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.368771289268993,
+                  "max": 0.6432679580676376,
+                  "rmse": 0.3918083757438792,
+                  "p95": 0.5423060459717709
+                },
+                "0.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 86,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4187964903902604,
+                  "max": 0.7224573753052711,
+                  "rmse": 0.4432549080639825,
+                  "p95": 0.6107189524239951
+                },
+                "1.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 84,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.4755571956310571,
+                  "max": 0.8044459640638009,
+                  "rmse": 0.49976017857809235,
+                  "p95": 0.6824100607896112
+                },
+                "1.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 82,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5346196002400218,
+                  "max": 0.8888405164701747,
+                  "rmse": 0.5586530458155355,
+                  "p95": 0.7463382622693454
+                },
+                "1.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 81,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5921522599078296,
+                  "max": 0.9751969251514276,
+                  "rmse": 0.616732432808801,
+                  "p95": 0.8198332234639225
+                },
+                "1.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 79,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6544691059506309,
+                  "max": 1.0630491015770895,
+                  "rmse": 0.6791044029161986,
+                  "p95": 0.8993911029828104
+                },
+                "1.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 77,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7163061946765722,
+                  "max": 1.1519065129878596,
+                  "rmse": 0.7417084923200898,
+                  "p95": 0.9795573307531729
+                },
+                "1.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 75,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.7757564159898493,
+                  "max": 1.2412341456975367,
+                  "rmse": 0.8026523606513241,
+                  "p95": 1.059479882863147
+                },
+                "1.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 74,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8338718569833372,
+                  "max": 1.330445808495349,
+                  "rmse": 0.8620390090609545,
+                  "p95": 1.138159033817576
+                },
+                "1.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 72,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8900899520608606,
+                  "max": 1.4188728867876095,
+                  "rmse": 0.9198357275098018,
+                  "p95": 1.2169103264411338
+                },
+                "1.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 70,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.9448128452032809,
+                  "max": 1.5058836551888253,
+                  "rmse": 0.9760616448267482,
+                  "p95": 1.3025944837359675
+                },
+                "1.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 69,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.0010413864719137,
+                  "max": 1.5909034714349928,
+                  "rmse": 1.0334543889814394,
+                  "p95": 1.3900756711787194
+                },
+                "2.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 67,
+                  "weighting": "equal per valid sample",
+                  "mean": 1.0545908560535644,
+                  "max": 1.6733856003763221,
+                  "rmse": 1.088634667863937,
+                  "p95": 1.4745545124699346
+                }
+              },
+              "rejected_samples": 375,
+              "horizon_unit": "s",
+              "horizon_reporting_resolution": 1e-07,
+              "alignment": "absolute future timestamp; bounded bracket interpolation"
+            },
+            "joint_position_violation": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 779,
+              "weighting": "equal per valid sample",
+              "mean": 0.0,
+              "max": 0.0,
+              "rmse": 0.0,
+              "p95": 0.0,
+              "violation_samples": 0,
+              "violation_duration": 0,
+              "observed_duration": 5.532000000000001,
+              "duration_unit": "s",
+              "window_duration": 6.000000000000001,
+              "coverage_fraction": 0.922,
+              "max_gap": 0.5359999999999996,
+              "coverage_complete": false,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad",
+              "max_overshoot": 0.0,
+              "rejected_samples": 0
+            },
+            "joint_speed_violation": {
+              "available": true,
+              "unit": "rad/s",
+              "sample_count": 779,
+              "weighting": "equal per valid sample",
+              "mean": 0.0029337560359136866,
+              "max": 1.976108749883684,
+              "rmse": 0.0714622596721154,
+              "p95": 2.0423715607620192e-09,
+              "violation_samples": 4,
+              "violation_duration": 0.02600000000000069,
+              "observed_duration": 5.532000000000001,
+              "duration_unit": "s",
+              "window_duration": 6.000000000000001,
+              "coverage_fraction": 0.922,
+              "max_gap": 0.5359999999999996,
+              "coverage_complete": false,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad/s",
+              "max_overshoot": 1.976108749883684,
+              "rejected_samples": 0
+            },
+            "invalid_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 120,
+              "count": 0,
+              "reason": null
+            },
+            "watchdog_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "rejected_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "feedback_rejections": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 1,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "reference_limit_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 61,
+              "count": 12,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "nees": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            },
+            "nis": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            }
+          },
+          "safety": {
+            "accepted": false,
+            "observations_accepted": false,
+            "coverage_complete": false,
+            "coverage": {
+              "joint_position_violation": {
+                "observed_duration": 5.532000000000001,
+                "window_duration": 6.000000000000001,
+                "coverage_fraction": 0.922,
+                "max_gap": 0.5359999999999996,
+                "coverage_complete": false,
+                "duration_unit": "s"
+              },
+              "joint_speed_violation": {
+                "observed_duration": 5.532000000000001,
+                "window_duration": 6.000000000000001,
+                "coverage_fraction": 0.922,
+                "max_gap": 0.5359999999999996,
+                "coverage_complete": false,
+                "duration_unit": "s"
+              }
+            },
+            "failed_checks": [
+              "joint_speed_violation"
+            ],
+            "unavailable_checks": [],
+            "policy": "physical position and speed gates; missing or incompletely covered evidence is unknown"
+          },
+          "physical_speed_peaks_rad_s": [
+            0.29710507597433755,
+            1.088576393803791,
+            1.2686643561824522,
+            3.476108749883684
+          ],
+          "physical_speed_limits_rad_s": [
+            1.0,
+            1.0,
+            1.0,
+            1.5
+          ],
+          "safe_command_count": 120,
+          "max_safe_command_bound_violation": 0.0
+        }
+      }
+    },
+    "compute_only": {
+      "source_summary": "results/experiments/m08_compute_verified/m08_compute_20261018T060843_761758Z_oyv1b02l/summary.json",
+      "comparable": true,
+      "incomparability_reasons": [],
+      "runs": {
+        "imm": {
+          "directory": "results/experiments/m08_compute_verified/m08_compute_20261018T060843_761758Z_oyv1b02l/runs/imm_seed42",
+          "seed": 42,
+          "execution_status": "completed",
+          "acceptance": null,
+          "error": null,
+          "cleanup": {
+            "returncode": 0,
+            "survivors": [],
+            "signals": [
+              "SIGINT"
+            ],
+            "elapsed": 0.48084901299989724
+          },
+          "window": {
+            "origin": 0.7160000000000001,
+            "window_start": 1.7160000000000002,
+            "window_end": 3.716,
+            "stop_clock": 3.718,
+            "monotonic_elapsed": 9.761930472999666
+          },
+          "acceptance_gates": {
+            "physical_joint_limits": null,
+            "invalid_commands": true,
+            "watchdog_events": true,
+            "rejected_commands": true,
+            "feedback_rejections": true,
+            "tracking_distance_available": true,
+            "pointing_error_available": true,
+            "prediction_rmse_available": true,
+            "target_position_error_available": true,
+            "physical_actuation_demonstrated": null
+          },
+          "actual_component_types": {
+            "predictor": "robot_prediction.baseline.imm.IMMPredictor",
+            "adaptation": "robot_prediction.online_adaptation.classical.residual_adapter.ResidualAdapter",
+            "fusion": "robot_prediction.fusion.weighted_correction.WeightedCorrection",
+            "dynamics": "FightFlightDynamics",
+            "integrator": "RK4Integrator",
+            "controller": "robot_control.controllers.weighted_least_squares.WeightedLeastSquaresController",
+            "model": "robot_models.whole_body.composer.WholeBodyComposer",
+            "safety": "robot_control.safety.safe_control_pipeline.SafeControlPipeline",
+            "robot_estimator": "RobotStateEstimator",
+            "target_estimator": "TargetStateEstimator"
+          },
+          "available_streams": {
+            "clock": {
+              "topic": "/clock",
+              "record_count": 1791,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.718
+            },
+            "target_truth": {
+              "topic": "/simulation/target_position",
+              "record_count": 268,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.708
+            },
+            "target_measurement": {
+              "topic": "/perception/target_position",
+              "record_count": 55,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.684
+            },
+            "joints": {
+              "topic": "/joint_states",
+              "record_count": 1373,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.5220000000000002
+            },
+            "base_truth": {
+              "topic": "/simulation/robot/ground_truth",
+              "record_count": 74,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.7
+            },
+            "odometry": {
+              "topic": "/wheel/odometry",
+              "record_count": 186,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.72
+            },
+            "robot_estimate": {
+              "topic": "/estimation/robot_state_full",
+              "record_count": 162,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.68
+            },
+            "target_estimate": {
+              "topic": "/estimation/target_state_full",
+              "record_count": 55,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.684
+            },
+            "prediction": {
+              "topic": "/prediction/trajectory",
+              "record_count": 55,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.684
+            },
+            "control": {
+              "topic": "/control/telemetry",
+              "record_count": 62,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.704
+            },
+            "command": {
+              "topic": "/control/safe_velocity",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "actuation": {
+              "topic": "/simulation/actuation/telemetry",
+              "record_count": 37,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": 3.704
+            },
+            "diagnostics": {
+              "topic": "/estimation/diagnostics",
+              "record_count": 18,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            }
+          },
+          "seed_consumers": {
+            "measurements.target_position.random_seed": 42
+          },
+          "metrics": {
+            "tracking_distance": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 164,
+              "weighting": "equal per valid sample",
+              "mean": 0.5561677815944368,
+              "max": 0.698706573115986,
+              "rmse": 0.5661213088464996,
+              "p95": 0.6928187716203669
+            },
+            "pointing_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 164,
+              "weighting": "equal per valid sample",
+              "mean": 0.38240205307932096,
+              "max": 0.4084310249765047,
+              "rmse": 0.38312699934998284,
+              "p95": 0.40818974777481704
+            },
+            "target_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 35,
+              "weighting": "equal per valid sample",
+              "mean": 0.06920084861561084,
+              "max": 0.1179171186760862,
+              "rmse": 0.07296834974386206,
+              "p95": 0.11233201397898922
+            },
+            "robot_position_error": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 88,
+              "weighting": "equal per valid sample",
+              "mean": 2.7614841468161088e-12,
+              "max": 2.761508860633207e-12,
+              "rmse": 2.7614841468223716e-12,
+              "p95": 2.7614942556977673e-12
+            },
+            "robot_yaw_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 88,
+              "weighting": "equal per valid sample",
+              "mean": 4.292987229187657e-15,
+              "max": 4.3580014149301755e-15,
+              "rmse": 4.293005895858065e-15,
+              "p95": 4.31811575200389e-15
+            },
+            "robot_joint_error": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 84,
+              "weighting": "equal per valid sample",
+              "mean": 5.517803547071834e-06,
+              "max": 0.00010452150192957781,
+              "rmse": 1.4156294088032067e-05,
+              "p95": 1.1038315855803879e-05
+            },
+            "control_compute_time": {
+              "available": true,
+              "unit": "s",
+              "sample_count": 40,
+              "weighting": "equal per valid sample",
+              "mean": 0.011876049349802997,
+              "max": 0.02494498099986231,
+              "rmse": 0.012710772623305442,
+              "p95": 0.018951449701125965
+            },
+            "realtime_factor": {
+              "available": true,
+              "unit": "1",
+              "sample_count": 5,
+              "weighting": "mean is total simulation delta / total monotonic delta; other stats use >=0.5s bins with >=0.1s final tail",
+              "mean": 0.9008326758104006,
+              "max": 0.9505936552439291,
+              "rmse": 0.9081569707937512,
+              "p95": 0.9498676464157066,
+              "overall_ratio": 0.9008326758104006,
+              "wall_duration": 2.2201681330006977,
+              "simulation_duration": 2.0
+            },
+            "prediction_rmse": {
+              "available": true,
+              "unit": "m",
+              "sample_count": 334,
+              "weighting": "equal per valid sample",
+              "mean": 0.21387304617372083,
+              "max": 0.9148609184445472,
+              "rmse": 0.26224748837741124,
+              "p95": 0.5174579966934085,
+              "horizons": {
+                "0.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 33,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.0848677529286015,
+                  "max": 0.166558087379399,
+                  "rmse": 0.09048193527110282,
+                  "p95": 0.140823896179156
+                },
+                "0.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 31,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.10287135988168074,
+                  "max": 0.2209315936784744,
+                  "rmse": 0.11181759590425173,
+                  "p95": 0.1846129891868939
+                },
+                "0.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 30,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.12339892013724496,
+                  "max": 0.2839712246773577,
+                  "rmse": 0.1358675509296449,
+                  "p95": 0.226333857465177
+                },
+                "0.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 28,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.14207343640130105,
+                  "max": 0.3553084297116154,
+                  "rmse": 0.15780814984876604,
+                  "p95": 0.2626296790063046
+                },
+                "0.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 26,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.15893098515038834,
+                  "max": 0.33191211436076706,
+                  "rmse": 0.17412013587684894,
+                  "p95": 0.29366899436907445
+                },
+                "0.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 25,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.18434503807844496,
+                  "max": 0.3951066253211881,
+                  "rmse": 0.2026897971827067,
+                  "p95": 0.3423690927454724
+                },
+                "0.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 23,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.1998224386842351,
+                  "max": 0.36673437451430835,
+                  "rmse": 0.21621349360675343,
+                  "p95": 0.35456435681282716
+                },
+                "0.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 21,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.22007910557525817,
+                  "max": 0.4456601400734014,
+                  "rmse": 0.23863505154735296,
+                  "p95": 0.39545715311079704
+                },
+                "0.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 19,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.23229856470782598,
+                  "max": 0.39428477755747876,
+                  "rmse": 0.24777942274069908,
+                  "p95": 0.3897831947555248
+                },
+                "1.0": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 18,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2643160386077506,
+                  "max": 0.4694852129478377,
+                  "rmse": 0.2853366162538377,
+                  "p95": 0.46839318417940967
+                },
+                "1.1": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 16,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.2932733151759847,
+                  "max": 0.5574186463468541,
+                  "rmse": 0.3178834117416553,
+                  "p95": 0.45418993696044335
+                },
+                "1.2": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 14,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.3087567460854904,
+                  "max": 0.46085306323787417,
+                  "rmse": 0.3330143253766225,
+                  "p95": 0.4540867648378296
+                },
+                "1.3": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 12,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.341302079117821,
+                  "max": 0.5189467480604745,
+                  "rmse": 0.3714952340979099,
+                  "p95": 0.517687035365265
+                },
+                "1.4": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 11,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.37478275865246613,
+                  "max": 0.5883911044121508,
+                  "rmse": 0.40520008194681795,
+                  "p95": 0.5712792424897075
+                },
+                "1.5": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 9,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.40695895740988575,
+                  "max": 0.6657352345336487,
+                  "rmse": 0.44254098760305693,
+                  "p95": 0.6435868699140923
+                },
+                "1.6": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 7,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.40925118490064916,
+                  "max": 0.674691700099934,
+                  "rmse": 0.4418130482300371,
+                  "p95": 0.6285153981938421
+                },
+                "1.7": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 5,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.5573259599245038,
+                  "max": 0.7473893827550433,
+                  "rmse": 0.5707996844570012,
+                  "p95": 0.7149936908565742
+                },
+                "1.8": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 4,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.6165218847342412,
+                  "max": 0.8278461656815127,
+                  "rmse": 0.6360362656728864,
+                  "p95": 0.7984200493777962
+                },
+                "1.9": {
+                  "available": true,
+                  "unit": "m",
+                  "sample_count": 2,
+                  "weighting": "equal per valid sample",
+                  "mean": 0.8104231332295833,
+                  "max": 0.9148609184445472,
+                  "rmse": 0.8171247798557217,
+                  "p95": 0.9044171399230508
+                }
+              },
+              "rejected_samples": 366,
+              "horizon_unit": "s",
+              "alignment": "absolute future timestamp; bounded bracket interpolation"
+            },
+            "joint_position_violation": {
+              "available": true,
+              "unit": "rad",
+              "sample_count": 656,
+              "weighting": "equal per valid sample",
+              "mean": 0.0,
+              "max": 0.0,
+              "rmse": 0.0,
+              "p95": 0.0,
+              "violation_samples": 0,
+              "violation_duration": 0,
+              "observed_duration": 1.8860000000000001,
+              "duration_unit": "s",
+              "window_duration": 2.0,
+              "coverage_fraction": 0.9430000000000001,
+              "max_gap": 0.19399999999999995,
+              "coverage_complete": false,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad",
+              "max_overshoot": 0.0,
+              "rejected_samples": 0
+            },
+            "joint_speed_violation": {
+              "available": true,
+              "unit": "rad/s",
+              "sample_count": 656,
+              "weighting": "equal per valid sample",
+              "mean": 0.0,
+              "max": 0.0,
+              "rmse": 0.0,
+              "p95": 0.0,
+              "violation_samples": 0,
+              "violation_duration": 0,
+              "observed_duration": 1.8860000000000001,
+              "duration_unit": "s",
+              "window_duration": 2.0,
+              "coverage_fraction": 0.9430000000000001,
+              "max_gap": 0.19399999999999995,
+              "coverage_complete": false,
+              "duration_method": "right hold capped by max_skew; no gap extrapolation",
+              "tolerance": 0.001,
+              "tolerance_unit": "rad/s",
+              "max_overshoot": 0.0,
+              "rejected_samples": 0
+            },
+            "invalid_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 40,
+              "count": 0,
+              "reason": null
+            },
+            "watchdog_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 21,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "rejected_commands": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 21,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "feedback_rejections": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 21,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "reference_limit_events": {
+              "available": true,
+              "unit": "count",
+              "sample_count": 21,
+              "count": 0,
+              "counter_resets": 0,
+              "reason": null,
+              "method": "cumulative deltas between observed baseline and final sample"
+            },
+            "nees": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            },
+            "nis": {
+              "available": false,
+              "unit": "1",
+              "sample_count": 0,
+              "reason": "unsupported: no matched full truth/innovation and covariance contract"
+            }
+          },
+          "safety": {
+            "accepted": null,
+            "observations_accepted": true,
+            "coverage_complete": false,
+            "coverage": {
+              "joint_position_violation": {
+                "observed_duration": 1.8860000000000001,
+                "window_duration": 2.0,
+                "coverage_fraction": 0.9430000000000001,
+                "max_gap": 0.19399999999999995,
+                "coverage_complete": false,
+                "duration_unit": "s"
+              },
+              "joint_speed_violation": {
+                "observed_duration": 1.8860000000000001,
+                "window_duration": 2.0,
+                "coverage_fraction": 0.9430000000000001,
+                "max_gap": 0.19399999999999995,
+                "coverage_complete": false,
+                "duration_unit": "s"
+              }
+            },
+            "failed_checks": [],
+            "unavailable_checks": [],
+            "policy": "physical position and speed gates; missing or incompletely covered evidence is unknown"
+          },
+          "physical_speed_peaks_rad_s": [
+            1.3035941250421321e-11,
+            0.0039882771276608525,
+            0.004276806247458402,
+            0.00023783983397625968
+          ],
+          "physical_speed_limits_rad_s": [
+            1.0,
+            1.0,
+            1.0,
+            1.5
+          ],
+          "safe_command_count": 0,
+          "max_safe_command_bound_violation": null
+        }
+      }
+    },
+    "timeout": {
+      "source_summary": "results/experiments/m08_timeout_verified/m08_timeout_20261018T060950_514361Z_obhnre2k/summary.json",
+      "comparable": false,
+      "incomparability_reasons": [
+        "seed 42: interrupted execution"
+      ],
+      "runs": {
+        "imm": {
+          "directory": "results/experiments/m08_timeout_verified/m08_timeout_20261018T060950_514361Z_obhnre2k/runs/imm_seed42",
+          "seed": 42,
+          "execution_status": "failed",
+          "acceptance": null,
+          "error": {
+            "type": "RunFailure",
+            "code": "wall_timeout",
+            "message": "wall_timeout: {'clock': None, 'monotonic_elapsed': 0.02215241799967771, 'origin': None}",
+            "details": {
+              "clock": null,
+              "monotonic_elapsed": 0.02215241799967771,
+              "origin": null
+            }
+          },
+          "cleanup": {
+            "returncode": -2,
+            "survivors": [],
+            "signals": [
+              "SIGINT"
+            ],
+            "elapsed": 0.025611662000301294
+          },
+          "window": null,
+          "acceptance_gates": {},
+          "actual_component_types": {},
+          "available_streams": {
+            "clock": {
+              "topic": "/clock",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "target_truth": {
+              "topic": "/simulation/target_position",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "target_measurement": {
+              "topic": "/perception/target_position",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "joints": {
+              "topic": "/joint_states",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "base_truth": {
+              "topic": "/simulation/robot/ground_truth",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "odometry": {
+              "topic": "/wheel/odometry",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "robot_estimate": {
+              "topic": "/estimation/robot_state_full",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "target_estimate": {
+              "topic": "/estimation/target_state_full",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "prediction": {
+              "topic": "/prediction/trajectory",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "control": {
+              "topic": "/control/telemetry",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "command": {
+              "topic": "/control/safe_velocity",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "actuation": {
+              "topic": "/simulation/actuation/telemetry",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            },
+            "diagnostics": {
+              "topic": "/estimation/diagnostics",
+              "record_count": 0,
+              "invalid_count": 0,
+              "out_of_order_count": 0,
+              "last_source_time": null
+            }
+          },
+          "seed_consumers": {
+            "measurements.target_position.random_seed": 42
+          },
+          "metrics": {},
+          "safety": {}
+        }
+      }
+    }
+  },
+  "notes": [
+    "Independent sequential headless studies; not bitwise deterministic or statistical significance evidence.",
+    "Seed42 capture preceded final horizon quantization and aggregation corrections; primary seed917 uses corrected implementation."
+  ]
+}

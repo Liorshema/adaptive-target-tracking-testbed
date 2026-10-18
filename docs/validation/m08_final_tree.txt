@@ -1,0 +1,16 @@
+robot_experiments/
+├── recording/
+│   ├── normalization.py
+│   ├── ros.py
+│   ├── storage.py
+│   └── __init__.py
+├── metrics/
+│   ├── alignment.py
+│   └── __init__.py
+├── benchmarking.py
+├── cli.py
+├── configuration.py
+├── execution.py
+├── reporting.py
+├── runner.py
+└── __init__.py

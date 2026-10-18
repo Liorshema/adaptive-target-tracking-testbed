@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "baseline": "b16b6492cf199d06c91419ff9ce3e4a6873fb1be",
+  "branch": "feature/m08-experiments",
+  "verdict": "CONDITIONAL",
+  "functional_tests": {
+    "passed": 1071,
+    "deselected_existing_style_checks": 18,
+    "log": "m08_final_regression.log"
+  },
+  "focused": {
+    "passed": 137,
+    "experiment_tests": 84,
+    "architecture_tests": 53,
+    "log": "m08_final_focused.log"
+  },
+  "builds": {
+    "normal": {
+      "packages": 10,
+      "exit_code": 0,
+      "log": "m08_final_build.log"
+    },
+    "copied": {
+      "packages": 10,
+      "exit_code": 0,
+      "log": "m08_final_copy_build.log"
+    }
+  },
+  "copied_installation": {
+    "packages": 10,
+    "console_entries": 8,
+    "seed_verified": 917,
+    "log": "m08_final_installed_checks.log",
+    "evidence": "m08_final_installed_checks.json"
+  },
+  "live": "m08_live_evidence.json",
+  "preservation": "m08_preservation.json",
+  "process_cleanup": "m08_final_process_check.json",
+  "limitations": [
+    "Physical joint overspeed acceptance fails",
+    "CV seed917 feedback rejection and incomplete joint coverage",
+    "Host performance/nondeterminism: seed917 CV RTF0.465; one-seed pair does not establish algorithm superiority",
+    "NEES/NIS unsupported",
+    "Some existing adapters emit shutdown tracebacks/nonzero child exit codes during requested SIGINT; no survivors"
+  ],
+  "no_commit_or_push": true
+}

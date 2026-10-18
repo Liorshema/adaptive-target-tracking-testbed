@@ -15,6 +15,7 @@ ALLOWED = {
     'robot_prediction': {'robot_interfaces', 'robot_configuration'},
     'robot_control': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
     'robot_simulation': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
+    'robot_experiments': {'robot_bringup','robot_configuration','robot_description','robot_models','robot_interfaces'},
     'robot_bringup': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration',
                       'robot_simulation', 'robot_estimation', 'robot_prediction', 'robot_control'},
 }
@@ -33,6 +34,7 @@ OBSOLETE = [
 ]
 CORE = {
     'robot_configuration': None, 'robot_models': None,
+    'robot_experiments': {'metrics'},
     'robot_estimation': {'interfaces', 'filters', 'robot', 'target', 'factory'},
     'robot_prediction': {'baseline', 'evaluation', 'fusion', 'history', 'interfaces', 'online_adaptation', 'factory'},
     'robot_control': {'controllers', 'interfaces', 'pipeline', 'safety', 'tracking'},

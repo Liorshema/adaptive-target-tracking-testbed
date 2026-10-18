@@ -1,0 +1,24 @@
+schema_version: 1
+experiment:
+  name: paired_prediction
+  description: Matched sensor seed and physical scenario; IMM versus CV, no claim of identical reactive trajectories.
+  duration: 6.0
+  settling_time: 3.0
+  seeds: [42]
+  variants:
+    - name: imm
+      system_config: {package: robot_bringup, path: config/system_nominal.yaml}
+    - name: cv
+      system_config: {package: robot_bringup, path: config/system_cv.yaml}
+  metrics: [tracking_distance, pointing_error, prediction_rmse, estimation_error, joint_speed_violation, joint_position_violation, realtime_factor, control_compute]
+  output:
+    directory: results/experiments
+  runtime:
+    enable_actuation: true
+  execution:
+    readiness_timeout: 45.0
+    stall_timeout: 12.0
+    wall_timeout: 150.0
+    shutdown_timeout: 5.0
+    max_skew: 0.08
+    failure_policy: continue

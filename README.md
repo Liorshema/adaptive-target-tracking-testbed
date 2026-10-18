@@ -21,11 +21,12 @@ domain interfaces. The deployed robot family remains the planar mobile manipulat
 - `robot_control` — tracking and robot command generation
 - `robot_simulation` — target dynamics, disturbances, and Gazebo simulation
 - `robot_bringup` — system configuration and launch files
+- `robot_experiments` — reproducible run orchestration, telemetry, metrics and benchmarks
 
 The workspace is organized into separate ROS 2 packages with clear responsibilities. 
 
 Synthetic target measurements currently belong to `robot_simulation`. Separate
-perception and experiment-management packages are planned, not implemented.
+perception remains a future package; experiment management is implemented in M08.
 Prediction deployment supports IMM or constant velocity, with residual correction
 or no adaptation. Other robot families require
 matching model, state and actuator implementations.
@@ -41,6 +42,22 @@ The [M06.1 hardening report](docs/m06_1_architecture_hardening.md) records verif
 and intentional internal API removals. Earlier M06 documents describe historical states.
 
 ## Key Features
+
+M08 runs experiments through the existing M07 system manifests:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install --packages-up-to robot_experiments
+source install/setup.bash
+ros2 run robot_experiments run --config config/paired_prediction.yaml
+```
+
+The example explicitly enables actuation and compares real IMM/CV variants with
+matched sensor seeds. Versioned results include raw timestamped telemetry,
+physical tracking/prediction metrics and independent safety status. Exit code 3
+means execution completed with failed or unknown acceptance; physical overspeed
+remains visible. See the [M08 guide](docs/m08_experiments_and_benchmarking.md)
+for compute-only operation, YAML, result contracts and reproduction.
 
 M07 adds one composition entry point to the existing launch:
 

@@ -59,3 +59,12 @@ def test_archived_loader_translates_imports_without_editing_evidence():
     translated = module.canonicalize_imports(source)
     assert translated == source.replace('from robot_estimation.common.state import',
                                         'from robot_estimation.state import')
+
+
+def test_experiment_domain_order_and_tenth_package(renderer, tmp_path):
+    for name in ['reporting','metrics','recording','execution','configuration','benchmarking']:
+        (tmp_path / name).mkdir()
+    assert [p.name for p in renderer.ordered_children(tmp_path,'robot_experiments')] == [
+        'configuration','execution','recording','metrics','benchmarking','reporting']
+    view=renderer.render_workspace(Path(__file__).resolve().parents[2], depth=1)
+    assert 'robot_experiments/' in view

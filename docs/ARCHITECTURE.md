@@ -1,11 +1,13 @@
 # Current architecture
 
-Authoritative navigation guide, updated 2026-10-16 through M07. The earlier M06 audit,
+Authoritative navigation guide, updated 2026-10-18 through M08. The earlier M06 audit,
 target tree and compatibility-migration report describe historical states. Current
-source has nine ROS packages, seven executable ROS adapters and no M06 Python
+source has ten ROS packages, seven executable ROS adapters plus one experiment CLI, and no M06 Python
 compatibility aliases. See [hardening verification](m06_1_architecture_hardening.md).
 M07 selection and runtime validation are documented in
 [the unified configuration guide](m07_unified_system_configuration.md).
+Experiment ownership and stable data contracts are documented in
+[the M08 guide](m08_experiments_and_benchmarking.md).
 
 ## Responsibilities and dependency direction
 
@@ -20,6 +22,7 @@ M07 selection and runtime validation are documented in
 | robot_control | DLS/WLS algorithms, velocity tasks, references, optimization and command safety | Gazebo physics/PID or physical-speed certification |
 | robot_simulation | Numerical target simulation, fields, RK4, synthetic observations, Gazebo, physical actuation transport/guard | Tracking controller algorithms or authoritative duplicate geometry |
 | robot_bringup | Cross-package deployment composition, launch, tracking TF and visualization | Core numerical algorithms |
+| robot_experiments | Experiment schema, isolated execution, recording, pure metrics, benchmarks and result artifacts | Physics, estimation/prediction/control algorithms, authoritative limits or launch assembly |
 
 Arrows below mean consumer → dependency. Dashed lines are deployment/resource
 dependencies; the others are direct project Python dependencies. The automated
@@ -27,6 +30,11 @@ tests check both declared project dependencies and runtime/launch imports.
 
 ```mermaid
 flowchart TD
+ X[robot_experiments] --> B
+ X --> Q
+ X --> D
+ X --> M
+ X --> I
  B[robot_bringup] --> Q[robot_configuration]
  B --> D[robot_description]
  B --> M[robot_models]
@@ -49,7 +57,9 @@ flowchart TD
  P --> Q
 ```
 
-No lower-level package imports bringup. Models and configuration have no ROS or
+No robotics algorithm package imports bringup or experiments. Experiments consumes
+bringup's existing pure composition/model factories and launch entry point; bringup
+does not depend on experiments. Models and configuration have no ROS or
 Gazebo dependency. ROS messages are not a home for pure Python data contracts.
 
 ## End-to-end operation
@@ -142,7 +152,7 @@ stubs have been removed. No aerial implementation is advertised.
 
 All architecture views use the actual filesystem through
 [`tools/show_architecture.py`](../tools/show_architecture.py). Generate the full
-current [canonical tree](validation/m07_final_tree.txt), or inspect one package:
+current [canonical tree](validation/m08_workspace_tree.txt), or inspect one package:
 
 ```bash
 python3 tools/show_architecture.py
