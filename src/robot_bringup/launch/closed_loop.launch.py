@@ -86,6 +86,19 @@ def configure(context):
         if ground_truth == 'false':
             raise ValueError('Tracking visualization requires publish_ground_truth=true')
         ground_truth = 'true'
+        from robot_bringup.visualization import validate_configuration
+        visual_argument = LaunchConfiguration('visualization_config', default='').perform(context)
+        visual_path = Path(visual_argument or 'config/tracking_visualization.yaml').expanduser()
+        if not visual_path.is_absolute():
+            visual_path = share('robot_bringup') / visual_path
+        validate_configuration(load(visual_path))
+        if plan:
+            visual_estimation = plan['estimation_parameters']
+        else:
+            visual_estimation = {}
+            for key in ['robot_estimator_config', 'target_estimator_config']:
+                visual_estimation.update(load(share('robot_estimation') / cfg[key])['estimation_node']['ros__parameters'])
+            visual_estimation.update(estimation_overrides)
     pose = robot['pose']
     common = {'use_sim_time': True}
     nodes = [
@@ -147,23 +160,30 @@ def configure(context):
         nodes.append(Node(package='robot_bringup', executable='tracking_visualization',
                           output='screen', parameters=[
                               common,
-                              {'configuration_file': str(share('robot_bringup') /
-                                                         'config/tracking_visualization.yaml'),
+                              {'configuration_file': str(visual_path),
                                'description_file': str(description_path), 'joint_names': names,
                                'joint_topic': robot['joint_states']['topic'],
                                'odom_topic': drive['odom_topic'],
                                'physical_pose_topic': robot['ground_truth_odometry']['topic'],
                                'reference_frame': simulation_cfg['tracking']['reference_frame'],
-                               'forward_axis': control['tracking_forward_axis']}]))
+                               'forward_axis': control['tracking_forward_axis'],
+                               'tracking_radius': float(control['tracking_radius']),
+                               'target_estimate_topic': visual_estimation['target_state_full_topic'],
+                               'robot_estimate_topic': visual_estimation['robot_state_full_topic'],
+                               'prediction_topic': control['prediction_topic'],
+                               'base_frame': drive['child_frame_id'],
+                               'odometry_frame': drive['frame_id']}]))
     if simulation_cfg['tracking']['source'] == 'tf':
+        physical_tf = simulation_cfg['tracking'].get('pose_source') == 'physical'
+        pose_feedback = robot['ground_truth_odometry'] if physical_tf else drive
         nodes.append(Node(package='robot_bringup', executable='tracking_feedback_tf',
                           output='screen', parameters=[
                               common, cfg['tracking_tf'],
                               {'joint_names': names,
                                'description_file': str(description_path),
                                'joint_topic': robot['joint_states']['topic'],
-                               'odom_topic': drive['odom_topic'],
-                               'parent_frame': drive['frame_id'],
+                               'odom_topic': pose_feedback['topic'] if physical_tf else drive['odom_topic'],
+                               'parent_frame': pose_feedback['frame_id'],
                                'child_frame': simulation_cfg['tracking']['tracking_frame']}]))
     if plan:
         nodes.insert(0, LogInfo(msg='System assembly: ' + json.dumps({
@@ -184,6 +204,8 @@ def generate_launch_description():
         DeclareLaunchArgument('enable_actuation', default_value='', description='Default false'),
         DeclareLaunchArgument('visualize_tracking', default_value='',
                               description='Publish measured frame axes and optical/target arrows'),
+        DeclareLaunchArgument('visualization_config', default_value='',
+                              description='Optional read-only visualization YAML; empty uses installed default'),
         DeclareLaunchArgument('publish_ground_truth', default_value='',
                               description=(
                                   'Optional physical pose output independent of RViz markers')),

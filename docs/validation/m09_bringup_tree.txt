@@ -1,0 +1,16 @@
+robot_bringup/
+├── nodes/
+│   ├── tracking_feedback_tf.py
+│   ├── tracking_visualization.py
+│   └── __init__.py
+├── factory/
+│   ├── model_factory.py
+│   ├── system_configuration.py
+│   └── __init__.py
+├── visualization/
+│   ├── configuration.py
+│   ├── geometry.py
+│   ├── rviz.py
+│   ├── scene.py
+│   └── __init__.py
+└── __init__.py

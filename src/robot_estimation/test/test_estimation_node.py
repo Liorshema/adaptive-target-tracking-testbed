@@ -69,6 +69,15 @@ def wheel_message(timestamp=10.0, velocity=0.0):
     return message
 
 
+def test_disabled_source_does_not_read_uninitialized_optional_ros_parameters(node):
+    node.test_parameters.update(full_state_publish_rate=0., diagnostic_log_period=5.,
+                                localization_enabled=False)
+    node._localization_enabled = False
+    parameters = node._runtime_parameters()
+    assert parameters['localization_enabled'] is False
+    assert 'localization_topic' not in parameters
+
+
 def test_full_state_publication_budget_preserves_fusion_without_duplicate_output(node):
     """Fuse equal-time measurements while keeping the full-message rate bounded."""
     node._full_state_period = .02
@@ -304,3 +313,78 @@ def test_stale_bad_joint_observation_does_not_poison_current_physical_status(nod
     assert node._raw_joint_valid
     assert node._joint_constraint.physical_valid
     assert node._robot_buffer.counters['joints']['stale'] == 1
+
+
+def localization_message(timestamp=10.0, x=.05):
+    """A delayed independent pose; not a physical truth subscription."""
+    message = Odometry()
+    message.header.stamp = Time(seconds=timestamp).to_msg()
+    message.header.frame_id = 'world'
+    message.child_frame_id = 'base_link'
+    message.pose.pose.position.x = x
+    message.pose.pose.orientation.w = 1.
+    message.pose.covariance = np.diag([.002, .002, 1000., 1000., 1000., .001]).ravel().tolist()
+    return message
+
+
+def enable_localization(node):
+    """Use the ordinary queue and a fixed spawn transform without DDS."""
+    from geometry_msgs.msg import TransformStamped
+    node.test_parameters.update(localization_enabled=True, localization_topic='/localization/odometry',
+        localization_frame='world', localization_max_age=.15, localization_nis_limit=11.345,
+        localization_transform_tolerance=1e-6, reorder_holdback=.08)
+    node._localization_enabled = True
+    transform = TransformStamped()
+    transform.transform.translation.z = -.25
+    transform.transform.rotation.w = 1.
+    node._pose_tf = SimpleNamespace(lookup_transform=lambda *args: transform)
+    node.count_publishers = lambda topic: 1
+    node._configure_robot_timing()
+
+
+def test_localization_delayed_observation_enters_existing_causal_queue(node):
+    enable_localization(node)
+    node._wheel_odometry_callback(wheel_message(10.02))
+    node._localization_callback(localization_message(10.0))
+    assert node._robot_estimator.state.timestamp is None
+    node.test_now=10.12
+    node._drain_robot()
+    assert node._last_localization_time==10.0
+    assert node._robot_estimator.pose_diagnostics['updates']==1
+    assert node._robot_estimator.state.timestamp==pytest.approx(10.02)
+    assert node._robot_buffer.counters['localization']['delayed']==1
+
+
+def test_localization_rejects_duplicate_late_future_bad_frame_and_outlier(node):
+    enable_localization(node)
+    node._localization_callback(localization_message())
+    node._localization_callback(localization_message())
+    node._localization_callback(localization_message(11.))
+    node.test_now=10.12;node._drain_robot()
+    node._localization_callback(localization_message(9.99))
+    wrong=localization_message(10.1);wrong.header.frame_id='base_link'
+    node._localization_callback(wrong)
+    node._localization_callback(localization_message(10.1,100.))
+    node.test_now=10.2;node._drain_robot()
+    counters=node._robot_buffer.counters['localization']
+    assert counters['duplicate']==1 and counters['future']==1 and counters['late']==1
+    assert counters['invalid']==1
+    assert node._robot_estimator.pose_diagnostics['rejected']==1
+    assert abs(node._robot_estimator.state.mean[0])<1.
+
+
+def test_localization_reset_discards_pending_pose_and_health(node):
+    enable_localization(node);node._localization_callback(localization_message())
+    node._on_time_jump(None)
+    node.test_now=.1;node._localization_callback(localization_message())
+    assert node._last_localization_time is None
+    assert node._robot_buffer.diagnostics()['pending']==0
+    assert node._robot_estimator.pose_diagnostics['updates']==0
+
+
+def test_disabled_localization_preserves_legacy_subscriptions(node):
+    subscriptions=[]
+    node.create_subscription=lambda kind,topic,*args:subscriptions.append(topic)
+    node._create_subscriptions()
+    assert '/localization/odometry' not in subscriptions
+    assert len(subscriptions)==4

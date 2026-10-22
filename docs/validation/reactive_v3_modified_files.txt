@@ -1,0 +1,15 @@
+docs/reactive_tracking_v3.md
+docs/validation/analyze_reactive_v3.py
+docs/validation/control_compute_profile.py
+docs/validation/reactive_v3_modified_files.txt
+docs/validation/v2_tracking_gazebo.py
+src/robot_bringup/config/reactive_tracking_3d.yaml
+src/robot_bringup/test/test_reactive_v3_configuration.py
+src/robot_control/config/whole_body_arm_preferred.yaml
+src/robot_models/robot_models/common/rotations.py
+src/robot_models/test/test_rotation_validation.py
+src/robot_simulation/config/scenarios/reactive_target_3d.yaml
+src/robot_simulation/config/scenarios/target_3d.yaml
+src/robot_simulation/robot_simulation/dynamics/target/fight_flight.py
+src/robot_simulation/robot_simulation/factory/simulation_factory.py
+src/robot_simulation/test/test_tangential_fight_flight.py

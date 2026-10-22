@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from m07_verify_installation import run as verify_m07
 
 
@@ -27,7 +27,7 @@ def run(prefix):
         prepared=materialize_run(spec['variants'][0],917,Path(temporary),share,spec['runtime'])
         assert prepared['snapshot']['seed_consumers']['measurements.target_position.random_seed']==917
         assert prepared['plan']['description_path'].is_relative_to(temporary)
-    executable=prefix/'lib/robot_experiments/run'
+    executable=Path(get_package_prefix('robot_experiments'))/'lib/robot_experiments/run'
     invocation=subprocess.run([str(executable),'--config','config/paired_prediction.yaml','--validate-only'],capture_output=True,text=True,check=True)
     parsed=json.loads(invocation.stdout)
     assert parsed['valid'] and len(parsed['variants'])==2

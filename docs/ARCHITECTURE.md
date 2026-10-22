@@ -1,6 +1,6 @@
 # Current architecture
 
-Authoritative navigation guide, updated 2026-10-18 through M08. The earlier M06 audit,
+Authoritative navigation guide, updated 2026-10-18 through M09. The earlier M06 audit,
 target tree and compatibility-migration report describe historical states. Current
 source has ten ROS packages, seven executable ROS adapters plus one experiment CLI, and no M06 Python
 compatibility aliases. See [hardening verification](m06_1_architecture_hardening.md).
@@ -8,20 +8,22 @@ M07 selection and runtime validation are documented in
 [the unified configuration guide](m07_unified_system_configuration.md).
 Experiment ownership and stable data contracts are documented in
 [the M08 guide](m08_experiments_and_benchmarking.md).
+Read-only live Gazebo/RViz display and its frame/time contracts are documented in
+[the M09 guide](m09_robot_realism_and_visualization.md).
 
 ## Responsibilities and dependency direction
 
 | Package | Owns | Does not own |
 |---|---|---|
 | robot_configuration | Pure YAML mapping loading, relative-parent inheritance and validation | ROS policy, physical parameters, experiment orchestration |
-| robot_description | Authoritative geometry, axes, masses, collisions, joint limits, mount; Xacro and parameter normalization | Control/estimator algorithms or scenario selection |
+| robot_description | Authoritative geometry, axes, masses, collisions, joint limits, mount; visual-only camera icon, Xacro and parameter normalization | Control/estimator algorithms or scenario selection |
 | robot_interfaces | ROS state, trajectory, safe command and telemetry messages | Numerical implementation or component selection |
 | robot_models | Pure kinematics, dynamics, transforms, geometry, constraints, references and robot composition | ROS/Gazebo adapters, file-based robot deployment |
 | robot_estimation | KF/EKF, measurements/process models, robot/target state handling, causal reordering and conditioning | Predictor/controller decisions or simulator truth feedback |
 | robot_prediction | Predictors, residual adaptation, fusion, confidence and history | Actuation, robot geometry, scenario generation |
 | robot_control | DLS/WLS algorithms, velocity tasks, references, optimization and command safety | Gazebo physics/PID or physical-speed certification |
 | robot_simulation | Numerical target simulation, fields, RK4, synthetic observations, Gazebo, physical actuation transport/guard | Tracking controller algorithms or authoritative duplicate geometry |
-| robot_bringup | Cross-package deployment composition, launch, tracking TF and visualization | Core numerical algorithms |
+| robot_bringup | Cross-package deployment composition, launch, tracking TF, pure visualization scene/configuration and read-only ROS display adapter | Control/estimation/prediction algorithms, M08 metrics or physics |
 | robot_experiments | Experiment schema, isolated execution, recording, pure metrics, benchmarks and result artifacts | Physics, estimation/prediction/control algorithms, authoritative limits or launch assembly |
 
 Arrows below mean consumer → dependency. Dashed lines are deployment/resource
@@ -84,9 +86,13 @@ flowchart LR
 The simulation target is integrated numerically and committed after the Gazebo
 pose service accepts it. Synthetic target measurements are separate from truth.
 The estimator does not receive the independent physical pose used by validation.
-The reactive target's tracking TF currently uses wheel odometry plus measured arm
-joints, so under skid drift it differs from the physical point. That is an explicit
-experiment limitation; there is no hidden static fallback or truth localization.
+The nominal reactive target tracking TF uses wheel odometry plus measured arm
+joints, so under skid drift it differs from the physical point. The isolated
+[reactive manipulation challenge](reactive_3d_manipulation_challenge.md) selects
+physical-base odometry for simulation interaction TF and typed base-relative
+guidance context. Neither selection routes truth into estimation or control.
+Contextual fields use retained causal source samples at each integration substep;
+missing/stale/future data never create a static fallback.
 
 Before starting process actions, optional `system_config` composition resolves
 resources and invokes actual owner factories to validate the selected deployment.
@@ -152,7 +158,7 @@ stubs have been removed. No aerial implementation is advertised.
 
 All architecture views use the actual filesystem through
 [`tools/show_architecture.py`](../tools/show_architecture.py). Generate the full
-current [canonical tree](validation/m08_workspace_tree.txt), or inspect one package:
+current [canonical tree](validation/m09_workspace_tree.txt), or inspect one package:
 
 ```bash
 python3 tools/show_architecture.py

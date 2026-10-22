@@ -1,0 +1,7 @@
+# Validation driver only; no production robot/safety parameters are overwritten.
+settle_seconds: 2.0
+seek_seconds: 5.0
+boundary_dwell_seconds: 1.0
+release_seconds: 4.0
+max_wall_seconds: 100.0
+publish_period_seconds: 0.02

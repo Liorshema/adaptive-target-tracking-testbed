@@ -4,11 +4,21 @@ import subprocess
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from copy import deepcopy
+from importlib.util import find_spec
 from pathlib import Path
 
 import numpy as np
 
 from robot_configuration.yaml_loader import load_yaml
+
+
+def actuator_library():
+    """Resolve the compiled Gazebo System without importing it as a Python module."""
+    spec = find_spec('robot_simulation.gazebo._actuator')
+    if spec is None or not spec.origin or not Path(spec.origin).is_file():
+        raise ValueError('Native actuator is not built; rebuild robot_simulation and source '
+                         'install/setup.bash')
+    return str(Path(spec.origin).resolve())
 
 
 def _number(value, name, *, positive=False, nonnegative=False):
@@ -46,6 +56,26 @@ def configure_robot_model(model, description, config, hold):
     physically converge under PID effort, without modifying link geometry.
     """
     model = deepcopy(model)
+    allowed = {'enabled', 'pid', 'positions', 'joint_overrides', 'backend',
+               'trace_directory', 'servo'}
+    if set(hold) - allowed:
+        raise ValueError(f'Unknown holding settings: {sorted(set(hold) - allowed)}')
+    backend = hold.get('backend', 'legacy_pid')
+    if backend not in ('legacy_pid', 'instrumented_pid', 'velocity_servo'):
+        raise ValueError('Invalid holding backend')
+    trace = hold.get('trace_directory', '')
+    if not isinstance(trace, str) or (trace and not Path(trace).is_absolute()):
+        raise ValueError('trace_directory must be empty or an absolute path')
+    if backend == 'legacy_pid' and trace:
+        raise ValueError('Legacy PID has no physics trace; select instrumented_pid')
+    servo = hold.get('servo', {})
+    if (not isinstance(servo, Mapping) or
+            any(isinstance(value, bool) for value in servo.values()) or
+            set(servo) - {'position_time_constant', 'acceleration_limit'} or
+            (backend == 'velocity_servo' and
+             set(servo) != {'position_time_constant', 'acceleration_limit'})):
+        raise ValueError('Velocity servo requires its configured demand governor')
+    servo = {k: _number(v, f'servo {k}', positive=True) for k, v in servo.items()}
     name = config['entity_name']
     if not isinstance(name, str) or not name.strip():
         raise ValueError('Robot entity_name must be nonempty')
@@ -72,12 +102,14 @@ def configure_robot_model(model, description, config, hold):
         # Reject competing effort/velocity/trajectory owners before adding PID.
         controllers = {
             'JointPositionController', 'JointController', 'JointTrajectoryController', 'DiffDrive',
+            'ArmActuator',
         }
         for plugin in model.findall('plugin'):
             system = plugin.get('name', '').rsplit('::', 1)[-1]
             controlled = {element.text for element in plugin.findall('joint_name')}
             controlled.update(element.text for element in plugin.findall('left_joint'))
             controlled.update(element.text for element in plugin.findall('right_joint'))
+            controlled.update(element.text for element in plugin.findall('joint/name'))
             if system in controllers and controlled.intersection(names.values()):
                 raise ValueError('Conflicting Gazebo joint controller on held arm')
         overrides = hold.get('joint_overrides', {})
@@ -85,6 +117,16 @@ def configure_robot_model(model, description, config, hold):
             raise ValueError('PID overrides must use description joint keys')
         if not isinstance(hold['pid'], Mapping):
             raise ValueError('Holding PID parameters must be a mapping')
+        native = None
+        if backend != 'legacy_pid':
+            native = ET.SubElement(model, 'plugin', filename=actuator_library(),
+                                   name='robot_simulation::ArmActuator')
+            ET.SubElement(native, 'backend').text = backend
+            if backend == 'velocity_servo':
+                for key, value in servo.items():
+                    ET.SubElement(native, key).text = str(value)
+            if trace:
+                ET.SubElement(native, 'trace_directory').text = trace
         for key, joint in joints.items():
             pid = dict(hold['pid'])
             entry = overrides.get(key, {})
@@ -114,7 +156,7 @@ def configure_robot_model(model, description, config, hold):
                 raise ValueError(f'{key} holding position exceeds description joint limits')
             if abs(offset) > effort:
                 raise ValueError(f'{key} PID offset exceeds description effort limit')
-            _plugin(model, 'JointPositionController', [
+            parameters = [
                 ('joint_name', names[key]), ('initial_position', position),
                 *([('topic', config['joint_position_topic_template'].format(
                     model=name, joint=names[key]))]
@@ -122,7 +164,15 @@ def configure_robot_model(model, description, config, hold):
                 *gains, ('i_min', integral_lower), ('i_max', integral_upper),
                 ('cmd_offset', offset), ('cmd_min', -effort), ('cmd_max', effort),
                 ('use_velocity_commands', 'false'),
-            ])
+            ]
+            if native is None:
+                _plugin(model, 'JointPositionController', parameters)
+            else:
+                entry = ET.SubElement(native, 'joint')
+                for field, value in parameters:
+                    if field not in ('cmd_min', 'cmd_max', 'use_velocity_commands'):
+                        tag = 'name' if field == 'joint_name' else field
+                        ET.SubElement(entry, tag).text = str(value)
 
     feedback = config['joint_states']
     if any(p.get('name') == 'gz::sim::systems::JointStatePublisher'

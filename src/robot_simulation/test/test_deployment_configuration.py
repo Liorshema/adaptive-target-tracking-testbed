@@ -38,3 +38,17 @@ def test_invalid_numerical_deployment_is_not_ignored(index, path, value):
     item[path[-1]] = value
     with pytest.raises(ValueError):
         validate_deployment_configuration(*data)
+
+
+@pytest.mark.parametrize('change',[
+    {'max_age':0.},{'reference_frame':'odom'},{'unused':True}])
+def test_contextual_deployment_rejects_bad_physical_context(change):
+    from robot_simulation.factory.deployment_configuration import validate_deployment_configuration
+    root=Path(__file__).parents[1]
+    d=load_yaml(root/'config/scenarios/reactive_manipulation.yaml')
+    d['physical_context'].update(change)
+    with pytest.raises(ValueError):
+        validate_deployment_configuration(d,load_yaml(root/d['target']['config']),
+            load_yaml(root/d['simulation']['environment_config']),
+            load_yaml(root/d['simulation']['config']),
+            load_yaml(root/d['simulation']['measurement_config']))

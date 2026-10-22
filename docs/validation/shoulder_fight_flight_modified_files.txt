@@ -1,0 +1,13 @@
+src/robot_description/config/robot/robot.yaml
+src/robot_bringup/config/reactive_tracking_low_damping.yaml
+src/robot_simulation/config/scenarios/reactive_target_low_damping.yaml
+src/robot_simulation/config/scenarios/target_fight_flight_low_damping.yaml
+src/robot_bringup/test/test_shoulder_safety.py
+src/robot_simulation/test/test_configuration.py
+src/robot_simulation/test/test_robot_builder.py
+docs/validation/v2_tracking_gazebo.py
+docs/validation/shoulder_experiment_metrics.py
+docs/validation/compare_shoulder_experiments.py
+docs/validation/test_shoulder_experiment_metrics.py
+docs/shoulder_safety_and_fight_flight.md
+docs/validation/shoulder_fight_flight_modified_files.txt

@@ -43,6 +43,20 @@ and intentional internal API removals. Earlier M06 documents describe historical
 
 ## Key Features
 
+M09 adds read-only Gazebo/RViz inspection around the same closed-loop system:
+
+```bash
+ros2 launch robot_bringup visualization.launch.py \
+  system_config:=config/system_nominal.yaml gui:=true rviz:=true
+```
+
+Actuation remains disabled unless `enable_actuation:=true` is explicit. Use
+`gui:=false rviz:=false` for headless marker/path publication. The display shows
+physical and estimated histories, the current future forecast, camera optical
+direction, target line of sight, configured radius and measured joint warnings.
+See the [M09 guide and runtime evidence](docs/m09_robot_realism_and_visualization.md)
+for YAML layers, frame conventions, GUI limitations and unchanged physics.
+
 M08 runs experiments through the existing M07 system manifests:
 
 ```bash

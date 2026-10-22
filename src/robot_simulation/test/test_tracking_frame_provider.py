@@ -109,3 +109,44 @@ def test_reactive_tracking_rejects_stale_and_future_transforms(timestamp, availa
     transform.transform.translation.z = 3.
     buffer.lookup_transform.return_value = transform
     assert (provider.position_world() is not None) == available
+
+
+def test_causal_tf_read_does_not_use_latest_future_sample():
+    provider,buffer=make_provider(max_age=.2,future_tolerance=0.)
+    provider._clock.now.return_value.nanoseconds=1_000_000_000
+    def transform(time,x):
+        value=Mock()
+        value.header.stamp.sec=int(time)
+        value.header.stamp.nanosec=round((time-int(time))*1e9)
+        value.transform.translation.x=x
+        value.transform.translation.y=0.
+        value.transform.translation.z=0.
+        return value
+    buffer.lookup_transform.return_value=transform(1.,1.)
+    np.testing.assert_equal(provider.position_at(1.),[1.,0.,0.])
+    provider._clock.now.return_value.nanoseconds=1_100_000_000
+    buffer.lookup_transform.return_value=transform(1.1,2.)
+    np.testing.assert_equal(provider.position_at(1.05),[1.,0.,0.])
+    provider.clear_history()
+    assert provider.position_at(1.05) is None
+
+
+def test_direct_tf_history_retains_causal_samples_while_pose_request_is_pending():
+    from geometry_msgs.msg import TransformStamped
+    from tf2_msgs.msg import TFMessage
+    provider,_=make_provider(max_age=.2,future_tolerance=0.,history_duration=2.)
+    provider._clock.now.return_value.nanoseconds=1_200_000_000
+    def sample(t,x,frame='world'):
+        value=TransformStamped();value.header.stamp.sec=1
+        value.header.stamp.nanosec=round((t-1.)*1e9)
+        value.header.frame_id=frame;value.child_frame_id='tracking_frame'
+        value.transform.translation.x=x
+        return value
+    provider._receive_direct(TFMessage(transforms=[sample(1.,1.),sample(1.1,2.),
+        sample(1.15,99.,'odom'),sample(1.3,100.)]))
+    np.testing.assert_equal(provider.position_at(1.05,refresh=False),[1.,0.,0.])
+    np.testing.assert_equal(provider.position_at(1.15,refresh=False),[2.,0.,0.])
+    provider.clear_history()
+    provider._clock.now.return_value.nanoseconds=1_000_000_000
+    provider._receive_direct(TFMessage(transforms=[sample(1.3,100.),sample(1.,3.)]))
+    np.testing.assert_equal(provider.position_at(1.,refresh=False),[3.,0.,0.])

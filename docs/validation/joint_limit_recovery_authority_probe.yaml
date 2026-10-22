@@ -1,0 +1,12 @@
+# Validation timing only. Robot limits, safety policy and motor gains stay owned.
+settle_seconds: 2.0
+seek_seconds: 15.0
+recovery_seconds: 6.0
+resume_seconds: 1.0
+stage_wall_seconds: 90.0
+max_wall_seconds: 240.0
+publish_period_seconds: 0.015
+seek_speed_fraction: 0.5
+resume_speed_fraction: 0.1
+minimum_motion_radians: 0.001
+minimum_base_motion_metres: 0.001

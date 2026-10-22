@@ -1,6 +1,53 @@
-# M02 — Physical Actuation & Control Safety
+# M02 — Current actuator resolution
 
-**Verdict: CONDITIONAL; physical-speed acceptance remains open.**
+2026-10-19. **CONDITIONAL overall; measured nominal simulation compliance demonstrated.**
+The permanent simulation now defaults to the governed effort-limited DART motor
+in robot_simulation. This replaces the explicit position PID for normal holding
+and tracking; original PID gains/configuration remain selectable for baselines.
+No limits, physics timestep, geometry, high-level algorithms or target dynamics changed.
+
+The original mechanism was bounded position-reference motion feeding a faster
+position-error derivative PID, with startup target mismatch, saturation and
+coupled dynamics. A direct native motor prototype still produced shoulder
+overspeed when other motor demands changed abruptly. The accepted implementation
+adds a 0.1 s position-response time and a 4 rad/s² demand slew limit before the
+native, effort-limited velocity motor. Neither setting claims a bound on physical
+acceleration. All physical limits still come from robot_description/SDF axes.
+
+Four final CV/IMM × seeds42/917 runs recorded every physics step through startup
+and tracking: zero velocity or position-policy violations at the existing .001
+tolerances, 100% sampled-interval coverage, maximum gap .002 s. Across those runs,
+maximum speeds were yaw .625272, shoulder 1.000000000, elbow 1.000000001, wrist
+.689062 rad/s against limits 1/1/1/1.5. New instrumented PID baselines reached
+wrist 2.392–3.054 rad/s; the historical 3.47610875 rad/s record is preserved.
+The small shoulder excursion -6.4716e-5 rad is inside the existing tolerance,
+not claimed to be exact geometric nonpenetration.
+
+Mean distance error before→after: CV42 .09587→.10158, CV917 .10697→.11094,
+IMM42 .10762→.10017, IMM917 .09147→.09507 m. Largest mean pointing increase
+was .54°. Base and every arm joint moved; no frozen/disabled actuation success.
+A real world-reset probe recovered control with both physics epochs safe/complete.
+Compute-only retained zero commands and passed 29 visualization gates.
+
+Full regression: 1,224 passed (18 existing style/copyright checks excluded).
+Normal and copied ten-package builds and independent installed-resource checks passed.
+Actual native motor torque, severe contacts/payloads, sustained hard-stop cases
+and universal hard velocity enforcement remain unverified. These limits keep the
+overall verdict CONDITIONAL; the implemented correction is tested-scenario
+simulation compliance, not hardware certification or a general hard bound.
+
+See [the full resolution report](validation/m02_actuation_safety_resolution.md)
+for mechanisms, instrumentation, per-joint metrics, plots, exact artifacts and
+commands. [M02-only changed files](validation/m02_resolution_modified_files.txt)
+separate this work from the preserved, uncommitted M09 changes. No commit/push.
+
+Everything below preserves the earlier closure as historical evidence. Its
+“not implemented” actuator proposal refers to that earlier state; the current
+implementation and verdict above and in the resolution report take precedence.
+
+## Earlier M02 closure — historical record
+
+**Historical verdict: CONDITIONAL; physical-speed acceptance remained open.**
 
 The numerical joint-boundary deadlock has a simulation-local recovery mechanism, strict high-level bounds remain intact, and position-reference discontinuities are blocked. This does **not** turn the effort PID into a physical velocity servo. M02 must not be marked PASS while measured joint speeds exceed description limits plus the unchanged acceptance tolerance.
 

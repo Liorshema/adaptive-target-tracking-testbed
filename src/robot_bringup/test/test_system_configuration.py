@@ -259,6 +259,33 @@ def test_empty_nonmapping_overrides_are_not_defaulted():
         load(example(), overrides=[])
 
 
+def test_localized_profile_is_additive_and_keeps_control_physics_contracts():
+    baseline = load(example('system_manipulation_D.yaml'))
+    localized = load(example('system_manipulation_D_localized.yaml'))
+    assert localized['control_parameters'] == baseline['control_parameters']
+    assert localized['description_path'] == baseline['description_path']
+    assert localized['identities'] == baseline['identities']
+    assert not baseline['estimation_parameters'].get('localization_enabled', False)
+    parameters = localized['estimation_parameters']
+    assert parameters['localization_enabled'] is True
+    assert parameters['localization_topic'] == '/localization/odometry'
+    assert parameters['planar_slip_noise_std'] == .15
+    assert parameters['yaw_slip_noise_std'] == .2
+    assert parameters['reorder_holdback'] == .08
+
+
+def test_truth_cannot_be_selected_as_localization_measurement(tmp_path):
+    from robot_configuration.yaml_loader import load_yaml
+    content = load_yaml(share('robot_estimation')/'config/robot_localized.yaml')
+    content['estimation_node']['ros__parameters']['localization_topic'] = '/simulation/robot/ground_truth'
+    (tmp_path/'estimator.yaml').write_text(yaml.safe_dump(content))
+    document = {'extends': str(example('system_manipulation_D_localized.yaml')),
+                'estimation': {'robot': {'config': str(tmp_path/'estimator.yaml')}}}
+    (tmp_path/'system.yaml').write_text(yaml.safe_dump(document))
+    with pytest.raises(ValueError, match='Localization|Ground truth'):
+        load(tmp_path/'system.yaml')
+
+
 def test_prediction_horizon_must_cover_selected_control_lookahead(tmp_path):
     content = yaml.safe_load((share('robot_prediction') / 'config/prediction.yaml').read_text())
     content['prediction']['horizon'] = 1

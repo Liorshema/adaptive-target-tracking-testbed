@@ -1,0 +1,4 @@
+extends: robot.yaml
+robot:
+  ground_truth_odometry:
+    enabled: true

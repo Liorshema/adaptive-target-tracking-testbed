@@ -8,6 +8,7 @@ import math
 
 from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.gazebo.sdf_generator import SDFGenerator
+from robot_simulation.gazebo.physics_engine import physics_engine_library
 
 
 def build_world(
@@ -38,12 +39,14 @@ def build_world(
     if world is None or not world.get('name'):
         raise ValueError('World SDF requires a named <world> element.')
     if physics is not None:
-        if set(physics).difference({'max_step_size', 'real_time_factor'}):
+        if set(physics).difference({'max_step_size', 'real_time_factor', 'engine'}):
             raise ValueError('Unsupported physics parameters')
         element = world.find('physics')
         if element is None:
             raise ValueError('Configured world must provide a physics element')
         for name, value in physics.items():
+            if name == 'engine':
+                continue
             if not math.isfinite(float(value)) or float(value) <= 0:
                 raise ValueError(f'Physics {name} must be finite and positive')
             parameter = element.find(name)
@@ -60,6 +63,18 @@ def build_world(
                 filename=filename,
                 name=name,
             )
+
+    if physics is not None and 'engine' in physics:
+        system = world.find("plugin[@name='gz::sim::systems::Physics']")
+        if system is None:
+            raise ValueError('Explicit physics engine requires the Physics system plugin')
+        engine = system.find('engine')
+        if engine is None:
+            engine = ET.SubElement(system, 'engine')
+        filename = engine.find('filename')
+        if filename is None:
+            filename = ET.SubElement(engine, 'filename')
+        filename.text = physics_engine_library(physics['engine'])
 
     target_xml = SDFGenerator.with_defaults().generate(
         load_yaml(target_config),

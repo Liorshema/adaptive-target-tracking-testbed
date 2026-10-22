@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 
 from robot_estimation.interfaces.estimator_interface import EstimatorInterface
 from robot_estimation.measurement import Measurement
+from robot_estimation.robot.planar_pose import PlanarPoseModel
 from robot_estimation.state import StateEstimate
 from robot_estimation.filters.extended_kalman_filter import (
     ExtendedKalmanFilter,
@@ -112,6 +113,8 @@ class RobotStateEstimator(EstimatorInterface):
             state_constraint=state_constraint,
         )
         self._state_constraint = state_constraint
+        self._pose_model = PlanarPoseModel(joint_count)
+        self.pose_diagnostics = {"accepted": False, "updates": 0, "rejected": 0}
 
     @property
     def state(self) -> StateEstimate:
@@ -238,6 +241,34 @@ class RobotStateEstimator(EstimatorInterface):
                 self._joint_measurement_model.jacobian
             ),
         )
+
+    def update_planar_pose(self, measurement, nis_limit):
+        """Gate and fuse an independent absolute pose without changing state layout.
+
+        Represent observed heading in the chart around predicted heading, so the
+        existing Joseph-form EKF update receives the correct wrapped innovation.
+        """
+        self._validate_measurement_dimension(measurement, 3, 'Planar pose')
+        R = measurement.covariance
+        if (not np.isfinite(nis_limit) or nis_limit <= 0
+                or not np.isfinite(measurement.value).all() or not np.isfinite(R).all()
+                or not np.allclose(R, R.T) or np.linalg.eigvalsh(R).min() <= 0):
+            raise ValueError('Invalid pose covariance, value or innovation gate')
+        state = self.state
+        H = self._pose_model.jacobian(state.mean)
+        innovation = self._pose_model.innovation(measurement.value, state.mean)
+        S = H @ state.covariance @ H.T + R
+        nis = float(innovation @ np.linalg.solve(S, innovation))
+        accepted = nis <= nis_limit
+        self.pose_diagnostics.update(accepted=accepted, nis=nis,
+            updates=self.pose_diagnostics['updates'] + int(accepted),
+            rejected=self.pose_diagnostics['rejected'] + int(not accepted))
+        if not accepted:
+            return state
+        equivalent = Measurement(self._pose_model.predict_measurement(state.mean) + innovation,
+                                 R.copy(), measurement.timestamp)
+        return self._filter.update(equivalent, self._pose_model.predict_measurement,
+                                   self._pose_model.jacobian)
 
     def _process_function(
         self,

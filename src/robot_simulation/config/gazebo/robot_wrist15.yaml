@@ -1,0 +1,4 @@
+extends: robot_manipulation.yaml
+robot:
+  description:
+    config: config/robot/robot_wrist15.yaml

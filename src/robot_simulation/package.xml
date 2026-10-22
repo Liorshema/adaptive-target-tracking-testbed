@@ -56,7 +56,17 @@
 
 
   <buildtool_depend>ament_python</buildtool_depend>
+  <build_depend>cmake</build_depend>
+  <build_depend>gz_sim_vendor</build_depend>
+  <build_depend>gz_plugin_vendor</build_depend>
+  <exec_depend>gz_sim_vendor</exec_depend>
+  <exec_depend>gz_plugin_vendor</exec_depend>
+  <build_depend>gz_physics_vendor</build_depend>
+  <exec_depend>gz_physics_vendor</exec_depend>
+  <build_depend>gz_dartsim_vendor</build_depend>
+  <exec_depend>gz_dartsim_vendor</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
   <exec_depend>robot_configuration</exec_depend>
 
   <export>

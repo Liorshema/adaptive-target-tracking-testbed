@@ -1,0 +1,7 @@
+# Experimental yaw allocation only; validate physical safety independently.
+# Same normalized WLS objective and safety bounds as whole_body.yaml.
+extends: whole_body.yaml
+controller:
+  parameters:
+    # [base linear, base yaw, arm yaw, shoulder, elbow, wrist]
+    motion_weights: [1.0, 12.0, 3.0, 3.0, 3.0, 2.0]

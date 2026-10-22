@@ -35,6 +35,7 @@ OBSOLETE = [
 CORE = {
     'robot_configuration': None, 'robot_models': None,
     'robot_experiments': {'metrics'},
+    'robot_bringup': {'visualization'},
     'robot_estimation': {'interfaces', 'filters', 'robot', 'target', 'factory'},
     'robot_prediction': {'baseline', 'evaluation', 'fusion', 'history', 'interfaces', 'online_adaptation', 'factory'},
     'robot_control': {'controllers', 'interfaces', 'pipeline', 'safety', 'tracking'},

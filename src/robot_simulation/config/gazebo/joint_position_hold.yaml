@@ -1,6 +1,12 @@
-# Simulation-local effort PID holding. Disable before another arm actuator owns these joints.
+# Simulation-local arm holding; one motor owner per joint.
+# Retain legacy_pid / instrumented_pid for the unchanged effort PID baseline.
 joint_position_hold:
   enabled: true
+  backend: velocity_servo
+  # Native motor demand shaping; physical acceleration still follows bounded effort.
+  servo:
+    position_time_constant: 0.1  # seconds, outer position-error response
+    acceleration_limit: 4.0    # rad/s^2, demanded velocity slew (not a physical guarantee)
   # Reuse the PID gains validated by compute_only_gazebo.py.
   # cmd_min/max are derived from each authoritative description effort limit.
   pid:
@@ -19,7 +25,7 @@ joint_position_hold:
     wrist: 0.0
   # The loaded arm's joints have different inertias and gravity loads.
   # Shoulder needs more stiffness; wrist needs lower derivative gain to avoid
-  # a velocity-limit oscillation at the world's 1 ms physics step.
+  # the legacy effort PID baseline. These gains are unused by velocity_servo.
   joint_overrides:
     shoulder:
       pid:

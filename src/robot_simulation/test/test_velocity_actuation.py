@@ -47,8 +47,11 @@ def actuator():
     node._sequence = -1
     node._command_stamp = None
     node._command = None
+    node._accepted_identity = None
     node._last_tick = None
     node._joint = (10., 10., np.array([.2, -.3]))
+    node._joint_velocity = np.array([.1, -.2])
+    node._joint_source_stamp = (10, 0)
     node._odom = (10., 10.)
     node._last_joint_stamp = None
     node._last_odom_stamp = None
@@ -60,6 +63,9 @@ def actuator():
     node._feedback_rejections = 0
     node._timeout_events = 0
     node._reference_limit_events = 0
+    node.get_clock = lambda: SimpleNamespace(now=lambda: Time(seconds=node.test_now))
+    node.diagnostics = []
+    node._diagnostic_publisher = SimpleNamespace(publish=node.diagnostics.append)
     return node
 
 
@@ -275,3 +281,100 @@ def test_first_active_command_keeps_the_configured_gazebo_startup_target(actuato
     actuator._reference.initialize([.3, -.2])
     actuator._command_callback(command())
     np.testing.assert_array_equal(actuator._reference.position, [.3, -.2])
+
+
+def diagnostic(actuator):
+    """Publish a real generated observation without constructing a ROS node."""
+    actuator._publish_diagnostics()
+    return actuator.diagnostics[-1]
+
+
+def test_diagnostics_reorder_velocity_and_preserve_feedback_source_stamp(actuator):
+    """The observation pairs each physical q/dq with its own feedback epoch."""
+    from sensor_msgs.msg import JointState
+    measured = JointState()
+    measured.header.stamp = Time(nanoseconds=9_987_654_321).to_msg()
+    measured.name = ['b', 'a']
+    measured.position = [-.3, .2]
+    measured.velocity = [-.7, .6]
+    actuator._joint_callback(measured)
+    actuator._reference.initialize([.25, -.2])
+    observation = diagnostic(actuator)
+    assert list(observation.joint_names) == ['a', 'b']
+    assert observation.feedback_valid
+    assert observation.feedback_stamp == measured.header.stamp
+    np.testing.assert_allclose(observation.measured_positions, [.2, -.3])
+    np.testing.assert_allclose(observation.measured_velocities, [.6, -.7])
+    np.testing.assert_allclose(observation.position_errors, [.05, .1])
+
+
+@pytest.mark.parametrize('loss', ['ros_age', 'wall_age', 'invalid'])
+def test_diagnostics_mark_lost_feedback_invalid(actuator, loss):
+    """An old cached value never masquerades as current physical feedback."""
+    if loss == 'ros_age':
+        actuator.test_now += .3
+    elif loss == 'wall_age':
+        actuator._wall = lambda: 10.6
+    else:
+        from sensor_msgs.msg import JointState
+        actuator._joint_callback(JointState())
+    observation = diagnostic(actuator)
+    assert not observation.feedback_valid
+    if loss == 'invalid':
+        assert not observation.measured_velocities
+        assert not observation.measured_positions
+    else:
+        np.testing.assert_allclose(observation.measured_velocities, [.1, -.2])
+        assert observation.feedback_stamp == Time(seconds=10.).to_msg()
+
+
+def test_diagnostics_keep_last_accepted_identity_through_inactive_and_replay(actuator):
+    """Validated heartbeats and rejected commands do not rewrite accepted lineage."""
+    assert not diagnostic(actuator).accepted_command_valid
+    accepted = command(sequence=7)
+    accepted.header.stamp = Time(nanoseconds=9_999_999_123).to_msg()
+    actuator._command_callback(accepted)
+    observation = diagnostic(actuator)
+    assert observation.active and observation.accepted_command_valid
+    assert observation.accepted_session_id == 'session'
+    assert observation.accepted_sequence == 7
+    assert observation.accepted_stamp == accepted.header.stamp
+    actuator._command_callback(command(sequence=8, active=False))
+    actuator._command_callback(command(sequence=7))
+    observation = diagnostic(actuator)
+    assert not observation.active
+    assert observation.accepted_command_valid
+    assert observation.accepted_sequence == 7
+    assert observation.accepted_stamp == accepted.header.stamp
+    actuator._odom = None
+    actuator._command_callback(command('next-session', sequence=1))
+    observation = diagnostic(actuator)
+    assert observation.accepted_session_id == 'session'
+    assert observation.accepted_sequence == 7
+    actuator._odom = (10., 10.)
+    actuator._command_callback(command('next-session', sequence=2))
+    observation = diagnostic(actuator)
+    assert observation.accepted_session_id == 'next-session'
+    assert observation.accepted_sequence == 2
+    actuator._on_time_jump(None)
+    observation = diagnostic(actuator)
+    assert not observation.accepted_command_valid
+    assert not observation.feedback_valid
+    assert not observation.measured_velocities
+
+
+@pytest.mark.parametrize('state', ['inactive', 'missing_feedback', 'recovery', 'unsafe'])
+def test_diagnostics_require_active_acceptance_before_recording_identity(actuator, state):
+    """Validated source order alone does not establish accepted normal arm authority."""
+    message = command(active=state != 'inactive')
+    if state == 'missing_feedback':
+        actuator._odom = None
+    elif state == 'recovery':
+        actuator._joint = (10., 10., np.array([-1.0001, 0.]))
+    elif state == 'unsafe':
+        message.velocity = [2., 0., 0., 0.]
+    actuator._command_callback(message)
+    observation = diagnostic(actuator)
+    assert not observation.active
+    assert not observation.accepted_command_valid
+    assert not observation.accepted_session_id

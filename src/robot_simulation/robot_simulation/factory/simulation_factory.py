@@ -23,6 +23,7 @@ from robot_simulation.disturbances.vector_field import (
     RestoringVectorField,
     VectorFieldParameters,
 )
+from robot_simulation.disturbances.base_guidance import BaseRelativeGuidance
 from robot_simulation.engine.simulation_engine import SimulationEngine
 from robot_simulation.factory.registry import ComponentRegistry
 from robot_simulation.integration.rk4 import RK4Integrator
@@ -130,6 +131,7 @@ class SimulationFactory:
         factory.field_registry.register(
             "sinusoidal", make_sinusoidal_field
         )
+        factory.field_registry.register("base_relative_guidance", BaseRelativeGuidance)
         factory.integrator_registry.register(
             "rk4", make_rk4
         )

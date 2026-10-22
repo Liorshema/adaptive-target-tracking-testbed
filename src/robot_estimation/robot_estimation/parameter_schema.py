@@ -48,3 +48,9 @@ OPTIONAL_PARAMETERS = {'full_state_publish_rate': 'DOUBLE',
  'diagnostic_log_period': 'DOUBLE',
  'robot_estimator_type': 'STRING',
  'target_estimator_type': 'STRING'}
+
+LOCALIZATION_PARAMETERS = {'localization_enabled': 'BOOL', 'localization_topic': 'STRING',
+ 'planar_slip_noise_std': 'DOUBLE', 'yaw_slip_noise_std': 'DOUBLE',
+ 'localization_frame': 'STRING', 'localization_max_age': 'DOUBLE',
+ 'localization_nis_limit': 'DOUBLE', 'localization_transform_tolerance': 'DOUBLE'}
+OPTIONAL_PARAMETERS.update(LOCALIZATION_PARAMETERS)

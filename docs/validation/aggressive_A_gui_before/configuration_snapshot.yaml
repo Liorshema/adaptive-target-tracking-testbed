@@ -1,0 +1,345 @@
+bringup:
+  simulation_config: config/scenarios/reactive_target_oscillatory.yaml
+  actuation_config: config/actuation.yaml
+  control_config: config/control.yaml
+  robot_estimator_config: config/robot_estimator.yaml
+  target_estimator_config: config/target_estimator.yaml
+  tracking_tf:
+    rate_hz: 20.0
+    max_age: 0.2
+    max_skew: 0.05
+    future_tolerance: 0.01
+  estimation_overrides: config/simulation_estimation.yaml
+simulation:
+  paths:
+    base: package
+  world:
+    source: worlds/tracking_testbed.sdf.xacro
+    terrain_config: config/terrain/flat.yaml
+    output_name: world.sdf
+    physics:
+      max_step_size: 0.002
+      real_time_factor: 1.0
+    system_plugins:
+    - filename: gz-sim-physics-system
+      name: gz::sim::systems::Physics
+    - filename: gz-sim-user-commands-system
+      name: gz::sim::systems::UserCommands
+    - filename: gz-sim-scene-broadcaster-system
+      name: gz::sim::systems::SceneBroadcaster
+  target:
+    config: config/scenarios/target_3d.yaml
+    entity_name: target
+    initial_position:
+    - 2.0
+    - 0.25
+    - 1.0
+    initial_velocity:
+    - 0.0
+    - 0.1
+    - -0.12
+  robot:
+    enabled: true
+    config: config/gazebo/robot.yaml
+    joint_position_hold: config/gazebo/joint_position_hold.yaml
+  tracking:
+    source: tf
+    position:
+    - 0.0
+    - 0.0
+    - 1.0
+    reference_frame: world
+    tracking_frame: tracking_frame
+    max_age: 0.2
+    future_tolerance: 0.01
+  simulation:
+    config: config/simulation.yaml
+    environment_config: config/scenarios/environment_oscillatory.yaml
+    measurement_config: config/measurements.yaml
+  gazebo:
+    gui: true
+    start_running: true
+    clock_topic: /clock
+    pose_service_template: /world/{world}/set_pose
+    pose_service_type: ros_gz_interfaces/srv/SetEntityPose
+description:
+  body:
+    length: 1.0
+    width: 0.6
+    height: 0.2
+    mass: 10.0
+  wheels:
+    radius: 0.15
+    width: 0.08
+    mass: 1.0
+    x_offset: 0.35
+    y_offset: 0.34
+    z_offset: -0.1
+  actuator:
+    torque_constant: 0.02
+    gear_ratio: 50.0
+    efficiency: 0.8
+  tracking_frame:
+    parent: wrist_link
+    translation:
+    - 0.12
+    - 0.0
+    - 0.0
+    rotation_rpy:
+    - 0.0
+    - 0.0
+    - 0.0
+  manipulator:
+    base:
+      radius: 0.1
+      height: 0.08
+      mass: 1.0
+    link1:
+      length: 0.4
+      width: 0.08
+      height: 0.08
+      mass: 1.0
+    link2:
+      length: 0.36
+      width: 0.07
+      height: 0.07
+      mass: 0.8
+    wrist:
+      length: 0.12
+      width: 0.06
+      height: 0.06
+      mass: 0.4
+    joints:
+      base_yaw:
+        axis:
+        - 0.0
+        - 0.0
+        - 1.0
+        lower: -3.14
+        upper: 3.14
+        effort: 20.0
+        velocity: 1.0
+        damping: 0.1
+      shoulder:
+        axis:
+        - 0.0
+        - -1.0
+        - 0.0
+        lower: 0.0
+        upper: 1.57
+        effort: 20.0
+        velocity: 1.0
+        damping: 0.2
+      elbow:
+        axis:
+        - 0.0
+        - -1.0
+        - 0.0
+        lower: -1.57
+        upper: 1.57
+        effort: 20.0
+        velocity: 1.0
+        damping: 0.2
+      wrist:
+        axis:
+        - 0.0
+        - -1.0
+        - 0.0
+        lower: -1.57
+        upper: 1.57
+        effort: 10.0
+        velocity: 1.5
+        damping: 0.15
+actuation:
+  command_topic: /control/safe_velocity
+  rate_hz: 50.0
+  command_max_age: 0.25
+  feedback_max_age: 0.2
+  wall_timeout: 0.5
+  future_tolerance: 0.01
+  max_position_lead: 0.08
+  max_integration_dt: 0.1
+  publish_diagnostics: true
+  diagnostic_rate_hz: 10.0
+  diagnostic_topic: /simulation/actuation/telemetry
+control:
+  joint_count: 4
+  base_model_type: differential_drive
+  manipulator_model_type: serial_arm
+  kinematics_adapter_type: planar
+  robot_state_topic: /estimation/robot_state_full
+  prediction_topic: /prediction/trajectory
+  max_robot_state_age: 0.2
+  max_prediction_age: 0.5
+  future_tolerance: 0.01
+  validation_rate: 20.0
+  compute_enabled: true
+  publish_commands: false
+  controller_type: jacobian
+  controller_damping: 1.0
+  controller_task_axes:
+  - 0
+  - 1
+  - 2
+  controller_task_gains:
+  - 1.0
+  - 1.0
+  - 1.0
+  reference_geometry_type: sphere
+  reference_policy_type: radial
+  tracking_radius: 1.0
+  tracking_lookahead_time: 0.0
+  tracking_forward_axis:
+  - 1.0
+  - 0.0
+  - 0.0
+  tracking_up_axis:
+  - 0.0
+  - -1.0
+  - 0.0
+  world_up_axis:
+  - 0.0
+  - 0.0
+  - 1.0
+  base_velocity_lower:
+  - -0.5
+  - -1.0
+  base_velocity_upper:
+  - 0.5
+  - 1.0
+  safety_enabled: true
+  command_topic: /control/safe_velocity
+  command_frame_id: base_link
+  command_joint_names: []
+  publish_telemetry: false
+  telemetry_topic: /control/telemetry
+  strategy_config_file: ''
+  robot_description_file: ''
+  feedforward_override: ''
+  lookahead_override: ''
+strategy:
+  controller:
+    type: weighted_least_squares
+    uses_safety_bounds: true
+    task:
+      type: distance_pointing
+      parameters:
+        minimum_distance: 0.001
+        antipodal_tolerance: 1.0e-05
+    parameters:
+      gains:
+      - 1.0
+      - 3.0
+      - 3.0
+      task_weights:
+      - 4.0
+      - 12.0
+      - 12.0
+      task_scales:
+      - 1.0
+      - 1.0
+      - 1.0
+      motion_weights:
+      - 1.0
+      - 2.0
+      - 3.0
+      - 3.0
+      - 3.0
+      - 2.0
+      damping: 0.08
+      posture_weight: 0.01
+      posture_gain: 0.3
+      smoothness_weight: 0.005
+      limit_avoidance_weight: 0.002
+  tracking:
+    lookahead_time: 0.25
+    prediction_sampling: linear
+    target_velocity_feedforward: true
+estimation_overrides:
+  wheel_linear_velocity_variance: 1.0e-06
+  wheel_angular_velocity_variance: 1.0e-06
+  joint_position_variance: 1.0e-06
+  joint_velocity_variance: 1.0e-06
+  target_acceleration_noise_std: 0.5
+  full_state_publish_rate: 50.0
+  diagnostic_log_period: 5.0
+launch:
+- ros2
+- launch
+- /home/user/ros2_ws/docs/validation/aggressive_A_gui_before/observed.launch.py
+- gui:=true
+- config:=config/reactive_tracking_oscillatory.yaml
+- enable_actuation:=true
+- strategy_config:=config/whole_body.yaml
+- visualize_tracking:=true
+target:
+  target:
+    geometry:
+      type: sphere
+      parameters:
+        radius: 0.1
+    appearance:
+      color:
+      - 1.0
+      - 0.3
+      - 0.1
+      - 1.0
+    physics:
+      kinematic: true
+      gravity: false
+      collision_enabled: false
+    dynamics:
+      type: saturated_fight_flight
+      parameters:
+        a_max: 0.15
+        transition_length: 0.15
+        preferred_distance: 1.0
+        damping: 0.5
+        distance_epsilon: 1.0e-06
+        tangential:
+          acceleration: 0.06
+          axis_world:
+          - 0.3
+          - -0.8
+          - 0.5
+environment:
+  environment:
+    acceleration_fields:
+    - type: linear_restoring
+      enabled: true
+      parameters:
+        center:
+        - 2.2
+        - 0.0
+        - 0.85
+        gain_matrix:
+        - - 0.5
+          - 0.0
+          - 0.0
+        - - 0.0
+          - 0.5
+          - 0.0
+        - - 0.0
+          - 0.0
+          - 0.5
+    - type: sinusoidal
+      enabled: true
+      parameters:
+        amplitude:
+        - 0.0
+        - 0.35
+        - 0.3
+        frequency:
+        - 0.0
+        - 0.2
+        - 0.3
+        phase:
+        - 0.0
+        - 0.0
+        - 1.57079632679
+    stochastic_disturbances: []
+joint_order:
+- base_yaw_joint
+- shoulder_joint
+- elbow_joint
+- wrist_joint

@@ -13,7 +13,7 @@ from robot_bringup.factory.system_configuration import load_system_configuration
 METRICS = {'tracking_distance', 'pointing_error', 'prediction_rmse', 'estimation_error',
            'joint_speed_violation', 'joint_position_violation', 'realtime_factor', 'control_compute'}
 DEFAULT_EXECUTION = dict(readiness_timeout=45., stall_timeout=12., wall_timeout=150.,
-                         shutdown_timeout=5., max_skew=.08, failure_policy='continue')
+                         shutdown_timeout=5., max_skew=.08, failure_policy='continue', record_actuator_trace=False)
 
 
 def mapping(value, allowed, required, label):
@@ -69,8 +69,10 @@ def load_experiment(path, share, output_override=None):
         ex['runtime'] = {'enable_actuation':runtime.get('enable_actuation',False)}
         execution = mapping(ex.get('execution',{}), DEFAULT_EXECUTION, set(), 'execution')
         ex['execution'] = {**DEFAULT_EXECUTION,**execution}
-        for key in DEFAULT_EXECUTION.keys()-{'failure_policy'}:
+        for key in DEFAULT_EXECUTION.keys()-{'failure_policy', 'record_actuator_trace'}:
             ex['execution'][key] = positive(ex['execution'][key], 'execution.'+key)
+        if type(ex['execution']['record_actuator_trace']) is not bool:
+            raise ValueError('execution.record_actuator_trace: expected boolean')
         if ex['execution']['failure_policy'] not in {'continue','abort'}:
             raise ValueError('execution.failure_policy: supported continue, abort')
         variants = ex['variants']
@@ -96,7 +98,7 @@ def _write(path, data):
     return str(path)
 
 
-def materialize_run(variant, seed, directory, share, runtime):
+def materialize_run(variant, seed, directory, share, runtime, record_actuator_trace=False):
     """Snapshot selected owner values and wire the supported sensor RNG to this seed.
 
     References outside the run are immutable installed owner resources, whose
@@ -136,6 +138,17 @@ def materialize_run(variant, seed, directory, share, runtime):
         resource=resolve_resource(sim[section][key],base,share)
         value=read(resource)
         sim[section][key]=str(resource)
+    localization_sensor = None
+    if sim.get('localization_sensor_config'):
+        localization_sensor = read(resolve_resource(sim['localization_sensor_config'],base,share))
+        localization_sensor['localization_sensor']['random_seed'] = int.from_bytes(
+            hashlib.sha256(f'{seed}:localization'.encode()).digest()[:4], 'little')
+        sim['localization_sensor_config'] = _write(inputs/'localization_sensor.yaml',localization_sensor)
+    original_holding = read(sim['robot']['joint_position_hold'])
+    if record_actuator_trace:
+        holding = deepcopy(original_holding)
+        holding['joint_position_hold']['trace_directory'] = str(directory/'physics')
+        sim['robot']['joint_position_hold'] = _write(inputs/'holding.yaml', holding)
     robot=read(sim['robot']['config'])['robot']
     description=read(plan['description_path'])
     description_file=_write(inputs/'robot_description.yaml',description)
@@ -186,6 +199,8 @@ def materialize_run(variant, seed, directory, share, runtime):
       'target_estimate':estparams['target_state_full_topic'],'prediction':ctrl['prediction_topic'],
       'control':ctrl['telemetry_topic'],'command':ctrl['command_topic'],'actuation':read(profile['actuation_config'])['actuation']['diagnostic_topic'],
       'diagnostics':estparams['diagnostic_topic']}
+    if localization_sensor:
+        topics['localization_measurement']=localization_sensor['localization_sensor']['topic']
     context={'description':description,'robot':robot,'control':ctrl,'joint_names':ctrl['command_joint_names'],
        'world_frame':sim['tracking']['reference_frame'],'estimator_frame':estparams['robot_state_frame_id'],
        'target_frame':sim['tracking']['reference_frame'],'topics':topics,
@@ -194,12 +209,17 @@ def materialize_run(variant, seed, directory, share, runtime):
       'target_initial_position':sim['target']['initial_position'],'target_initial_velocity':sim['target']['initial_velocity'],
       'target_dynamics':read(sim['target']['config']),'environment':read(sim['simulation']['environment_config']),
       'integration':integration,'measurements':measurements,'tracking':sim['tracking'],
+      'physical_context':deepcopy(sim.get('physical_context')),
       'prediction_sampling':{key:prediction_configuration['prediction'][key] for key in ['dt','horizon']},
-      'holding':read(sim['robot']['joint_position_hold']),'terrain':read(sim['world']['terrain_config']),
+      'holding':original_holding,'terrain':read(sim['world']['terrain_config']),
       'world_sha256':snapshots[str(world_path)]['sha256'],'actuation':read(profile['actuation_config']),
       'tracking_reference':{key:ctrl[key] for key in ['tracking_radius','tracking_forward_axis','base_velocity_lower','base_velocity_upper']}}
+    if localization_sensor:
+        comparison_contract['localization_sensor']=localization_sensor
     snapshot={'schema_version':1,'resources':snapshots,'seed_consumers':{'measurements.target_position.random_seed':seed},
       'initial_conditions':{'robot_pose':robot['pose'],'target_position':sim['target']['initial_position'],'target_velocity':sim['target']['initial_velocity']},
       'reproducibility':'Owner config replay and sensor RNG control; asynchronous ROS/Gazebo, contact/skid dynamics and reactive target trajectories are not bitwise deterministic.'}
+    if localization_sensor:
+        snapshot['seed_consumers']['localization_sensor.random_seed']=localization_sensor['localization_sensor']['random_seed']
     return {'plan':resolved,'context':context,'snapshot':snapshot,'system_path':system_path,'simulation_path':simulation_file,
             'comparison_contract':comparison_contract}

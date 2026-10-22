@@ -11,11 +11,11 @@ actuation:
   position_recovery:
     numerical_tolerance: 1.0e-9
     recoverable_violation: 0.001
-    # PID-reference slew [rad/s], capped by description velocity; not a physical servo bound.
+    # Position-reference slew [rad/s], capped by description velocity; not a physical speed bound.
     recovery_speed: 0.1
-    # Worst horizontal shoulder load: 9.73152 Nm. With existing P=200 Nm/rad,
-    # up to 1 Nm adverse integral and 0.005 rad release, need >0.05866 rad.
-    # This actuator policy offset stays below max_position_lead; no PID retuning.
+    # Legal inward reference offset, shared by the configured holding backends.
+    # Legacy PID load calculation motivated this value; velocity_servo does not
+    # use PID gains. Its effort-bounded motor must physically cross release_margin.
     recovery_inset: 0.06
     release_margin: 0.005
   publish_diagnostics: true

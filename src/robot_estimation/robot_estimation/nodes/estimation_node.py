@@ -17,7 +17,10 @@ from rclpy.clock import JumpThreshold
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-from robot_estimation.parameter_schema import PARAMETERS
+from robot_estimation.parameter_schema import PARAMETERS, LOCALIZATION_PARAMETERS
+from robot_estimation.robot.planar_pose import transform_observation
+from scipy.spatial.transform import Rotation
+from rclpy.time import Time
 
 from robot_estimation.measurement import Measurement
 from robot_estimation.timestamp_buffer import TimestampBuffer
@@ -64,8 +67,7 @@ class EstimationNode(Node):
         self.declare_parameter('target_estimator_type', 'kalman')
         self.declare_parameter('full_state_publish_rate', 0.)
         self.declare_parameter('diagnostic_log_period', 5.)
-        validate_runtime_parameters({name: self.get_parameter(name).value for name in
-                                     [*self._PARAMETERS, 'full_state_publish_rate', 'diagnostic_log_period']})
+        validate_runtime_parameters(self._runtime_parameters())
         rate = float(self.get_parameter('full_state_publish_rate').value)
         period = float(self.get_parameter('diagnostic_log_period').value)
         if not np.isfinite(rate) or rate < 0 or not np.isfinite(period) or period <= 0:
@@ -106,10 +108,23 @@ class EstimationNode(Node):
     # Parameter schemas define types, never experiment-specific values.
     _PARAMETERS = {name: getattr(Parameter.Type, kind) for name, kind in PARAMETERS.items()}
 
+    def _runtime_parameters(self):
+        """Read required values without touching disabled uninitialized ROS options."""
+        optional = list(LOCALIZATION_PARAMETERS) if self._localization_enabled else ['localization_enabled']
+        names = [*self._PARAMETERS, *optional, 'full_state_publish_rate', 'diagnostic_log_period']
+        return {name: self.get_parameter(name).value for name in names}
+
     def _declare_parameters(self) -> None:
         """Declare strictly typed parameters supplied by ROS YAML overrides."""
         for name, parameter_type in self._PARAMETERS.items():
             self.declare_parameter(name, parameter_type)
+        for name, kind in LOCALIZATION_PARAMETERS.items():
+            default = (False if name == 'localization_enabled' else 0.
+                       if name in ['planar_slip_noise_std', 'yaw_slip_noise_std'] else getattr(Parameter.Type, kind))
+            self.declare_parameter(name, default)
+        self._localization_enabled = self.get_parameter('localization_enabled').value
+        self._slip_parameters = {name: self.get_parameter(name).value
+                                for name in ['planar_slip_noise_std', 'yaw_slip_noise_std']}
         missing = [
             name for name in self._PARAMETERS
             if self.get_parameter(name).value is None
@@ -138,6 +153,7 @@ class EstimationNode(Node):
     def _create_robot_estimator(self) -> RobotStateEstimator:
         """Resolve the physical description and delegate pure filter assembly."""
         parameters = {name: self.get_parameter(name).value for name in self._PARAMETERS}
+        parameters.update(getattr(self, '_slip_parameters', {}))
         physical = None
         if parameters['joint_bounds_enabled']:
             path = parameters['robot_description_file']
@@ -181,7 +197,52 @@ class EstimationNode(Node):
         self.create_subscription(Imu, str(self.get_parameter('imu_topic').value), self._imu_callback, 10)
         self.create_subscription(Odometry, str(self.get_parameter('wheel_odometry_topic').value), self._wheel_odometry_callback, 10)
         self.create_subscription(JointState, str(self.get_parameter('joint_states_topic').value), self._joint_state_callback, 10)
+        if getattr(self, '_localization_enabled', False):
+            from tf2_ros import Buffer, TransformListener
+            self._pose_tf = Buffer(node=self)
+            self._pose_listener = TransformListener(self._pose_tf, self)
+            self.create_subscription(Odometry, self.get_parameter('localization_topic').value,
+                                     self._localization_callback, 10)
         self.create_subscription(PointStamped, str(self.get_parameter('target_measurement_topic').value), self._target_measurement_callback, 10)
+
+    def _localization_callback(self, message):
+        """Transform imperfect external poses, retaining acquisition time and covariance."""
+        if (message.header.frame_id != self.get_parameter('localization_frame').value
+                or message.child_frame_id != self.get_parameter('base_frame').value
+                or self.count_publishers(self.get_parameter('localization_topic').value) > 1):
+            self._reject_robot_input('localization')
+            return
+        try:
+            stamp = self._stamp_to_seconds(message.header.stamp)
+            now = self.get_clock().now().nanoseconds * 1e-9
+            if now - stamp > self.get_parameter('localization_max_age').value:
+                raise ValueError('Localization observation is stale')
+            p, q = message.pose.pose.position, message.pose.pose.orientation
+            quaternion = np.array([q.x, q.y, q.z, q.w])
+            tolerance = self.get_parameter('localization_transform_tolerance').value
+            if not np.isfinite(quaternion).all() or abs(quaternion @ quaternion - 1.) > tolerance:
+                raise ValueError('Invalid localization quaternion')
+            yaw = Rotation.from_quat(quaternion).as_euler('xyz')[2]
+            target_frame = self.get_parameter('robot_state_frame_id').value
+            transform = np.eye(4)
+            if message.header.frame_id != target_frame:
+                tf = self._pose_tf.lookup_transform(target_frame, message.header.frame_id, Time(seconds=stamp))
+                v, r = tf.transform.translation, tf.transform.rotation
+                transform[:3, :3] = Rotation.from_quat([r.x, r.y, r.z, r.w]).as_matrix()
+                transform[:3, 3] = [v.x, v.y, v.z]
+            covariance = np.asarray(message.pose.covariance).reshape(6, 6)[np.ix_([0, 1, 5], [0, 1, 5])]
+            value, covariance = transform_observation([p.x, p.y, yaw], covariance, transform, tolerance)
+            measurement = Measurement(value, covariance, stamp)
+            if not self._measurement_valid(measurement):
+                raise ValueError('Invalid localization measurement')
+            self._queue_robot('localization', measurement)
+        except (ValueError, np.linalg.LinAlgError):
+            self._reject_robot_input('localization')
+        except Exception as error:
+            from tf2_ros import TransformException
+            if not isinstance(error, TransformException):
+                raise
+            self._reject_robot_input('localization')
 
     def _imu_callback(self, msg: Imu) -> None:
         """
@@ -312,6 +373,7 @@ class EstimationNode(Node):
         self._robot_buffer.reset()
         self._raw_joint_time = None
         self._raw_joint_valid = None
+        self._last_localization_time = None
         self.get_logger().warning('ROS clock changed; reinitialized estimation filters.')
 
     def _measurement_time_valid(
@@ -356,6 +418,7 @@ class EstimationNode(Node):
         self._raw_joint_time = None
         self._raw_joint_valid = None
         self._fusion_errors = 0
+        self._last_localization_time = None
 
     def _reject_robot_input(self, source):
         """Count malformed/frame-invalid observations that cannot enter the queue."""
@@ -392,6 +455,10 @@ class EstimationNode(Node):
                 elif source == 'joints':
                     self._robot_estimator.update_joint_encoders(measurement)
                     self._last_joint_time = timestamp
+                elif source == 'localization':
+                    self._robot_estimator.update_planar_pose(measurement, self.get_parameter('localization_nis_limit').value)
+                    if self._robot_estimator.pose_diagnostics['accepted']:
+                        self._last_localization_time = timestamp
                 elif source == 'imu':
                     self._robot_estimator.update_imu(measurement)
                 else:
@@ -414,6 +481,11 @@ class EstimationNode(Node):
             'fusion_errors': self._fusion_errors, 'raw_joint_valid': self._raw_joint_valid,
             'raw_joint_time': self._raw_joint_time,
         }
+        if getattr(self, '_localization_enabled', False):
+            data['localization'] = {**self._robot_estimator.pose_diagnostics,
+                'last_accepted_time': self._last_localization_time,
+                'available': self._last_localization_time is not None and
+                    data['time'] - self._last_localization_time <= self.get_parameter('localization_max_age').value}
         if constraint is not None:
             data['joint_bounds'] = {
                 'physical_valid': constraint.physical_valid,

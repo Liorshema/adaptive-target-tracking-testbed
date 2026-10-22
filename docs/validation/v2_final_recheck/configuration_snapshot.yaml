@@ -1,0 +1,274 @@
+actuation:
+  command_max_age: 0.25
+  command_topic: /control/safe_velocity
+  diagnostic_rate_hz: 10.0
+  diagnostic_topic: /simulation/actuation/telemetry
+  feedback_max_age: 0.2
+  future_tolerance: 0.01
+  max_integration_dt: 0.1
+  max_position_lead: 0.08
+  publish_diagnostics: true
+  rate_hz: 50.0
+  wall_timeout: 0.5
+bringup:
+  actuation_config: config/actuation.yaml
+  control_config: config/control.yaml
+  estimation_overrides: config/simulation_estimation.yaml
+  robot_estimator_config: config/robot_estimator.yaml
+  simulation_config: config/scenarios/moving_target.yaml
+  target_estimator_config: config/target_estimator.yaml
+  tracking_tf:
+    future_tolerance: 0.01
+    max_age: 0.2
+    max_skew: 0.05
+    rate_hz: 20.0
+control:
+  base_model_type: differential_drive
+  base_velocity_lower:
+  - -0.5
+  - -1.0
+  base_velocity_upper:
+  - 0.5
+  - 1.0
+  command_frame_id: base_link
+  command_joint_names: []
+  command_topic: /control/safe_velocity
+  compute_enabled: true
+  controller_damping: 1.0
+  controller_task_axes:
+  - 0
+  - 1
+  - 2
+  controller_task_gains:
+  - 1.0
+  - 1.0
+  - 1.0
+  controller_type: jacobian
+  feedforward_override: ''
+  future_tolerance: 0.01
+  joint_count: 4
+  kinematics_adapter_type: planar
+  lookahead_override: ''
+  manipulator_model_type: serial_arm
+  max_prediction_age: 0.5
+  max_robot_state_age: 0.2
+  prediction_topic: /prediction/trajectory
+  publish_commands: false
+  publish_telemetry: false
+  reference_geometry_type: sphere
+  reference_policy_type: radial
+  robot_description_file: ''
+  robot_state_topic: /estimation/robot_state_full
+  safety_enabled: true
+  strategy_config_file: ''
+  telemetry_topic: /control/telemetry
+  tracking_forward_axis:
+  - 0.0
+  - 0.0
+  - 1.0
+  tracking_lookahead_time: 0.0
+  tracking_radius: 1.0
+  tracking_up_axis:
+  - 0.0
+  - -1.0
+  - 0.0
+  validation_rate: 20.0
+  world_up_axis:
+  - 0.0
+  - 0.0
+  - 1.0
+description:
+  actuator:
+    efficiency: 0.8
+    gear_ratio: 50.0
+    torque_constant: 0.02
+  body:
+    height: 0.2
+    length: 1.0
+    mass: 10.0
+    width: 0.6
+  manipulator:
+    base:
+      height: 0.08
+      mass: 1.0
+      radius: 0.1
+    joints:
+      base_yaw:
+        axis:
+        - 0.0
+        - 0.0
+        - 1.0
+        damping: 0.1
+        effort: 20.0
+        lower: -3.14
+        upper: 3.14
+        velocity: 1.0
+      elbow:
+        axis:
+        - 0.0
+        - -1.0
+        - 0.0
+        damping: 0.2
+        effort: 20.0
+        lower: -1.57
+        upper: 1.57
+        velocity: 1.0
+      shoulder:
+        axis:
+        - 0.0
+        - -1.0
+        - 0.0
+        damping: 0.2
+        effort: 20.0
+        lower: -1.57
+        upper: 1.57
+        velocity: 1.0
+      wrist:
+        axis:
+        - 0.0
+        - -1.0
+        - 0.0
+        damping: 0.15
+        effort: 10.0
+        lower: -1.57
+        upper: 1.57
+        velocity: 1.5
+    link1:
+      height: 0.08
+      length: 0.4
+      mass: 1.0
+      width: 0.08
+    link2:
+      height: 0.07
+      length: 0.36
+      mass: 0.8
+      width: 0.07
+    wrist:
+      height: 0.06
+      length: 0.12
+      mass: 0.4
+      width: 0.06
+  tracking_frame:
+    parent: wrist_link
+    rotation_rpy:
+    - 0.0
+    - 0.0
+    - 0.0
+    translation:
+    - 0.12
+    - 0.0
+    - 0.0
+  wheels:
+    mass: 1.0
+    radius: 0.15
+    width: 0.08
+    x_offset: 0.35
+    y_offset: 0.34
+    z_offset: -0.1
+estimation_overrides:
+  diagnostic_log_period: 5.0
+  full_state_publish_rate: 50.0
+  joint_position_variance: 1.0e-06
+  joint_velocity_variance: 1.0e-06
+  target_acceleration_noise_std: 0.5
+  wheel_angular_velocity_variance: 1.0e-06
+  wheel_linear_velocity_variance: 1.0e-06
+launch:
+- ros2
+- launch
+- robot_bringup
+- closed_loop.launch.py
+- gui:=false
+- config:=config/optimal_tracking.yaml
+- enable_actuation:=true
+- strategy_config:=config/whole_body.yaml
+simulation:
+  gazebo:
+    clock_topic: /clock
+    gui: true
+    pose_service_template: /world/{world}/set_pose
+    pose_service_type: ros_gz_interfaces/srv/SetEntityPose
+    start_running: true
+  paths:
+    base: package
+  robot:
+    config: config/gazebo/robot.yaml
+    enabled: true
+    joint_position_hold: config/gazebo/joint_position_hold.yaml
+  simulation:
+    config: config/simulation.yaml
+    environment_config: config/scenarios/environment.yaml
+    measurement_config: config/measurements.yaml
+  target:
+    config: config/scenarios/target.yaml
+    entity_name: target
+    initial_position:
+    - 2.7
+    - 0.0
+    - 0.85
+    initial_velocity:
+    - 0.0
+    - 0.35
+    - 0.0
+  tracking:
+    future_tolerance: 0.01
+    max_age: 0.2
+    position:
+    - 0.0
+    - 0.0
+    - 1.0
+    reference_frame: world
+    source: static
+    tracking_frame: tracking_frame
+  world:
+    output_name: world.sdf
+    physics:
+      max_step_size: 0.002
+      real_time_factor: 1.0
+    source: worlds/tracking_testbed.sdf.xacro
+    system_plugins:
+    - filename: gz-sim-physics-system
+      name: gz::sim::systems::Physics
+    - filename: gz-sim-user-commands-system
+      name: gz::sim::systems::UserCommands
+    - filename: gz-sim-scene-broadcaster-system
+      name: gz::sim::systems::SceneBroadcaster
+    terrain_config: config/terrain/flat.yaml
+strategy:
+  controller:
+    parameters:
+      damping: 0.08
+      gains:
+      - 1.0
+      - 3.0
+      - 3.0
+      limit_avoidance_weight: 0.002
+      motion_weights:
+      - 1.0
+      - 2.0
+      - 3.0
+      - 3.0
+      - 3.0
+      - 2.0
+      posture_gain: 0.3
+      posture_weight: 0.01
+      smoothness_weight: 0.005
+      task_scales:
+      - 1.0
+      - 1.0
+      - 1.0
+      task_weights:
+      - 4.0
+      - 12.0
+      - 12.0
+    task:
+      parameters:
+        antipodal_tolerance: 1.0e-05
+        minimum_distance: 0.001
+      type: distance_pointing
+    type: weighted_least_squares
+    uses_safety_bounds: true
+  tracking:
+    lookahead_time: 0.25
+    prediction_sampling: linear
+    target_velocity_feedforward: true

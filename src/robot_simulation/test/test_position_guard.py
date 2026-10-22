@@ -91,8 +91,8 @@ def test_boundary_release_does_not_move_ordinary_legal_positions():
     assert g.observe([1e-7, 0.], release_boundary=True) == 'normal'
 
 
-def test_deployment_recovery_offset_can_lift_the_horizontal_loaded_arm():
-    """Derive static load from description; preserve PID gains and effort limits."""
+def test_legacy_pid_recovery_offset_can_lift_the_horizontal_loaded_arm():
+    """Legacy PID offset rationale only; native velocity servo needs physical tests."""
     root = Path(__file__).resolve().parents[2]
     simulation = root / 'robot_simulation'
     robot_path = root / 'robot_description/config/robot/robot.yaml'

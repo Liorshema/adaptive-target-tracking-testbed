@@ -1,0 +1,103 @@
+Panels:
+- Class: rviz_common/Displays
+  Name: Displays
+Visualization Manager:
+  Global Options:
+    Fixed Frame: world
+    Background Color: 32; 35; 40
+    Frame Rate: 30
+  Displays:
+  - Class: rviz_default_plugins/Grid
+    Name: World grid
+    Enabled: true
+    Plane Cell Count: 30
+  - Class: rviz_default_plugins/TF
+    Name: Display and tracking TF
+    Enabled: false
+    Show Names: false
+  - Class: rviz_default_plugins/RobotModel
+    Name: Physical robot (visual/ TF)
+    Enabled: true
+    Description Source: Topic
+    Description Topic:
+      Value: /visualization/robot_description
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    TF Prefix: visual
+  - Class: rviz_default_plugins/MarkerArray
+    Name: Camera geometry and measured warnings
+    Enabled: true
+    Marker Topic:
+      Value: /tracking/markers
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+  - Class: rviz_default_plugins/Path
+    Name: Target Truth
+    Enabled: true
+    Topic:
+      Value: /tracking/paths/target_truth
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Color: 0; 230; 51
+    Line Style: Billboards
+    Line Width: 0.025
+    Buffer Length: 1
+    Alpha: 1.0
+  - Class: rviz_default_plugins/Path
+    Name: Target Estimate
+    Enabled: true
+    Topic:
+      Value: /tracking/paths/target_estimate
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Color: 255; 128; 0
+    Line Style: Billboards
+    Line Width: 0.015
+    Buffer Length: 1
+    Alpha: 1.0
+  - Class: rviz_default_plugins/Path
+    Name: Target Prediction
+    Enabled: true
+    Topic:
+      Value: /tracking/paths/target_prediction
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Color: 38; 102; 255
+    Line Style: Billboards
+    Line Width: 0.035
+    Buffer Length: 1
+    Alpha: 1.0
+  - Class: rviz_default_plugins/Path
+    Name: Robot Truth
+    Enabled: false
+    Topic:
+      Value: /tracking/paths/robot_truth
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Color: 178; 178; 178
+    Line Style: Billboards
+    Line Width: 0.012
+    Buffer Length: 1
+    Alpha: 1.0
+  - Class: rviz_default_plugins/Path
+    Name: Robot Estimate
+    Enabled: false
+    Topic:
+      Value: /tracking/paths/robot_estimate
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Color: 255; 153; 51
+    Line Style: Billboards
+    Line Width: 0.012
+    Buffer Length: 1
+    Alpha: 1.0
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 3.8
+      Pitch: 0.6
+      Yaw: 0.8
+      Focal Point:
+        X: 1.0
+        Y: 0.0
+        Z: 0.6

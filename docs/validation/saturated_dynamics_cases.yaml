@@ -1,0 +1,24 @@
+duration: 80.0
+sample_period: 0.05
+max_center_distance: 10.0
+max_speed: 10.0
+closed_loop_workspace_radius: 2.0
+candidates:
+  suggested: {a_max: 1.5, transition_length: 0.5, damping: 0.15}
+  matched: {a_max: 0.5, transition_length: 0.5, damping: 0.3}
+  gentle: {a_max: 0.35, transition_length: 0.35, damping: 0.3}
+  damped: {a_max: 0.35, transition_length: 0.35, damping: 0.5}
+  contained: {a_max: 0.15, transition_length: 0.15, damping: 0.5}
+initial_conditions:
+  nominal:
+    position: [2.0, 0.25, 1.0]
+    velocity: [0.0, 0.10, -0.12]
+  high:
+    position: [3.0, -0.4, 1.4]
+    velocity: [-0.15, 0.10, 0.20]
+  low:
+    position: [1.4, 0.3, 0.65]
+    velocity: [0.10, -0.10, -0.20]
+references:
+  static: {center: [0.8, 0.0, 0.6], amplitude: [0.0, 0.0, 0.0], angular_frequency: 0.5}
+  moving: {center: [0.8, 0.0, 0.6], amplitude: [0.25, 0.20, 0.15], angular_frequency: 0.5}

@@ -1,0 +1,6 @@
+# Encoder precision is not chassis-motion accuracy during four-wheel skid turns.
+# Historical independent wheel/body RMSE: ~0.129 m/s, ~0.189 rad/s.
+# These variances cover chassis slip/model error; joint/target calibration is retained.
+extends: simulation_estimation_wrist15.yaml
+wheel_linear_velocity_variance: 0.02
+wheel_angular_velocity_variance: 0.04

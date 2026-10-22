@@ -7,6 +7,22 @@ from robot_experiments.configuration import load_experiment, materialize_run
 SRC=Path(__file__).resolve().parents[2]
 SHARE=lambda name:SRC/name
 
+
+def test_localization_materialization_uses_independent_seed_and_records_contract(tmp_path):
+ spec=load_experiment(document(tmp_path, variants=[{'name':'localized', 'system_config':
+     {'package':'robot_bringup','path':'config/system_manipulation_D_localized.yaml'}}]), SHARE)
+ run=tmp_path/'run';run.mkdir()
+ prepared=materialize_run(spec['variants'][0],917,run,SHARE,spec['runtime'])
+ from robot_configuration.yaml_loader import load_yaml
+ sim=load_yaml(prepared['simulation_path'])
+ sensor=load_yaml(sim['localization_sensor_config'])['localization_sensor']
+ target=load_yaml(sim['simulation']['measurement_config'])['measurements']['target_position']
+ assert sensor['random_seed'] != target['random_seed']
+ assert target['random_seed'] == 917
+ assert prepared['context']['topics']['localization_measurement'] == sensor['topic']
+ assert prepared['comparison_contract']['localization_sensor']['localization_sensor'] == sensor
+ assert prepared['snapshot']['seed_consumers']['localization_sensor.random_seed'] == sensor['random_seed']
+
 def document(tmp_path,**changes):
  data={'schema_version':1,'experiment':{'name':'paired','duration':2.,'settling_time':1.,'seeds':[42],
  'variants':[{'name':'imm','system_config':{'package':'robot_bringup','path':'config/system_nominal.yaml'}}],
@@ -54,3 +70,20 @@ def test_prediction_horizon_is_part_of_matched_comparison_contract(tmp_path):
  result=materialize_run(spec['variants'][0],917,run,SHARE,spec['runtime'])
  assert result['comparison_contract']['prediction_sampling']['horizon']>0
  assert result['comparison_contract']['prediction_sampling']['dt']>0
+
+
+def test_optional_physics_trace_is_run_local_and_not_part_of_physics_contract(tmp_path):
+ spec=load_experiment(document(tmp_path,execution={'record_actuator_trace':True}),SHARE)
+ run=tmp_path/'run';run.mkdir()
+ result=materialize_run(spec['variants'][0],42,run,SHARE,spec['runtime'],record_actuator_trace=True)
+ sim=yaml.safe_load(result['simulation_path'].read_text())
+ hold=yaml.safe_load(Path(sim['robot']['joint_position_hold']).read_text())['joint_position_hold']
+ assert hold['trace_directory']==str(run/'physics')
+ assert 'trace_directory' not in result['comparison_contract']['holding']['joint_position_hold']
+ assert not (run/'physics').exists()
+
+
+@pytest.mark.parametrize('value',['true',1,None])
+def test_trace_option_requires_boolean(tmp_path,value):
+ with pytest.raises(ValueError):
+  load_experiment(document(tmp_path,execution={'record_actuator_trace':value}),SHARE)

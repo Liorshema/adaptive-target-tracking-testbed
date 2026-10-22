@@ -7,7 +7,7 @@ from typing import Any, Mapping
 import numpy as np
 
 from robot_simulation.interfaces.dynamics import Dynamics
-from robot_simulation.interfaces.disturbance import AccelerationField
+from robot_simulation.interfaces.disturbance import AccelerationField, ContextualAccelerationField
 
 
 @dataclass(frozen=True)
@@ -150,7 +150,10 @@ class FightFlightDynamics(Dynamics):
 
         if self.environment_field is not None:
             external_acceleration = np.asarray(
-                self.environment_field.acceleration(position, time),
+                (self.environment_field.acceleration_with_context(
+                    position, time, context.get("physical_base"))
+                 if isinstance(self.environment_field, ContextualAccelerationField)
+                 else self.environment_field.acceleration(position, time)),
                 dtype=float,
             )
 
