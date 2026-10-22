@@ -1,0 +1,10 @@
+# Fractions of existing [linear, angular] speed limits; duration and ramp are seconds.
+ramp_seconds: 1.0
+segments:
+  - {name: stationary_start, seconds: 5.0, velocity_fraction: [0.0, 0.0]}
+  - {name: straight, seconds: 8.0, velocity_fraction: [0.4, 0.0]}
+  - {name: stationary_after_straight, seconds: 2.0, velocity_fraction: [0.0, 0.0]}
+  - {name: rotation, seconds: 8.0, velocity_fraction: [0.0, 0.4]}
+  - {name: stationary_after_rotation, seconds: 2.0, velocity_fraction: [0.0, 0.0]}
+  - {name: curve, seconds: 8.0, velocity_fraction: [0.3, 0.3]}
+  - {name: stationary_end, seconds: 5.0, velocity_fraction: [0.0, 0.0]}

@@ -1,0 +1,73 @@
+Task-only inventory relative to tracking_loss_baseline.json.
+All 1,633 pre-existing files retain exact hashes; no production changes.
+No staging/commits/push.
+
+ADDED NONIGNORED DIAGNOSTIC / DOCUMENTATION FILES
+docs/validation/tracking_loss.launch.py
+docs/validation/tracking_loss_analysis.py
+docs/validation/tracking_loss_baseline.json
+docs/validation/tracking_loss_context_test.py
+docs/validation/tracking_loss_experiments.yaml
+docs/validation/tracking_loss_feasibility.py
+docs/validation/tracking_loss_final_processes.json
+docs/validation/tracking_loss_final_verification.json
+docs/validation/tracking_loss_geometry.py
+docs/validation/tracking_loss_initial_processes.json
+docs/validation/tracking_loss_intervention_design.md
+docs/validation/tracking_loss_modified_files.txt
+docs/validation/tracking_loss_oracle.py
+docs/validation/tracking_loss_plan.md
+docs/validation/tracking_loss_plot.py
+docs/validation/tracking_loss_prediction_consistency.json
+docs/validation/tracking_loss_prediction_replay.py
+docs/validation/tracking_loss_preservation.json
+docs/validation/tracking_loss_report.py
+docs/validation/tracking_loss_root_cause.md
+docs/validation/tracking_loss_run.py
+docs/validation/tracking_loss_runtime.json
+docs/validation/tracking_loss_test.py
+docs/validation/tracking_loss_wheels.py
+
+GENERATED / IGNORED LOGS (including failed attempts)
+docs/validation/tracking_loss_baseline_confirmation.log
+docs/validation/tracking_loss_combined_analysis.log
+docs/validation/tracking_loss_context_test.log
+docs/validation/tracking_loss_functional_regression.log
+docs/validation/tracking_loss_historical_analysis.log
+docs/validation/tracking_loss_interventions.log
+docs/validation/tracking_loss_plot.log
+docs/validation/tracking_loss_plot_final.log
+docs/validation/tracking_loss_plot_verified.log
+docs/validation/tracking_loss_prediction_replay.log
+docs/validation/tracking_loss_prediction_replay_verified.log
+docs/validation/tracking_loss_rate_feasibility.log
+docs/validation/tracking_loss_rate_feasibility_verified.log
+docs/validation/tracking_loss_report.log
+docs/validation/tracking_loss_robot_analysis.log
+docs/validation/tracking_loss_robot_oracle_retry.log
+docs/validation/tracking_loss_target_analysis.log
+docs/validation/tracking_loss_tests_final.log
+docs/validation/tracking_loss_tests_green.log
+docs/validation/tracking_loss_tests_red.log
+docs/validation/tracking_loss_wheels.log
+docs/validation/tracking_loss_wheels_verified.log
+
+GENERATED / IGNORED RESULT ROOTS (all preserved)
+results/tracking_loss_baseline_confirmation
+results/tracking_loss_combined_analysis
+results/tracking_loss_diagnostic_relay_failure
+results/tracking_loss_figures
+results/tracking_loss_figures_final
+results/tracking_loss_figures_verified
+results/tracking_loss_final_comparison
+results/tracking_loss_historical_D42
+results/tracking_loss_interventions
+results/tracking_loss_prediction_replay
+results/tracking_loss_prediction_replay_verified
+results/tracking_loss_rate_feasibility
+results/tracking_loss_rate_feasibility_verified
+results/tracking_loss_robot_analysis
+results/tracking_loss_robot_oracle_retry
+results/tracking_loss_target_analysis
+results/tracking_loss_wheels
+results/tracking_loss_wheels_verified

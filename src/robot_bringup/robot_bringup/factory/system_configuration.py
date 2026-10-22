@@ -290,6 +290,30 @@ def _assemble(source, share, overrides):
         validate_deployment_configuration(sim, target, environment, integration, measurements)
     except (ValueError, TypeError, KeyError) as error:
         raise ValueError(f'simulation ({profile["simulation_config"]}): {error}') from error
+    if sim.get('physical_context'):
+        truth = deployed['ground_truth_odometry']
+        ctx = sim['physical_context']
+        if (runtime.get('publish_ground_truth', truth['enabled']) is not True
+                or truth['topic'] != ctx['base_topic'] or truth['frame_id'] != ctx['reference_frame']):
+            raise ValueError('physical guidance requires enabled matching physical ground truth')
+    sensor_config = sim.get('localization_sensor_config')
+    if sensor_config:
+        from robot_simulation.measurements.planar_localization import validate_configuration
+        localization_sensor = load_yaml(resolve_resource(sensor_config, resource, share))['localization_sensor']
+        validate_configuration(localization_sensor)
+        if localization_sensor['enabled']:
+            truth = deployed['ground_truth_odometry']
+            if (not runtime.get('publish_ground_truth', truth['enabled'])
+                    or localization_sensor['source_topic'] != truth['topic']
+                    or localization_sensor['source_frame'] != truth['frame_id']
+                    or localization_sensor['child_frame'] != truth['child_frame_id']):
+                raise ValueError('Localization simulation requires matching enabled physical source')
+        if params.get('localization_enabled', False) and (
+                params['localization_topic'] != localization_sensor['topic']
+                or params['localization_frame'] != localization_sensor['source_frame']):
+            raise ValueError('Localization measurement topic/frame do not match the selected sensor')
+    if params.get('localization_enabled', False) and params['localization_topic'] == deployed['ground_truth_odometry']['topic']:
+        raise ValueError('Ground truth is not an estimator measurement; select the imperfect sensor output')
     sensor = measurements['measurements']['target_position']
     _equal(sensor['enabled'], True, 'simulation.measurements.target_position.enabled')
     _equal(sensor['observation']['components'], ['position'], 'simulation.measurements.observation')

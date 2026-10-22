@@ -55,3 +55,19 @@ def test_future_feedback_cannot_poison_tracking_tf_after_reset():
     module.TrackingFeedbackTF._receive(receiver, 'joints', future)
     module.TrackingFeedbackTF._receive(receiver, 'joints', fresh)
     assert receiver._latest['joints'] is fresh
+
+
+def test_fk_stamp_is_not_older_than_any_measurement_used():
+    from unittest.mock import Mock
+    module=importlib.import_module('robot_bringup.nodes.tracking_feedback_tf')
+    model=create_robot_model()
+    joints=JointState();joints.name=['base_yaw_joint','shoulder_joint','elbow_joint','wrist_joint']
+    joints.position=[0.,0.,0.,0.];joints.header.stamp=Time(seconds=1.04).to_msg()
+    odom=Odometry();odom.header.frame_id='world';odom.header.stamp=Time(seconds=1.).to_msg()
+    odom.pose.pose.orientation.w=1.
+    receiver=SimpleNamespace(_latest={'joints':joints,'odom':odom},_parent='world',_child='tracking_frame',
+        _model=model,_names=joints.name,_max_age=.2,_max_skew=.08,_future_tolerance=0.,
+        _broadcaster=Mock(),get_clock=lambda:SimpleNamespace(now=lambda:Time(seconds=1.05)))
+    module.TrackingFeedbackTF._publish(receiver)
+    sent=receiver._broadcaster.sendTransform.call_args.args[0]
+    assert sent.header.stamp==joints.header.stamp

@@ -1,0 +1,4 @@
+# Isolate allocation cost from C: same scenario and wrist +/-15 degrees.
+extends: system_manipulation_C.yaml
+control:
+  strategy: {package: robot_control, path: config/whole_body_manipulation_arm_priority.yaml}

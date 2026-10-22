@@ -182,3 +182,45 @@ def test_robot_builder_generates_real_description_without_geometry_changes(tmp_p
     drive = model.find("plugin[@name='gz::sim::systems::DiffDrive']")
     assert float(drive.findtext('wheel_radius')) == 0.15
     assert float(drive.findtext('wheel_separation')) == 0.68
+
+
+@pytest.mark.parametrize('backend', ['instrumented_pid', 'velocity_servo'])
+def test_native_actuator_is_single_owner_with_authoritative_joint_binding(inputs, monkeypatch, backend):
+    """Both observable backends replace stock PID writers without a second owner."""
+    from robot_simulation.gazebo import robot_builder
+    monkeypatch.setattr(robot_builder, 'actuator_library', lambda: '/installed/actuator.so',
+                        raising=False)
+    model, description, config, hold = deepcopy(inputs)
+    hold.update(backend=backend, trace_directory='/tmp/test_actuator_trace',
+                servo={'position_time_constant': .1, 'acceleration_limit': 4.})
+    model = configure_model(model, description, config, hold)
+    assert not model.findall("plugin[@name='gz::sim::systems::JointPositionController']")
+    system = model.find("plugin[@name='robot_simulation::ArmActuator']")
+    assert system is not None and system.get('filename') == '/installed/actuator.so'
+    assert system.findtext('backend') == backend
+    assert system.findtext('trace_directory') == '/tmp/test_actuator_trace'
+    assert [j.findtext('name') for j in system.findall('joint')] == [
+        'custom_' + key for key in description['robot']['manipulator']['joints']]
+    assert system.findtext('joint/p_gain') == '80.0'
+    assert system.findtext('joint/initial_position') == '0.2'
+
+
+@pytest.mark.parametrize('servo', [{}, {'position_time_constant': 0., 'acceleration_limit': 4.},
+    {'position_time_constant': .1, 'acceleration_limit': float('nan')}, {'unknown': 1.},
+    {'position_time_constant': True, 'acceleration_limit': 4.}])
+def test_native_governor_configuration_rejected_before_loading(inputs, servo):
+    """Demand-shaping settings must be explicit finite positive owner parameters."""
+    model, description, config, hold = deepcopy(inputs)
+    hold.update(backend='velocity_servo', servo=servo)
+    with pytest.raises(ValueError):
+        configure_model(model, description, config, hold)
+
+
+@pytest.mark.parametrize('entry', [{'backend': 'invalid'}, {'trace_directory': 'relative'},
+                                 {'backend': True}, {'trace_directory': 1}])
+def test_invalid_actuator_backend_or_trace_rejected(inputs, entry):
+    """Unknown mechanisms and ambiguous trace destinations fail before physics launch."""
+    model, description, config, hold = deepcopy(inputs)
+    hold.update(entry)
+    with pytest.raises(ValueError):
+        configure_model(model, description, config, hold)

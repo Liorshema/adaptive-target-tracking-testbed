@@ -1,6 +1,7 @@
 """Pure construction of the currently supported robot and target estimators."""
 
 import numpy as np
+from robot_estimation.robot.planar_pose import validate_localization_parameters
 from robot_estimation.state import StateEstimate
 from robot_estimation.filters.kalman_filter import KalmanFilter
 from robot_estimation.robot.joint_bounds import JointBoundsConditioner
@@ -16,6 +17,7 @@ from robot_estimation.timestamp_buffer import TimestampBuffer
 
 def validate_runtime_parameters(parameters):
     """Check the existing node's publication and causal-reordering budgets."""
+    validate_localization_parameters(parameters)
     rate = parameters.get('full_state_publish_rate', 0.)
     period = parameters.get('diagnostic_log_period', 5.)
     if not np.isfinite(rate) or rate < 0:
@@ -38,7 +40,9 @@ def create_robot_estimator(parameters, physical=None, estimator_type='robot_ekf'
     if estimator_type != 'robot_ekf':
         raise ValueError(f'estimation.robot.type={estimator_type!r}: supported: robot_ekf')
     joint_count = int(parameters['joint_count'])
-    process_model = RobotProcessModel(joint_count=joint_count, linear_acceleration_noise_std=float(parameters['linear_acceleration_noise_std']), angular_acceleration_noise_std=float(parameters['angular_acceleration_noise_std']), joint_acceleration_noise_std=float(parameters['joint_acceleration_noise_std']))
+    process_model = RobotProcessModel(joint_count=joint_count, linear_acceleration_noise_std=float(parameters['linear_acceleration_noise_std']), angular_acceleration_noise_std=float(parameters['angular_acceleration_noise_std']), joint_acceleration_noise_std=float(parameters['joint_acceleration_noise_std']),
+        planar_slip_noise_std=parameters.get('planar_slip_noise_std', 0.),
+        yaw_slip_noise_std=parameters.get('yaw_slip_noise_std', 0.))
     state_dimension = process_model.state_dimension
     initial_mean = np.asarray(parameters['robot_initial_state'], dtype=float)
     covariance_diagonal = np.asarray(parameters['robot_initial_covariance_diagonal'], dtype=float)

@@ -72,7 +72,10 @@ class VelocityActuationNode(Node):
         self._sequence = -1
         self._command_stamp = None
         self._command = None
+        self._accepted_identity = None
         self._joint = None
+        self._joint_velocity = None
+        self._joint_source_stamp = None
         self._odom = None
         self._last_joint_stamp = None
         self._last_odom_stamp = None
@@ -160,12 +163,16 @@ class VelocityActuationNode(Node):
                 raise ValueError('Out-of-order joint feedback')
             self._last_joint_stamp = stamp
             self._joint = (stamp, self._wall(), measured)
+            self._joint_velocity = velocity
+            self._joint_source_stamp = (message.header.stamp.sec, message.header.stamp.nanosec)
             if (self._position_guard.observe(measured) == 'fault' and
                     self._reason != self._position_guard.fault):
                 self._halt(self._position_guard.fault)
         except (ValueError, IndexError, TypeError) as error:
             self._feedback_rejections += 1
             self._joint = None
+            self._joint_velocity = None
+            self._joint_source_stamp = None
             self._halt(str(error))
 
     def _odom_callback(self, message):
@@ -253,6 +260,8 @@ class VelocityActuationNode(Node):
                     self._reference.initialize(self._joint[2])
                 self._last_tick = self._now()
             self._command = (stamp, self._wall(), velocity)
+            self._accepted_identity = (message.session_id, message.sequence,
+                                       message.header.stamp.sec, message.header.stamp.nanosec)
             self._accepted_commands += 1
             self._was_active = True
             self._reason = None
@@ -277,7 +286,10 @@ class VelocityActuationNode(Node):
         self._session = None
         self._sequence = -1
         self._command_stamp = None
+        self._accepted_identity = None
         self._joint = None
+        self._joint_velocity = None
+        self._joint_source_stamp = None
         self._odom = None
         self._last_joint_stamp = None
         self._last_odom_stamp = None
@@ -352,13 +364,21 @@ class VelocityActuationNode(Node):
         self._send(self._command[2])
 
     def _publish_diagnostics(self):
-        """Observe transport and reference limiting without per-callback logging."""
+        """Snapshot adapter state; stamps identify feedback and accepted command sources."""
         message = ActuationTelemetry()
         message.header.stamp = self.get_clock().now().to_msg()
         message.header.frame_id = self._frame
         message.enabled = self._enabled
         message.active = self._command is not None
         message.reason = self._reason or ''
+        message.joint_names = self._names
+        message.accepted_command_valid = self._accepted_identity is not None
+        if self._accepted_identity is not None:
+            session, sequence, seconds, nanoseconds = self._accepted_identity
+            message.accepted_session_id = session
+            message.accepted_sequence = sequence
+            message.accepted_stamp.sec = seconds
+            message.accepted_stamp.nanosec = nanoseconds
         if self._joint is not None and self._position_guard.mode != 'normal':
             message.reason = (self._position_guard.fault or
                               'Position ' + self._position_guard.mode)
@@ -370,6 +390,11 @@ class VelocityActuationNode(Node):
             message.position_reference = self._reference.position.tolist()
         if self._joint is not None:
             message.measured_positions = self._joint[2].tolist()
+            message.measured_velocities = self._joint_velocity.tolist()
+            message.feedback_stamp.sec, message.feedback_stamp.nanosec = self._joint_source_stamp
+            message.feedback_valid = self._fresh(self._joint, self._config['feedback_max_age'])
+            if self._reference.position is not None:
+                message.position_errors = (self._reference.position - self._joint[2]).tolist()
         for name in ['accepted_commands', 'rejected_commands', 'inactive_commands',
                      'feedback_rejections', 'timeout_events', 'reference_limit_events']:
             setattr(message, name, getattr(self, '_' + name))

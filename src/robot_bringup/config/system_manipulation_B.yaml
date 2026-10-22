@@ -1,0 +1,4 @@
+# Challenge scenario, nominal description and WLS.
+extends: system_nominal.yaml
+simulation:
+  config: {package: robot_bringup, path: config/reactive_manipulation.yaml}

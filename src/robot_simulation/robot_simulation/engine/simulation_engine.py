@@ -44,6 +44,8 @@ class SimulationEngine:
             ),
         }
 
+        context["physical_base"] = state.physical_base
+
         next_vector = self.integrator.step(
             dynamics=self.dynamics,
             state=state_to_vector(state.target),
@@ -60,4 +62,5 @@ class SimulationEngine:
             target=vector_to_state(next_vector),
             tracking_position_world=state.tracking_position_world,
             time=state.time + dt,
+            physical_base=state.physical_base,
         )

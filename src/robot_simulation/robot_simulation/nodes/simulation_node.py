@@ -8,6 +8,8 @@ import numpy as np
 import rclpy
 
 from geometry_msgs.msg import PointStamped
+from nav_msgs.msg import Odometry
+from robot_simulation.state.physical_context import PhysicalPositionHistory
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -83,6 +85,7 @@ class SimulationNode(Node):
         super().__init__("simulation_node")
 
         self._declare_parameters()
+        self.declare_parameter("physical_base_max_age", .2)
 
         target_config = load_yaml(
             required_string(self, "target_config")
@@ -116,6 +119,7 @@ class SimulationNode(Node):
             max_steps=integration_config["max_steps"],
         )
         self._dt = dt
+        self._context_history_duration = dt*integration_config["max_steps"]
 
         self._initial_position = required_vector(
             self, "initial_position"
@@ -153,8 +157,24 @@ class SimulationNode(Node):
                 ),
                 max_age=self.get_parameter('tracking_max_age').value,
                 future_tolerance=self.get_parameter('tracking_future_tolerance').value,
+                history_duration=(self._context_history_duration
+                    + self.get_parameter('physical_base_max_age').value
+                    if engine.dynamics.environment_field.context_requirements else None),
             )
 
+        self._physical_history = None
+        requirements = engine.dynamics.environment_field.context_requirements
+        if requirements:
+            topic = required_string(self, 'physical_base_topic')
+            self._physical_history = PhysicalPositionHistory(
+                self._reference_frame, topic, self.get_parameter('physical_base_max_age').value,
+                history_duration=self._context_history_duration
+                + self.get_parameter('physical_base_max_age').value)
+            self.create_subscription(Odometry, topic, self._on_physical_base, 30)
+            if self._tracking_provider is None:
+                raise ValueError('contextual guidance requires live tracking TF')
+        self._last_clock = None
+        self._epoch = 0
         self._state: SimulationState | None = None
         self._pending = False
 
@@ -264,6 +284,7 @@ class SimulationNode(Node):
             "tracking_source",
             "reference_frame",
             "tracking_frame",
+            "physical_base_topic",
         )
 
         vector_parameters = (
@@ -349,6 +370,30 @@ class SimulationNode(Node):
         self._measurement_publisher.publish(message)
         self._last_measurement_time = timestamp
 
+    def _on_physical_base(self, message):
+        """Cache stamped ground truth; only causal samples enter integration."""
+        stamp = message.header.stamp
+        pose = message.pose.pose.position
+        timestamp = stamp.sec+stamp.nanosec*1e-9
+        now = self.get_clock().now().nanoseconds*1e-9
+        # Old-epoch messages after reset must not poison the monotonic history.
+        if timestamp > now + self.get_parameter('tracking_future_tolerance').value:
+            return
+        try:
+            self._physical_history.add(
+                np.array([pose.x, pose.y, pose.z]), timestamp,
+                message.header.frame_id)
+        except ValueError as error:
+            self.get_logger().error(f'Invalid physical base feedback: {error}')
+
+    def _refresh_physical_context(self, current):
+        """Select only source samples preceding each integration substep."""
+        base = self._physical_history.at(current.time)
+        camera = self._tracking_provider.position_at(current.time, refresh=False)
+        if base is None or camera is None:
+            raise ValueError(f'Physical context unavailable at t={current.time:.6f}')
+        return replace(current, physical_base=base, tracking_position_world=camera)
+
     def _on_clock(self, message: Clock) -> None:
         """Advance the target to the current Gazebo time."""
         now = (
@@ -360,11 +405,27 @@ class SimulationNode(Node):
             self.get_logger().error("Invalid simulation clock.")
             return
 
+        if self._last_clock is not None and now < self._last_clock:
+            if self._physical_history is not None:
+                self._physical_history.clear()
+                self._tracking_provider.clear_history()
+            self._state = None
+            self._epoch += 1
+            self._last_measurement_time = None
+        self._last_clock = now
         if self._pending:
             return
 
         try:
-            tracking_position = self._read_tracking_position()
+            sample_time = self._state.time if self._state is not None else now
+            physical_base = None
+            if self._physical_history is not None:
+                physical_base = self._physical_history.at(sample_time)
+                tracking_position = self._tracking_provider.position_at(sample_time)
+                if physical_base is None:
+                    return
+            else:
+                tracking_position = self._read_tracking_position()
         except ValueError as error:
             self.get_logger().error(
                 f"Invalid tracking position: {error}"
@@ -402,12 +463,15 @@ class SimulationNode(Node):
         current = replace(
             self._state,
             tracking_position_world=tracking_position,
+            physical_base=physical_base,
         )
 
         try:
             candidate = self._stepper.advance(
                 state=current,
                 target_time=now,
+                refresh_context=(self._refresh_physical_context
+                                 if self._physical_history is not None else None),
             )
         except ValueError as error:
             self.get_logger().error(
@@ -422,8 +486,8 @@ class SimulationNode(Node):
             future = self._pose_client.send_pose(pose)
 
             future.add_done_callback(
-                lambda completed, next_state=candidate:
-                self._on_pose_result(completed, next_state)
+                lambda completed, next_state=candidate, epoch=self._epoch:
+                self._on_pose_result(completed, next_state, epoch)
             )
         except Exception as error:
             self._pending = False
@@ -435,9 +499,12 @@ class SimulationNode(Node):
         self,
         future: Any,
         candidate: SimulationState,
+        epoch: int | None = None,
     ) -> None:
         """Commit state after Gazebo accepts the target pose."""
         try:
+            if epoch is not None and epoch != self._epoch:
+                return
             response = future.result()
 
             if response is None or not response.success:

@@ -39,6 +39,8 @@ class RobotProcessModel:
         linear_acceleration_noise_std: float = 1.0,
         angular_acceleration_noise_std: float = 1.0,
         joint_acceleration_noise_std: float = 1.0,
+        planar_slip_noise_std: float = 0.0,
+        yaw_slip_noise_std: float = 0.0,
     ) -> None:
         if joint_count <= 0:
             raise ValueError(
@@ -61,6 +63,10 @@ class RobotProcessModel:
             )
 
         self._joint_count = joint_count
+        slip = np.asarray([planar_slip_noise_std, yaw_slip_noise_std], dtype=float)
+        if not np.isfinite(slip).all() or np.any(slip < 0):
+            raise ValueError('Contact-slip noise amplitudes must be finite nonnegative')
+        self._slip_density = slip**2
 
         self._linear_acceleration_noise_std = (
             linear_acceleration_noise_std
@@ -225,6 +231,14 @@ class RobotProcessModel:
         q[2, 4] = q[4, 2] = angular_density * dt**2 / 2
         q[:2, 4] = q[4, :2] = angular_density * dt**3 / 6 * tangent
         q[:2, 2] = q[2, :2] = angular_density * dt**4 / 8 * tangent
+        # Independent contact-slip pose diffusion: wheel feedback cannot observe
+        # lateral motion or systematic encoder/body heading discrepancy. Integrate
+        # its frozen continuous Jacobian, including heading-to-position coupling.
+        planar_density, yaw_density = self._slip_density
+        q[:2, :2] += planar_density * dt * np.eye(2) + yaw_density * dt**3 / 3 * np.outer(tangent, tangent)
+        q[2, 2] += yaw_density * dt
+        q[:2, 2] += yaw_density * dt**2 / 2 * tangent
+        q[2, :2] = q[:2, 2]
         positions = self.BASE_STATE_DIMENSION + np.arange(self._joint_count)
         speeds = positions + self._joint_count
         density = self._joint_acceleration_noise_std**2

@@ -1,0 +1,16 @@
+# Independent pose is optional; this profile explicitly selects it.
+extends: robot_estimator.yaml
+estimation_node:
+  ros__parameters:
+    reorder_holdback: 0.08
+    linear_acceleration_noise_std: 0.3
+    angular_acceleration_noise_std: 0.3
+    # Contact-slip pose diffusion [m/sqrt(s), rad/sqrt(s)], independent of encoder precision.
+    planar_slip_noise_std: 0.15
+    yaw_slip_noise_std: 0.20
+    localization_enabled: true
+    localization_topic: /localization/odometry
+    localization_frame: world
+    localization_max_age: 0.15
+    localization_nis_limit: 11.345
+    localization_transform_tolerance: 0.000001

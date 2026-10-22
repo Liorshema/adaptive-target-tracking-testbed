@@ -1,0 +1,23 @@
+# Abstract mapped-fiducial/external-tracker measurement, not implemented VIO/SLAM.
+localization_sensor:
+  enabled: true
+  source_topic: /simulation/robot/ground_truth
+  source_frame: world
+  child_frame: base_link
+  topic: /localization/odometry
+  diagnostic_topic: /localization/sensor_diagnostics
+  rate_hz: 10.0
+  timer_period: 0.005
+  diagnostic_period: 1.0
+  latency: 0.04
+  latency_jitter: 0.01
+  max_delivery_age: 0.15
+  future_tolerance: 0.01
+  white_noise_std: [0.04, 0.04, 0.03490658503988659]
+  calibration_bias_std: [0.01, 0.01, 0.008726646259971648]
+  dropout_probability: 0.05
+  outages: []
+  outlier_probability: 0.0
+  outlier_offset: [1.0, 1.0, 0.5]
+  unobserved_variance: 1000.0
+  random_seed: 42

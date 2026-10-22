@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from robot_models.target.target_state import TargetState
+from robot_simulation.state.physical_context import PhysicalBaseContext
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,7 @@ class SimulationState:
     target: TargetState
     tracking_position_world: np.ndarray
     time: float
+    physical_base: PhysicalBaseContext | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.target, TargetState):

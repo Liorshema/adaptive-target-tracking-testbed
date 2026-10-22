@@ -8,8 +8,9 @@ world:
   source: worlds/tracking_testbed.sdf.xacro
   terrain_config: config/terrain/flat.yaml
   output_name: world.sdf
-  # 2 ms validated under gravity with existing PIDs; 1 ms remains selectable.
-  physics: {max_step_size: 0.002, real_time_factor: 1.0}
+  # Independent effort-bounded motor rows allow inward release at DART hard stops.
+  # Keep the validated physics step and fidelity unchanged.
+  physics: {engine: dartsim_recovery, max_step_size: 0.002, real_time_factor: 1.0}
   system_plugins:
     - {filename: gz-sim-physics-system, name: 'gz::sim::systems::Physics'}
     - {filename: gz-sim-user-commands-system, name: 'gz::sim::systems::UserCommands'}

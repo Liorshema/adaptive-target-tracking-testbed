@@ -37,6 +37,7 @@ class TimeStepper:
         self,
         state: SimulationState,
         target_time: float,
+        refresh_context=None,
     ) -> SimulationState:
         """Advance without creating zero or negative integration steps."""
         if not np.isfinite(target_time):
@@ -83,6 +84,8 @@ class TimeStepper:
             if step_dt <= 0.0:
                 break
 
+            if refresh_context is not None:
+                current = refresh_context(current)
             next_state = self._engine.step(
                 state=current,
                 dt=step_dt,

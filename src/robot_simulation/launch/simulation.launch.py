@@ -76,6 +76,24 @@ def configure(context):
     simulation_cfg = cfg["simulation"]
     gazebo_cfg = cfg["gazebo"]
 
+    # Validate owner field/context contracts before any process starts.
+    from robot_simulation.factory.deployment_configuration import validate_deployment_configuration
+    from robot_simulation.factory.simulation_factory import SimulationFactory
+    target_data = load_yaml(resolve_path(cfg['target']['config']))
+    environment_data = load_yaml(resolve_path(cfg['simulation']['environment_config']))
+    integration_data = load_yaml(resolve_path(cfg['simulation']['config']))
+    validate_deployment_configuration(cfg, target_data, environment_data, integration_data,
+                                     load_yaml(resolve_path(cfg['simulation']['measurement_config'])))
+    SimulationFactory.with_defaults().create(target_data, environment_data, integration_data)
+
+    sensor_path = None
+    sensor = None
+    if cfg.get('localization_sensor_config'):
+        from robot_simulation.measurements.planar_localization import validate_configuration
+        sensor_path = resolve_path(cfg['localization_sensor_config'])
+        sensor = load_yaml(sensor_path)['localization_sensor']
+        validate_configuration(sensor)
+
     # Build the configured Gazebo world.
     output_dir = Path(
         tempfile.mkdtemp(prefix="robot_simulation_")
@@ -91,6 +109,10 @@ def configure(context):
             raise ValueError('publish_ground_truth must be true or false')
         if truth_override:
             robot_cfg['ground_truth_odometry']['enabled'] = truth_override == 'true'
+        if sensor and sensor['enabled']:
+            truth = robot_cfg['ground_truth_odometry']
+            if (not truth['enabled'] or truth['topic'] != sensor['source_topic'] or truth['frame_id'] != sensor['source_frame'] or truth['child_frame_id'] != sensor['child_frame']):
+                raise ValueError('Localization sensor requires matching enabled physical source')
         hold_cfg = load_yaml(resolve_path(robot_launch['joint_position_hold']))['joint_position_hold']
         description = robot_cfg['description']
         description_share = Path(get_package_share_directory(description['package']))
@@ -99,6 +121,13 @@ def configure(context):
             description_share / description['config'],
             robot_cfg, hold_cfg, output_dir,
         )
+
+    physical_context = cfg.get('physical_context')
+    if physical_context:
+        truth = robot_cfg['ground_truth_odometry'] if robot_cfg else {}
+        if (not truth.get('enabled') or truth['topic'] != physical_context['base_topic']
+                or truth['frame_id'] != physical_context['reference_frame']):
+            raise ValueError('contextual guidance requires matching enabled physical ground truth')
 
     world_path, world_name = build_world(
         resolve_path(world_cfg["source"]),
@@ -232,17 +261,19 @@ def configure(context):
                 "tracking_frame": tracking_cfg[
                     "tracking_frame"
                 ],
+                'physical_base_topic': '' if not physical_context else physical_context['base_topic'],
+                'physical_base_max_age': .2 if not physical_context else physical_context['max_age'],
                 'tracking_max_age': tracking_cfg.get('max_age', 0.2),
                 'tracking_future_tolerance': tracking_cfg.get('future_tolerance', 0.01),
             }
         ],
     )
 
-    return [
-        gazebo,
-        bridge,
-        simulation,
-    ]
+    nodes = [gazebo, bridge, simulation]
+    if sensor and sensor['enabled']:
+        nodes.append(Node(package='robot_simulation', executable='localization_sensor',
+            parameters=[{'use_sim_time': True, 'configuration_file': str(sensor_path)}], output='screen'))
+    return nodes
 
 
 def generate_launch_description():

@@ -1,0 +1,22 @@
+# Test-only interventions. Never installed or loaded by production bringup.
+diagnostic_only: true
+variant: D
+seed: 42
+duration: 90.0
+modes:
+  baseline: {robot_truth: false, target_truth: false}
+  oracle_robot: {robot_truth: true, target_truth: false}
+  oracle_target: {robot_truth: false, target_truth: true}
+  oracle_both: {robot_truth: true, target_truth: true}
+robot_output: /diagnostics/tracking_loss/robot_state
+prediction_output: /diagnostics/tracking_loss/prediction
+max_truth_age: 0.08
+target_publish_period: 0.05
+target_oracle_lookahead: 0.0
+analysis:
+  max_age: 0.08
+  max_gap: 0.15
+  compliance_distance_m: 0.20
+  compliance_pointing_deg: 15.0
+  divergence_translation_m: 0.50
+  divergence_yaw_deg: 30.0

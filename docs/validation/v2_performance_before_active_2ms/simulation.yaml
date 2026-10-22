@@ -1,0 +1,46 @@
+gazebo:
+  clock_topic: /clock
+  gui: true
+  pose_service_template: /world/{world}/set_pose
+  pose_service_type: ros_gz_interfaces/srv/SetEntityPose
+  start_running: true
+paths:
+  base: package
+robot:
+  config: config/gazebo/robot.yaml
+  enabled: true
+  joint_position_hold: config/gazebo/joint_position_hold.yaml
+simulation:
+  config: config/simulation.yaml
+  environment_config: config/scenarios/environment.yaml
+  measurement_config: config/measurements.yaml
+target:
+  config: config/scenarios/target.yaml
+  entity_name: target
+  initial_position:
+  - 2.7
+  - 0.0
+  - 0.85
+  initial_velocity:
+  - 0.0
+  - 0.35
+  - 0.0
+tracking:
+  position:
+  - 0.0
+  - 0.0
+  - 1.0
+  reference_frame: world
+  source: static
+  tracking_frame: tracking_frame
+world:
+  output_name: world.sdf
+  source: /home/user/ros2_ws/docs/validation/v2_performance_before_active_2ms/world.sdf.xacro
+  system_plugins:
+  - filename: gz-sim-physics-system
+    name: gz::sim::systems::Physics
+  - filename: gz-sim-user-commands-system
+    name: gz::sim::systems::UserCommands
+  - filename: gz-sim-scene-broadcaster-system
+    name: gz::sim::systems::SceneBroadcaster
+  terrain_config: config/terrain/flat.yaml

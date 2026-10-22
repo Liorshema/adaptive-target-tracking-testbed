@@ -1,6 +1,7 @@
-# Opt-in measured-FK overlay. Forward axis and physical mount come from Bringup.
+# Read-only styling; physical bounds, optical axis and radius come from owner files.
+# Long gaps/jumps break a trail; samples are never smoothed or interpolated.
 topic: /tracking/markers
-target_topic: /simulation/target_position  # Actual simulated target; perception is noisy.
+target_topic: /simulation/target_position
 rate_hz: 5.0
 max_age: 0.2
 max_skew: 0.08
@@ -11,9 +12,111 @@ forward_length: 0.8
 width: 0.012
 origin_size: 0.035
 colors:
-  origin: [1.0, 1.0, 1.0, 1.0]
-  x: [1.0, 0.0, 0.0, 1.0]
-  y: [0.0, 1.0, 0.0, 1.0]
-  z: [0.0, 0.0, 1.0, 1.0]
-  optical: [1.0, 0.8, 0.0, 1.0]
-  target: [1.0, 0.0, 1.0, 0.8]
+  origin:
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  x:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 1.0
+  y:
+  - 0.0
+  - 1.0
+  - 0.0
+  - 1.0
+  z:
+  - 0.0
+  - 0.0
+  - 1.0
+  - 1.0
+  optical:
+  - 0.0
+  - 1.0
+  - 1.0
+  - 1.0
+  target:
+  - 1.0
+  - 0.0
+  - 1.0
+  - 0.8
+  truth:
+  - 0.0
+  - 0.9
+  - 0.2
+  - 1.0
+  estimate:
+  - 1.0
+  - 0.5
+  - 0.0
+  - 1.0
+  prediction:
+  - 0.15
+  - 0.4
+  - 1.0
+  - 1.0
+  robot_truth:
+  - 0.7
+  - 0.7
+  - 0.7
+  - 1.0
+  robot_estimate:
+  - 1.0
+  - 0.6
+  - 0.2
+  - 1.0
+  safety:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 1.0
+  radius:
+  - 0.0
+  - 0.8
+  - 1.0
+  - 0.3
+schema_version: 1
+enabled: true
+frame_id: world
+history_seconds: 8.0
+max_points: 500
+prediction_max_age: 0.3
+model_frame_prefix: visual/
+paths_topic: /tracking/paths
+layers:
+  target_truth: true
+  target_estimate: true
+  target_prediction: true
+  robot_truth: false
+  robot_estimate: false
+  camera_axis: true
+  line_of_sight: true
+  tracking_radius: true
+  joint_limits: true
+  target_truth_current: true
+  target_estimate_current: true
+history_max_gap: 0.5
+history_max_step: 1.0
+show_all_tf: false
+path_widths:
+  target_truth: 0.025
+  target_estimate: 0.015
+  target_prediction: 0.035
+  robot_truth: 0.012
+  robot_estimate: 0.012
+point_sizes:
+  truth: 0.065
+  estimate: 0.085
+overlay_widths:
+  line_of_sight: 0.008
+  tracking_radius: 0.004
+view:
+  distance: 3.8
+  pitch: 0.6
+  yaw: 0.8
+  focal_point:
+  - 1.0
+  - 0.0
+  - 0.6

@@ -1,0 +1,24 @@
+# Controlled-factor study; run-level results retain changed scenario/physical contracts.
+# M08 pooled comparisons correctly reject A/B/C/E as physically incomparable;
+# C versus D is the matched physical-contract allocation comparison.
+extends: paired_prediction.yaml
+experiment:
+  name: reactive_manipulation
+  description: Original nominal; challenge nominal; wrist15; wrist15 yaw-priority; wrist30.
+  duration: 40.0
+  settling_time: 0.0
+  seeds: [42, 917]
+  variants:
+    - name: A
+      system_config: {package: robot_bringup, path: config/system_manipulation_A.yaml}
+    - name: B
+      system_config: {package: robot_bringup, path: config/system_manipulation_B.yaml}
+    - name: C
+      system_config: {package: robot_bringup, path: config/system_manipulation_C.yaml}
+    - name: D
+      system_config: {package: robot_bringup, path: config/system_manipulation_D.yaml}
+    - name: E
+      system_config: {package: robot_bringup, path: config/system_manipulation_E.yaml}
+  execution:
+    record_actuator_trace: true
+    wall_timeout: 300.0

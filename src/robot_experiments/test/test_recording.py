@@ -55,6 +55,11 @@ def test_normalizes_full_joint_and_odometry_observations():
     assert data['angular_velocity'] == [7., 8., 9.]
     assert data['pose_covariance'] == [0.]*36
     assert data['twist_covariance'] == [1.]*36
+    independent = recording().normalize('localization_measurement', odom, 1., 2.)
+    assert independent['source_time'] == 2.5
+    assert independent['frame_id'] == 'world'
+    assert independent['data']['pose_covariance'] == [0.]*36
+    assert independent['raw_message']['child_frame_id'] == 'base'
 
 
 def test_preserves_covariance_and_absolute_prediction_times():
@@ -89,6 +94,32 @@ def test_preserves_controller_command_and_actuation_counters():
     assert result['data']['timeout_events'] == 3
     assert result['data']['measured_positions'] == [.9]
     assert result['data']['feedback_rejections'] == 6
+
+
+def test_preserves_additive_actuation_source_identity_and_feedback():
+    """Adapter snapshots keep source epochs distinct from publication time."""
+    actuation = NS(header=header(), accepted_commands=10, rejected_commands=2,
+                   timeout_events=3, reference_limit_events=4, inactive_commands=5,
+                   feedback_rejections=6, commanded_velocity=[],
+                   position_reference=[1.], measured_positions=[.9], enabled=True,
+                   active=False, reason='watchdog', joint_names=['axis'],
+                   feedback_valid=False, feedback_stamp=NS(sec=1, nanosec=123),
+                   measured_velocities=[.4], position_errors=[.1],
+                   accepted_command_valid=True, accepted_session_id='source',
+                   accepted_sequence=7, accepted_stamp=NS(sec=1, nanosec=45))
+    result = recording().normalize('actuation', actuation, 3., 2.)
+    data = result['data']
+    assert data['joint_names'] == ['axis']
+    assert data['feedback_valid'] is False
+    assert data['feedback_stamp'] == {'sec': 1, 'nanosec': 123}
+    assert data['measured_velocities'] == [.4]
+    assert data['position_errors'] == [.1]
+    assert data['accepted_command_valid'] is True
+    assert data['accepted_session_id'] == 'source'
+    assert data['accepted_sequence'] == 7
+    assert data['accepted_stamp'] == {'sec': 1, 'nanosec': 45}
+    for field in data:
+        assert data[field] == result['raw_message'][field]
 
 
 def test_rejected_nonfinite_or_bad_shapes_never_make_stream_ready(tmp_path):

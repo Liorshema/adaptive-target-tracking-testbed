@@ -47,7 +47,14 @@ def _git():
     def git(*args):
         try:return subprocess.check_output(['git',*args],stderr=subprocess.DEVNULL,text=True).strip()
         except (OSError,subprocess.CalledProcessError):return None
-    return {'revision':git('rev-parse','HEAD'),'branch':git('branch','--show-current'),
+    sources = git('ls-files', '-co', '--exclude-standard', 'src')
+    source_hash = hashlib.sha256()
+    for name in sorted(set((sources or '').splitlines())):
+        path = Path(name)
+        if path.is_file():
+            source_hash.update(name.encode()+b'\0'+path.read_bytes()+b'\0')
+    return {'worktree_source_sha256': source_hash.hexdigest() if sources else None,
+      'revision':git('rev-parse','HEAD'),'branch':git('branch','--show-current'),
       'status':git('status','--short'),'tracked_diff_sha256':hashlib.sha256((git('diff','HEAD') or '').encode()).hexdigest()}
 
 
@@ -95,12 +102,13 @@ def run_one(spec,variant,seed,directory,share):
               'git':_git(),'package_versions':_versions(share),
               'time_contract':{'duration':'simulation seconds after settling','source_time':'ROS header epoch',
               'timeouts':'host monotonic seconds','wall_timestamps':'UTC ISO8601'},
-              'environment':{k:os.environ.get(k) for k in ['ROS_DISTRO','RMW_IMPLEMENTATION','WSL_DISTRO_NAME','ROS_VERSION']},
+              'environment':{k:os.environ.get(k) for k in ['ROS_DISTRO','RMW_IMPLEMENTATION','WSL_DISTRO_NAME','ROS_VERSION','OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS']},
               'platform':{'system':os.uname().sysname,'release':os.uname().release,'cpu_count':os.cpu_count()},
               'artifacts':{'metrics':'metrics.json','time_series':'time_series.json','telemetry':'telemetry','log':'launch.log'}}
     comparison_contract=None
     try:
-        prepared=materialize_run(variant,seed,directory,share,spec['runtime'])
+        prepared=materialize_run(variant,seed,directory,share,spec['runtime'],
+            record_actuator_trace=spec['execution']['record_actuator_trace'])
         context=prepared['context'];plan=prepared['plan']
         context['readiness_max_age']=spec['execution']['max_skew']
         comparison_contract={**prepared['comparison_contract'],'duration':spec['duration'],'settling_time':spec['settling_time'],

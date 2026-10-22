@@ -3,7 +3,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!-- =============================================== -->
-  <!-- Virtual tracking frame                          -->
+  <!-- Tracking frame and schematic camera visual      -->
   <!-- =============================================== -->
 
   <xacro:macro name="tracking_frame" params="robot">
@@ -12,7 +12,42 @@
       name="tracking_cfg"
       value="${robot['tracking_frame']}"/>
 
-    <link name="tracking_frame"/>
+    <!-- Schematic housing/lens icon, scaled only from authoritative wrist
+         geometry. These are not measured physical camera dimensions or camera
+         intrinsics/FOV. The existing massless fixed frame and all collision,
+         inertia and joint properties stay unchanged. Gazebo merges these
+         visuals into the physical parent when reducing the fixed joint. -->
+    <xacro:property name="camera_wrist" value="${robot['manipulator']['wrist']}"/>
+    <xacro:property name="housing_length" value="${camera_wrist['length'] / 2.0}"/>
+    <xacro:property name="lens_length" value="${camera_wrist['length'] / 10.0}"/>
+
+    <link name="tracking_frame">
+
+      <visual name="schematic_camera_housing">
+        <origin xyz="${-housing_length / 2.0} 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${housing_length}
+                     ${camera_wrist['width'] * 1.5}
+                     ${camera_wrist['height'] * 1.5}"/>
+        </geometry>
+        <material name="black"/>
+      </visual>
+
+      <!-- Cyan lens faces local +X, the existing tracking/control forward
+           axis. No optical +Z transform, sensor or FOV is introduced. -->
+      <visual name="schematic_camera_lens">
+        <origin xyz="${lens_length / 2.0} 0 0" rpy="0 ${pi / 2.0} 0"/>
+        <geometry>
+          <cylinder
+            radius="${min(camera_wrist['width'], camera_wrist['height']) / 3.0}"
+            length="${lens_length}"/>
+        </geometry>
+        <material name="camera_cyan">
+          <color rgba="0 1 1 1"/>
+        </material>
+      </visual>
+
+    </link>
 
     <joint name="tracking_frame_joint" type="fixed">
 

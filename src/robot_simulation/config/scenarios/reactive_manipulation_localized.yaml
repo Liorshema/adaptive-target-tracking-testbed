@@ -1,0 +1,2 @@
+extends: reactive_manipulation_wrist15.yaml
+localization_sensor_config: config/sensors/planar_localization.yaml

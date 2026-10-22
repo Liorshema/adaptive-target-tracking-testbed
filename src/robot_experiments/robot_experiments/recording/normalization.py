@@ -12,6 +12,7 @@ STREAM_TYPES = {
     'joints': ('sensor_msgs.msg', 'JointState'),
     'base_truth': ('nav_msgs.msg', 'Odometry'),
     'odometry': ('nav_msgs.msg', 'Odometry'),
+    'localization_measurement': ('nav_msgs.msg', 'Odometry'),
     'robot_estimate': ('robot_interfaces.msg', 'StateEstimate'),
     'target_estimate': ('robot_interfaces.msg', 'StateEstimate'),
     'prediction': ('robot_interfaces.msg', 'PredictedTrajectory'),
@@ -85,7 +86,7 @@ def _normalize_data(stream, raw):
         if effort and len(effort) != len(names):
             raise ValueError('joint effort shape differs from joint names')
         return {'names': names, 'position': position, 'velocity': velocity, 'effort': effort}
-    if stream in ('base_truth', 'odometry'):
+    if stream in ('base_truth', 'odometry', 'localization_measurement'):
         pose, twist = raw['pose']['pose'], raw['twist']['twist']
         return {'position': _numbers(_vector(pose['position']), 3),
                 'orientation': _numbers(_vector(pose['orientation'], 4), 4),

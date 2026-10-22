@@ -2,12 +2,35 @@
 """ROS 2 package setup for the simulation subsystem."""
 
 import os
+from pathlib import Path
+import subprocess
 from glob import glob
 
-from setuptools import find_packages, setup
+from setuptools import Extension, find_packages, setup
+from setuptools.command.build_ext import build_ext
 
 
 package_name = "robot_simulation"
+
+
+class GazeboBuild(build_ext):
+    """Build a native Gazebo System inside the existing ament_python distribution."""
+
+    def build_extension(self, extension):
+        """Use vendor CMake targets; retain Python resources and console entry points."""
+        output = Path(self.get_ext_fullpath(extension.name)).resolve()
+        recovery = extension.name.endswith('._dartsim_recovery')
+        build = Path(self.build_temp).resolve() / ('gazebo_recovery' if recovery
+                                                  else 'gazebo_actuator')
+        source = Path(__file__).resolve().parent / package_name / 'gazebo/native'
+        prefix = 'RECOVERY' if recovery else 'ACTUATOR'
+        subprocess.run(['cmake', '-S', str(source), '-B', str(build),
+                        '-DCMAKE_BUILD_TYPE=RelWithDebInfo',
+                        f'-D{prefix}_OUTPUT_DIRECTORY={output.parent}',
+                        f'-D{prefix}_OUTPUT_NAME={output.name}'], check=True)
+        target = 'robot_dartsim_recovery' if recovery else 'robot_actuator'
+        subprocess.run(['cmake', '--build', str(build), '--target', target,
+                        '--parallel', '2'], check=True)
 
 
 def install_files(directory: str, pattern: str) -> list:
@@ -63,6 +86,9 @@ setup(
     name=package_name,
     version="0.0.0",
     packages=find_packages(exclude=["test", "test.*"]),
+    ext_modules=[Extension('robot_simulation.gazebo._actuator', sources=[]),
+                 Extension('robot_simulation.gazebo._dartsim_recovery', sources=[])],
+    cmdclass={'build_ext': GazeboBuild},
 
     data_files=[
         (
@@ -72,6 +98,11 @@ setup(
         (
             os.path.join("share", package_name),
             ["package.xml"],
+        ),
+        (
+            os.path.join("share", package_name, "third_party", "dartsim_recovery"),
+            [os.path.join(package_name, "gazebo", "native", "dartsim_recovery", name)
+             for name in ("LICENSE", "UPSTREAM.json", "README.md")],
         ),
 
         # ROS 2 launch files
@@ -107,6 +138,7 @@ setup(
         ),
         *install_directory_tree("config/gazebo"),
         *install_directory_tree("config/scenarios"),
+        *install_directory_tree("config/sensors"),
     ],
 
     install_requires=[
@@ -138,6 +170,7 @@ setup(
         "console_scripts": [
             "simulation_node = "
             "robot_simulation.nodes.simulation_node:main",
+            "localization_sensor = robot_simulation.nodes.localization_sensor:main",
             "velocity_actuation = robot_simulation.nodes.velocity_actuation:main",
         ],
     },

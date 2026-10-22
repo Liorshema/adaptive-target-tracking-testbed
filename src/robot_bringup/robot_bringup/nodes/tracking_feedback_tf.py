@@ -113,7 +113,7 @@ class TrackingFeedbackTF(Node):
         except (ValueError, IndexError):
             return
         message = TransformStamped()
-        message.header.stamp = Time(seconds=min(times)).to_msg()
+        message.header.stamp = Time(seconds=max(times)).to_msg()
         message.header.frame_id = self._parent
         message.child_frame_id = self._child
         translation = message.transform.translation

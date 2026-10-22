@@ -39,3 +39,13 @@ docs/validation/**/samples.jsonl
 
 # Local workspace tree export
 project_tree.txt
+
+# Native Gazebo actuator produced by setuptools develop builds.
+src/robot_simulation/robot_simulation/gazebo/_actuator*.so
+src/robot_simulation/robot_simulation/gazebo/_dartsim_recovery*.so
+
+# Raw validation recordings (retained locally)
+docs/validation/**/gazebo_poses.jsonl
+docs/validation/**/experiment_streams.json
+docs/validation/**/processing.json
+docs/validation/**/streams.json
