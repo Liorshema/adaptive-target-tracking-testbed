@@ -226,3 +226,27 @@ def test_saturated_scenario_selects_shared_engine_without_inherited_alpha():
         target, load_yaml(CONFIG_DIR.parent / scenario['simulation']['environment_config']),
         load_yaml(CONFIG_DIR.parent / scenario['simulation']['config']))
     assert engine.dynamics.parameters.a_max > 0.
+
+
+def test_launch_without_physics_override_uses_effective_world_step(tmp_path, monkeypatch):
+    """An optional override must not become a new required launch YAML key."""
+    import importlib.util
+    from pathlib import Path
+    from launch import LaunchContext
+    from launch_ros.actions import Node
+    from launch_ros.utilities import evaluate_parameters
+    from robot_configuration.yaml_loader import load_yaml
+    import yaml
+    root=Path(__file__).resolve().parents[2]
+    spec=importlib.util.spec_from_file_location('simulation_without_physics_override',root/'robot_simulation/launch/simulation.launch.py')
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    monkeypatch.setattr(module,'get_package_share_directory',lambda name:str(root/name))
+    monkeypatch.setenv('ROS_LOG_DIR',str(tmp_path/'ros'))
+    cfg=load_yaml(root/'robot_simulation/config/launch.yaml');del cfg['world']['physics']
+    path=tmp_path/'launch.yaml';path.write_text(yaml.safe_dump(cfg))
+    context=LaunchContext();context.launch_configurations.update(
+        config=str(path),gui='false',enable_actuation='false',publish_ground_truth='')
+    nodes=module.configure(context)
+    simulation=next(n for n in nodes if isinstance(n,Node) and n.node_executable=='simulation_node')
+    params=evaluate_parameters(context,simulation._Node__parameters)[0]
+    assert params['context_history_capacity'] == 10402

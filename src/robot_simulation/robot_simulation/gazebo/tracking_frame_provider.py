@@ -24,6 +24,7 @@ class TrackingFrameProvider:
         max_age: float | None = None,
         future_tolerance: float = 0.,
         history_duration: float | None = None,
+        history_capacity: int | None = None,
     ) -> None:
         if not isinstance(reference_frame, str) or not reference_frame.strip():
             raise ValueError("Reference frame must be non-empty.")
@@ -40,7 +41,7 @@ class TrackingFrameProvider:
         self._max_age = max_age
         self._future_tolerance = future_tolerance
         self._clock = node.get_clock()
-        self._history = (PhysicalPositionHistory(reference_frame, "tf:"+tracking_frame, max_age, history_duration)
+        self._history = (PhysicalPositionHistory(reference_frame, "tf:"+tracking_frame, max_age, history_duration, history_capacity)
                          if max_age is not None else None)
 
         if history_duration is not None:
@@ -90,7 +91,9 @@ class TrackingFrameProvider:
 
         if self._history is not None:
             stamp = transform.header.stamp
-            self._history.add(position, stamp.sec + stamp.nanosec*1e-9, self._reference_frame)
+            self._history.add(position, stamp.sec + stamp.nanosec*1e-9,
+                              self._reference_frame,
+                              receipt_time=self._clock.now().nanoseconds*1e-9)
         return position
 
     def _receive_direct(self, message):
@@ -102,19 +105,24 @@ class TrackingFrameProvider:
             timestamp = stamp.sec+stamp.nanosec*1e-9
             if (transform.header.frame_id != self._reference_frame
                     or transform.child_frame_id != self._tracking_frame
-                    or timestamp > now+self._future_tolerance):
+                    or timestamp < 0):
                 continue
             p = transform.transform.translation
             try:
-                self._history.add(np.array([p.x,p.y,p.z]),timestamp,self._reference_frame)
+                self._history.add(np.array([p.x,p.y,p.z]),timestamp,self._reference_frame, receipt_time=now)
             except ValueError:
                 continue
 
-    def position_at(self, time, refresh=True):
+    def position_at(self, time, refresh=True, valid_until=None):
         """Return a cached causal TF sample for contextual integration."""
         if refresh:
             self.position_world()
         sample = self._history.at(time) if self._history is not None else None
+        if sample is not None and valid_until is not None:
+            try:
+                sample.position_at(valid_until, self._reference_frame)
+            except ValueError:
+                return None
         return None if sample is None else sample.position_world.copy()
 
     def clear_history(self):

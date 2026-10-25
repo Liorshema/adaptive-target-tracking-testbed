@@ -42,6 +42,40 @@ ros2 launch robot_bringup closed_loop.launch.py \
 
 ## Schema and ownership
 
+### Explicit nominal, CV and DLS compositions (S3B1)
+
+The additive schema-2 entries are `config/systems/nominal_tracking.yaml`,
+`config/systems/cv_prediction.yaml` and `config/systems/dls_control.yaml`.
+The first owns the common selectors, direct deployment and TF policy. Each
+variant inherits it once: CV changes predictor type, adaptation and fusion;
+DLS changes controller type and explicitly sets `strategy: null` to clear WLS.
+Omitting that null would inherit the WLS strategy and fail controller preflight.
+
+All three preserve the historical nominal physical setup: the standard robot
+description, saturated Fight/Flight with spatial circulation, oscillatory
+environment fields, native holding, actuation and existing estimator calibration.
+The flat `robot_simulation/config/scenarios/oscillatory_reactive_tracking.yaml`
+bypasses the six-document bringup profile and six-document deployment chains.
+Component numerical owners remain shared and unchanged. CV is a prediction
+selection; the physical target remains reactive. DLS retains Cartesian position
+control with damping 1.0 and zero lookahead; it is not a WLS pointing-task variant.
+
+```bash
+ros2 launch robot_bringup closed_loop.launch.py \
+  system_config:=config/systems/nominal_tracking.yaml gui:=false enable_actuation:=true
+# Substitute cv_prediction.yaml or dls_control.yaml in that same systems directory.
+# Compute without command publication:
+ros2 launch robot_bringup closed_loop.launch.py \
+  system_config:=config/systems/nominal_tracking.yaml gui:=false publish_commands:=false
+```
+
+Explicit runtime/strategy/lookahead/feedforward overrides keep their existing
+precedence. A schema-2 system cannot accept a legacy `config:=` profile override;
+select its direct deployment in the system manifest. All historical schema-1
+system and legacy profile entry points remain available unchanged for rollback.
+See [S3B1 validation](validation/configuration_nominal_composition_s3b1_closure.md)
+for exact equivalence, installation and runtime coverage evidence.
+
 Version 1 has required `schema_version`, `robot`, `estimation`, `prediction`,
 `control`, `simulation` sections; `runtime` is optional. Unknown keys and wrong
 primitive types are errors. The actual nominal manifest is:
@@ -92,6 +126,48 @@ There are no joint angles, physical limits, gains or dynamics constants in the n
 manifests. Every pre-existing owner YAML/Xacro/message asset is preserved. Existing
 profile calibration remains explicit: the profile's `estimation_overrides` applies
 on top of the selected owner estimator files.
+
+## Schema 2: explicit pose-aided manipulation composition
+
+`config/systems/mobile_manipulator_pose_tracking.yaml` represents the historical
+localized manipulation D setup: physical ±15° wrist, saturated Fight/Flight with
+base-relative guidance, imperfect planar pose fusion, IMM/residual correction and
+arm-priority WLS. It is one specific composition, not every mobile manipulator.
+
+```bash
+ros2 launch robot_bringup closed_loop.launch.py \
+  system_config:=config/systems/mobile_manipulator_pose_tracking.yaml \
+  gui:=false enable_actuation:=true
+```
+
+Its `simulation.config` selects the direct robot_simulation deployment
+`config/scenarios/base_relative_manipulation.yaml`. Schema 1 continues selecting
+a bringup profile. Schema 2 additionally selects `simulation.robot`, `actuation`,
+optional `localization_sensor`, `tracking_tf`, and optional `estimation.calibration`.
+The selected robot/localization canonical resource paths must match the deployment;
+a disagreement is an error. Manifest resources use the shared package/relative
+resolver. Deployment-internal resources remain string paths under their existing
+`paths.base` convention, as required by the unchanged simulation launcher.
+
+The schema-specific compiler creates an in-memory profile interface, then invokes
+the existing M07 owner/factory, routing and physical-contract checks. It adds no
+launch stack. The manifest owns calibration, actuation and TF selection. The flat
+`config/calibration/manipulation_pose.yaml` preserves all eight effective values of
+the old calibration chain. Numeric calibration still overrides estimator owner
+parameters; manifest estimator type selectors retain their existing authority over
+optional owner/calibration selector defaults. Physical description, topic/frame
+and joint-layout conflicts remain errors. ROS DOUBLE normalization preserves
+tracking policy values while accepting numeric YAML integers safely.
+
+Existing nonempty runtime/strategy/lookahead/feedforward overrides retain their
+precedence. `config:=<legacy-profile>` is rejected with schema 2: select a direct
+deployment in the manifest. Compute Only and `publish_commands:=false` remain
+supported. No original manifest, profile, simulation resource or safety limit was
+changed or archived. The compatibility rollback is the original
+`config/system_manipulation_D_localized.yaml`.
+
+See [S3A closure](validation/configuration_composition_s3a_closure.md) for exact
+owner/launch equivalence, provenance, installations and bounded runtime evidence.
 
 ## Resource resolution and inheritance
 
@@ -240,14 +316,14 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
     source /opt/ros/jazzy/setup.bash
     source /tmp/m07_copy/install/local_setup.bash
     cd /tmp
-    python3 /home/user/ros2_ws/docs/validation/m07_verify_installation.py \
+    python3 /home/user/ros2_ws/tools/validation/m07_verify_installation.py \
       --prefix /tmp/m07_copy/install --output /tmp/m07_install_repeat.json'
 ```
 
 Bounded live validation; use fresh output directories to preserve prior evidence:
 
 ```bash
-ROS_DOMAIN_ID=152 python3 docs/validation/v2_tracking_gazebo.py \
+ROS_DOMAIN_ID=152 python3 tools/validation/v2_tracking_gazebo.py \
   --case reactive --system-config config/system_nominal.yaml \
   --physical-ground-truth --without-markers --shoulder-posture \
   --duration 12 --settling-time 4 --wall-timeout 100 --output results/m07_nominal_repeat
@@ -351,7 +427,7 @@ Raw evidence directories are `results/m07_unified_verified`,
 exact launch command in result.json, runtime.log with actual identities,
 configuration_snapshot.yaml, generated_world.sdf, experiment_streams.json,
 samples.jsonl, physical pose/posture captures and RTF/CPU samples. The compact
-[runtime evidence](validation/m07_runtime_evidence.json) records evaluation windows,
+[runtime evidence](../results/validation/m07_runtime_evidence.json) records evaluation windows,
 component identities, stream counts, failed gates and measured values. Earlier
 failed attempts in `results/m07_unified` and `results/m07_unified_final` are
 preserved; they are not counted as completed simulation evidence.
@@ -384,6 +460,6 @@ tuning or controller equations were changed.
 
 The exact tracked modifications, new source/resources/tests/docs, generated logs
 and raw artifact paths are listed in
-[m07_modified_files.txt](validation/m07_modified_files.txt). The captured Git status
-and diff summary are [m07_git_status_short.txt](validation/m07_git_status_short.txt)
-and [m07_git_diff_stat.txt](validation/m07_git_diff_stat.txt).
+[m07_modified_files.txt](../results/validation/m07_modified_files.txt). The captured Git status
+and diff summary are [m07_git_status_short.txt](../results/validation/m07_git_status_short.txt)
+and [m07_git_diff_stat.txt](../results/validation/m07_git_diff_stat.txt).

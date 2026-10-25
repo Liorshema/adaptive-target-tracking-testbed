@@ -48,7 +48,7 @@ def test_repository_render_is_actual_and_ordered(renderer):
 
 
 def test_archived_loader_translates_imports_without_editing_evidence():
-    path = Path(__file__).resolve().parents[3] / 'docs/validation/archived_estimation_imports.py'
+    path = Path(__file__).resolve().parents[3] / 'tools/validation/archived_estimation_imports.py'
     spec = importlib.util.spec_from_file_location('archived_import_translation', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

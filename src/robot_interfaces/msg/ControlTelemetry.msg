@@ -2,6 +2,9 @@
 std_msgs/Header header
 bool valid
 string reason
+# Input source times in seconds; -1 means absent, also populated during holds.
+float64 robot_state_time
+float64 prediction_reference_time
 geometry_msgs/Point target_position
 geometry_msgs/Pose desired_pose
 geometry_msgs/Pose actual_pose

@@ -10,8 +10,6 @@ import pytest
 
 from robot_configuration.yaml_loader import load_yaml
 
-import yaml
-
 SOURCE = Path(__file__).resolve().parents[2]
 
 
@@ -32,7 +30,7 @@ def test_aggressive_environment_changes_only_sinusoidal_parameters():
         'phase': [0., 0., 1.57079632679]}
     assert experiment == expected
     scene = load_yaml(root / 'reactive_target_oscillatory_aggressive.yaml')
-    base_scene = load_yaml(root / 'reactive_target_oscillatory.yaml')
+    base_scene = load_yaml(root / 'oscillatory_reactive_tracking.yaml')
     base_scene['simulation']['environment_config'] = (
         'config/scenarios/environment_oscillatory_aggressive.yaml')
     assert scene == base_scene
@@ -44,10 +42,10 @@ def test_aggressive_environment_changes_only_sinusoidal_parameters():
 
 
 def test_allocation_changes_only_base_penalties():
-    """Read plain strategy YAML exactly as the production Control loader does."""
+    """Resolve strategy inheritance exactly as the production Control loader does."""
     root = SOURCE / 'robot_control/config'
     original = load_yaml(root / 'whole_body.yaml')
-    experiment = yaml.safe_load((root / 'whole_body_oscillatory_arm_preferred.yaml').read_text())
+    experiment = load_yaml(root / 'whole_body_oscillatory_arm_preferred.yaml')
     expected = deepcopy(original)
     expected['controller']['parameters']['motion_weights'] = [3., 4., 3., 3., 3., 2.]
     assert experiment == expected
@@ -69,7 +67,8 @@ def test_ground_truth_is_independent_of_marker_node(visualize, override, expecte
         'visualize_tracking': visualize, 'publish_ground_truth': override,
         'strategy_config': '', 'lookahead': '', 'feedforward': ''})
     nodes = module.configure(context)
-    arguments = dict(nodes[0].launch_arguments)
+    arguments = dict(next(node for node in nodes
+                          if hasattr(node, 'launch_arguments')).launch_arguments)
     assert arguments['publish_ground_truth'] == expected
     executables = [node.node_executable
                    for node in nodes if hasattr(node, 'node_executable')]

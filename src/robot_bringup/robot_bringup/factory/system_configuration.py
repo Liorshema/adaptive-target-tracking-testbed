@@ -9,6 +9,10 @@ from pathlib import Path
 
 import numpy as np
 
+from robot_bringup.factory.explicit_composition import (
+    REFERENCES as EXPLICIT_REFERENCES, compile_profile)
+from robot_bringup.factory.sensor_inventory import build_sensor_inventory
+
 from robot_configuration.parameter_validation import validate_parameters
 from robot_configuration.resources import resolve_resource
 from robot_configuration.yaml_loader import load_yaml
@@ -74,7 +78,7 @@ def _assemble(source, share, overrides):
     _mapping(overrides, RUNTIME | {'config', 'strategy_config', 'lookahead', 'feedforward'},
              set(), 'launch overrides')
     def normalize(document, origin):
-        for dotted in REFERENCES:
+        for dotted in (*REFERENCES, *EXPLICIT_REFERENCES):
             keys = dotted.split('.')
             parent = document
             for key in keys[:-1]:
@@ -84,7 +88,8 @@ def _assemble(source, share, overrides):
             else:
                 if isinstance(parent, dict) and keys[-1] in parent:
                     value = parent[keys[-1]]
-                    if dotted == 'control.strategy' and value is None:
+                    if (dotted in {'control.strategy', 'simulation.localization_sensor'}
+                            and value is None):
                         continue
                     try:
                         parent[keys[-1]] = resolve_resource(value, origin.parent, share)
@@ -96,22 +101,28 @@ def _assemble(source, share, overrides):
     _mapping(data, {'schema_version', 'robot', 'estimation', 'prediction', 'control',
                     'simulation', 'runtime'},
              {'schema_version', 'robot', 'estimation', 'prediction', 'control', 'simulation'}, 'manifest')
-    if type(data['schema_version']) is not int or data['schema_version'] != 1:
-        raise ValueError(f'schema_version={data["schema_version"]!r}: supported: integer 1')
+    version = data['schema_version']
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError(f'schema_version={version!r}: supported: integer 1 or 2')
     robot = _mapping(data['robot'], {'type', 'description', 'model'},
                      {'type', 'description', 'model'}, 'robot')
     _equal(robot['type'], 'mobile_manipulator', 'robot.type')
     model = _mapping(robot['model'], {'base', 'manipulator'}, {'base', 'manipulator'}, 'robot.model')
-    estimation = _mapping(data['estimation'], {'robot', 'target'}, {'robot', 'target'}, 'estimation')
+    estimation = _mapping(data['estimation'], {'robot', 'target'} | (
+        {'calibration'} if version == 2 else set()), {'robot', 'target'}, 'estimation')
     for name in ['robot', 'target']:
         _mapping(estimation[name], {'type', 'config'}, {'type', 'config'}, f'estimation.{name}')
     prediction = _mapping(data['prediction'], {'type', 'config', 'adaptation', 'fusion'},
                           {'type', 'config', 'adaptation', 'fusion'}, 'prediction')
     control = _mapping(data['control'], {'type', 'config', 'strategy'}, {'type', 'config'}, 'control')
-    simulation = _mapping(data['simulation'], {'config'}, {'config'}, 'simulation')
+    simulation_keys = {'config'} if version == 1 else {
+        'config', 'robot', 'actuation', 'localization_sensor', 'tracking_tf'}
+    required_simulation = {'config'} if version == 1 else simulation_keys - {'localization_sensor'}
+    simulation = _mapping(data['simulation'], simulation_keys, required_simulation, 'simulation')
     for label, value in [('robot.type', robot['type']),
                          *[('robot.model.' + key, model[key]) for key in model],
-                         *[('estimation.' + key + '.type', estimation[key]['type']) for key in estimation],
+                         *[('estimation.' + key + '.type', estimation[key]['type'])
+                           for key in ['robot', 'target']],
                          *[('prediction.' + key, prediction[key]) for key in ['type', 'adaptation', 'fusion']],
                          ('control.type', control['type'])]:
         if not isinstance(value, str) or not value.strip():
@@ -137,10 +148,15 @@ def _assemble(source, share, overrides):
         runtime['publish_ground_truth'] = True
 
     # Existing bringup profile supplies deployment resources, not algorithm implementations.
-    profile_path = simulation['config']
-    if overrides.get('config'):
-        profile_path = resolve_resource(overrides['config'], share('robot_bringup'), share)
-    profile = load_yaml(profile_path)
+    composition = None
+    if version == 2:
+        profile_path = source  # This manifest owns the in-memory compatibility adapter.
+        profile, composition = compile_profile(data, source, share, overrides)
+    else:
+        profile_path = simulation['config']
+        if overrides.get('config'):
+            profile_path = resolve_resource(overrides['config'], share('robot_bringup'), share)
+        profile = load_yaml(profile_path)
     allowed = {'simulation_config', 'actuation_config', 'control_config', 'robot_estimator_config',
                'target_estimator_config', 'tracking_tf', 'estimation_overrides'}
     _mapping(profile, allowed, allowed - {'estimation_overrides'}, f'simulation.config ({profile_path})')
@@ -180,6 +196,7 @@ def _assemble(source, share, overrides):
         if not np.isfinite(angle) or not physical[name]['lower'] <= angle <= physical[name]['upper']:
             raise ValueError(f'simulation.joint_position_hold.positions.{name}={angle!r}: outside authoritative limits')
     params = {}
+    parameter_sources = {}
     for name in ['robot', 'target']:
         parameters = _ros_parameters(estimation[name]['config'], 'estimation_node',
                                      {**ESTIMATION_PARAMETERS, **OPTIONAL_PARAMETERS})
@@ -187,11 +204,13 @@ def _assemble(source, share, overrides):
         if overlap:
             raise ValueError(f'estimation.{name}.config: competing parameter owners {sorted(overlap)}')
         params.update(parameters)
+        parameter_sources.update({key: str(estimation[name]['config']) for key in parameters})
     if 'estimation_overrides' in profile:
         overrides_data = load_yaml(profile['estimation_overrides'])
         overrides_data = validate_parameters(overrides_data, {**ESTIMATION_PARAMETERS, **OPTIONAL_PARAMETERS},
                                              path=str(profile['estimation_overrides']))
         params.update(overrides_data)
+        parameter_sources.update({key: str(profile['estimation_overrides']) for key in overrides_data})
     params = validate_parameters(params, {**ESTIMATION_PARAMETERS, **OPTIONAL_PARAMETERS},
                                  required=ESTIMATION_PARAMETERS, path='estimation.parameters')
     validate_runtime_parameters(params)
@@ -297,9 +316,12 @@ def _assemble(source, share, overrides):
                 or truth['topic'] != ctx['base_topic'] or truth['frame_id'] != ctx['reference_frame']):
             raise ValueError('physical guidance requires enabled matching physical ground truth')
     sensor_config = sim.get('localization_sensor_config')
+    sensor_path = None
+    localization_sensor = None
     if sensor_config:
         from robot_simulation.measurements.planar_localization import validate_configuration
-        localization_sensor = load_yaml(resolve_resource(sensor_config, resource, share))['localization_sensor']
+        sensor_path = resolve_resource(sensor_config, resource, share)
+        localization_sensor = load_yaml(sensor_path)['localization_sensor']
         validate_configuration(localization_sensor)
         if localization_sensor['enabled']:
             truth = deployed['ground_truth_odometry']
@@ -329,10 +351,31 @@ def _assemble(source, share, overrides):
     identities = {'robot_estimator': _typename(robot_estimator), 'target_estimator': _typename(target_estimator),
                   **system.component_types, **pipeline.component_types,
                   'dynamics': _typename(engine.dynamics), 'integrator': _typename(engine.integrator)}
-    return {'source': source, 'profile': profile, 'profile_path': profile_path,
-            'description_path': physical_path, 'prediction_path': prediction['config'],
-            'strategy_path': strategy_path, 'selection': selection, 'runtime': runtime,
-            'estimation_parameters': params, 'control_parameters': control_parameters,
-            'identities': identities, 'prediction_topics': {
-                'estimated_state_topic': params['target_state_full_topic'],
-                'trajectory_full_topic': control_parameters['prediction_topic']}}
+    sensor_inventory = build_sensor_inventory(
+        deployment=sim, robot=deployed, parameters=params, measurements=measurements,
+        integration=integration, localization=localization_sensor, runtime=runtime,
+        tracking_tf=profile['tracking_tf'], actuation=actuator,
+        context_required=bool(engine.dynamics.environment_field.context_requirements),
+        resources={'system': source, 'profile': profile_path,
+                   'simulation': profile['simulation_config'],
+                   'robot': robot_path, 'description': physical_path, 'localization': sensor_path,
+                   'robot_estimator': estimation['robot']['config'],
+                   'target_estimator': estimation['target']['config'],
+                   'estimation_overrides': profile.get('estimation_overrides'),
+                   'actuation': profile['actuation_config'],
+                   'integration': resolve_resource(
+                       sim['simulation']['config'], resource, share),
+                   'target_measurements': resolve_resource(
+                       sim['simulation']['measurement_config'], resource, share)},
+        parameter_sources=parameter_sources)
+    result = {'source': source, 'profile': profile, 'profile_path': profile_path,
+              'description_path': physical_path, 'prediction_path': prediction['config'],
+              'strategy_path': strategy_path, 'selection': selection, 'runtime': runtime,
+              'estimation_parameters': params, 'control_parameters': control_parameters,
+              'identities': identities, 'sensor_inventory': sensor_inventory,
+              'prediction_topics': {
+                  'estimated_state_topic': params['target_state_full_topic'],
+                  'trajectory_full_topic': control_parameters['prediction_topic']}}
+    if composition is not None:
+        result['composition'] = composition
+    return result

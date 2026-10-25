@@ -1,5 +1,0 @@
-{
-  "exit_code": 2,
-  "output_created": false,
-  "log": "{\"schema_version\": 1, \"error\": \"/tmp/m08_invalid.yaml: duration: expected finite positive number\"}\n[ros2run]: Process exited with failure 2\n"
-}

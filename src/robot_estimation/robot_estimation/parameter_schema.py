@@ -54,3 +54,10 @@ LOCALIZATION_PARAMETERS = {'localization_enabled': 'BOOL', 'localization_topic':
  'localization_frame': 'STRING', 'localization_max_age': 'DOUBLE',
  'localization_nis_limit': 'DOUBLE', 'localization_transform_tolerance': 'DOUBLE'}
 OPTIONAL_PARAMETERS.update(LOCALIZATION_PARAMETERS)
+
+POSE_POLICY_PARAMETERS = {'localization_consensus_window': 'INTEGER',
+ 'localization_consensus_inliers': 'INTEGER', 'localization_consensus_span': 'DOUBLE',
+ 'localization_consensus_max_age': 'DOUBLE', 'localization_trust_timeout': 'DOUBLE',
+ 'localization_recovery_nis_target': 'DOUBLE'}
+LOCALIZATION_PARAMETERS.update(POSE_POLICY_PARAMETERS)
+OPTIONAL_PARAMETERS.update(POSE_POLICY_PARAMETERS)

@@ -1,0 +1,6 @@
+# Same nominal physical scenario; use the existing CV predictor without adaptation/fusion.
+extends: nominal_tracking.yaml
+prediction:
+  type: constant_velocity
+  adaptation: none
+  fusion: none

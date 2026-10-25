@@ -88,6 +88,9 @@ or `config/system_dls.yaml` for the existing DLS controller. Existing `config` a
 [M07 configuration guide and verification](docs/m07_unified_system_configuration.md)
 for supported combinations, overrides, errors and measured limitations.
 
+Use the [sensor navigation guide](docs/architecture/sensors.md) to find sensor
+owners, select publisher/fusion settings and inspect the effective M07 inventory.
+
 The current Control Compute Only milestone, verified behavior, and local
 reproduction commands are documented in [docs/control_compute_only.md](docs/control_compute_only.md).
 
@@ -99,10 +102,26 @@ reproduction commands are documented in [docs/control_compute_only.md](docs/cont
 - Inherited scenario configurations with recorded validation evidence
 - Explicit model, prediction, task and safety contracts
 
-`docs/validation/` holds reproducible validation utilities and selected historical
-evidence. New raw run outputs belong in gitignored `results/`; existing local evidence
-is preserved. Physical joint overspeed, skid localization and aggressive tracking
-remain research limitations, not hardware-safety guarantees.
+`docs/validation/` holds permanent engineering reports. Reusable probes, analyses
+and their fixtures live in [`tools/validation/`](tools/validation/README.md).
+Generated captures and source snapshots live in ignored `results/validation/`;
+experiment studies use `results/<study>/`. Large historical captures and copied
+workspaces are preserved in verified `results/archives/*.tar.gz` archives with
+member checksums and exact restore commands in adjacent JSON manifests. For example:
+
+```bash
+tar -xzf results/archives/reactive_challenge_study.tar.gz -C .
+```
+
+Restore from the workspace root before using an archived study's original paths.
+Archives and local evidence do not ship with a source clone. Captured logs, source
+snapshots and metadata retain their original contents and paths as historical
+records; current reproduction commands use the new locations. Keep these artifacts
+with the scientific results when transferring a study.
+
+The [repository cleanup report](docs/repository_cleanup.md) records the exact
+relocations, configuration aliases removed, storage savings and verification.
+R1C benchmarking remains **CONDITIONAL**; research results do not certify hardware safety.
 
 ## Technology
 

@@ -33,7 +33,7 @@ def test_periodic_field_rejects_invalid_frequencies(frequency):
 
 
 @pytest.mark.parametrize('scenario', [
-    'reactive_target_oscillatory.yaml', 'reactive_target_oscillatory_aggressive_reference.yaml'])
+    'oscillatory_reactive_tracking.yaml', 'reactive_target_oscillatory_aggressive_reference.yaml'])
 def test_configured_motion_remains_spatial_bounded_and_repeatable(scenario):
     """Both selected fields must sustain post-transient Y/Z reversals with RK4."""
     scene = load_yaml(CONFIG / 'scenarios' / scenario)

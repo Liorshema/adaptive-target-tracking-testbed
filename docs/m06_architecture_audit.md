@@ -25,7 +25,7 @@ and top-level symbols. Reviewed runtime call paths, message definitions, model
 composition, factories, loaders, launch resolution, safety, TF, prediction timing,
 and relevant tests/validation wrappers directly. Static inventory is not a proof
 that every public method is used externally or that every dynamic path is correct.
-The supporting [inventory](validation/m06_architecture_inventory.json) records
+The supporting [inventory](../results/validation/m06_architecture_inventory.json) records
 imports, symbols, package dependencies and file/path disposition for review.
 
 Evidence baseline remains M03's 848 functional tests and M04/M05's fresh 210 focused
@@ -184,7 +184,7 @@ generalizing them needs a demonstrated new adapter contract, not folder changes.
 | Predictor/adaptation | prediction `config/prediction.yaml` → `PredictionConfig` → `PredictionSystemFactory.create` | Package resource path fixed in node; factory unconditionally chooses IMM+ResidualAdapter |
 | Control and task | control YAML + optional strategy YAML → adapters/factory/registries | DLS/WLS; Cartesian/distance-pointing; shared radius and axes injected |
 | System composition | bringup `config/closed_loop.yaml` and inherited scenario files | Selects simulation, actuator, control and estimator resource files; no predictor file selector |
-| Duration, output, evaluation thresholds | `docs/validation/v2_tracking_gazebo.py` CLI and `v2_thresholds.yaml` | Validation-only orchestration; not a production experiment API |
+| Duration, output, evaluation thresholds | `tools/validation/v2_tracking_gazebo.py` CLI and `v2_thresholds.yaml` | Validation-only orchestration; not a production experiment API |
 
 Loading is not uniform and should not be blindly made uniform. Simulation's
 `factory/config_loader.py::load_yaml` implements relative-parent `extends`, recursive
@@ -294,7 +294,7 @@ and validation scripts, not filenames alone. External consumers cannot be ruled 
 | OnlineSequenceLearner | Abstract learner API only; no concrete learned deployment | Extension contract, not an implemented ML predictor |
 | ArmDynamics / MobileDynamics / camera geometry/projection | Reusable mathematical alternatives; no current Gazebo actuation call path | Keep; not duplicate Gazebo physics or current tracking controller |
 | Empty aerial/omnidirectional package initializers | Existing reserved namespace, no model implementation | Do not claim support; don't create more empty symmetry directories |
-| `docs/validation/m02_before_source`, `m03_before_source` | Deliberate executable behavior baselines used by probes | Keep byte-for-byte, not abandoned backups |
+| `results/validation/m02_before_source`, `m03_before_source` | Deliberate executable behavior baselines used by probes | Keep byte-for-byte, not abandoned backups |
 | Ignored `.bak`, `__pycache__`, `.pytest_cache` | Local backups/caches; caches include names of old modules with no current .py | Backups archive without loss; caches excluded from installation. A stale .pyc is not evidence of a live source implementation |
 | `models/target/model.sdf` | Installed model asset; generated runtime worlds go to temporary directories | Keep source asset; don't conflate SDF extension with generated output |
 | Historic `config/comparison`, `config/experiments` and validation scripts | Explicitly installed legacy configs, research/test harness rather than new experiment manager | Keep during compatibility migration; report reachability before any deprecation |

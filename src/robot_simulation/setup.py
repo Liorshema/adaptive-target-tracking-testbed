@@ -123,15 +123,6 @@ setup(
             "config/*.yaml",
         ),
 
-        # Legacy configuration — retained temporarily
-        *install_files(
-            "config/comparison",
-            "config/comparison/*.yaml",
-        ),
-        *install_files(
-            "config/experiments",
-            "config/experiments/*.yaml",
-        ),
         *install_files(
             "config/terrain",
             "config/terrain/*.yaml",

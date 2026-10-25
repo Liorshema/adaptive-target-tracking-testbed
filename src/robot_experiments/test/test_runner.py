@@ -12,31 +12,58 @@ SRC=Path(__file__).resolve().parents[2]
 SHARE=lambda name:SRC/name
 
 def test_startup_failure_persists_status_cleanup_and_environment(tmp_path,monkeypatch):
- spec=load_experiment(SRC/'robot_experiments/config/nominal.yaml',SHARE)
- class Recorder:
-  def __init__(self,context,path):
-   self.streams={};self.availability={};self.events=[];self.closed=False
-  def spin_once(self,timeout):pass
-  def close(self):self.closed=True
- class Process:
-  stopped=0
-  def __init__(self,command,env,log):self.log=log
-  def start(self):self.log.write_text('failed startup\n');return self
-  def stop(self,grace):Process.stopped+=1;return {'survivors':[],'returncode':7}
- def fail(*args,**kwargs):raise RunFailure('readiness_timeout',{'clock':0})
- monkeypatch.setattr(recording,'Recorder',Recorder)
- monkeypatch.setattr(runner,'OwnedLaunch',Process)
- monkeypatch.setattr(runner,'run_window',fail)
- monkeypatch.setattr(runner,'_git',lambda:{'revision':'test'})
- before={k:os.environ.get(k) for k in ['ROS_DOMAIN_ID','GZ_PARTITION','GZ_IP','ROS_LOG_DIR']}
- result=runner.run_one(spec,spec['variants'][0],917,tmp_path/'run',SHARE)
- status=json.loads((tmp_path/'run/status.json').read_text())
- assert status['execution_status']=='failed' and status['error']['code']=='readiness_timeout'
- assert Process.stopped==1 and status['cleanup']['survivors']==[]
- assert status['acceptance'] is None
- assert (tmp_path/'run/resolved_configuration.json').exists()
- assert result['artifacts']=='runs/run'
- assert {k:os.environ.get(k) for k in before}==before
+    """Even failed startup retains the effective, seeded sensing configuration."""
+    spec = load_experiment(SRC / 'robot_experiments/config/nominal.yaml', SHARE)
+
+    class Recorder:
+        def __init__(self, context, path):
+            self.streams = {}
+            self.availability = {}
+            self.events = []
+            self.closed = False
+
+        def spin_once(self, timeout):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    class Process:
+        stopped = 0
+
+        def __init__(self, command, env, log):
+            self.log = log
+
+        def start(self):
+            self.log.write_text('failed startup\n')
+            return self
+
+        def stop(self, grace):
+            Process.stopped += 1
+            return {'survivors': [], 'returncode': 7}
+
+    def fail(*args, **kwargs):
+        raise RunFailure('readiness_timeout', {'clock': 0})
+
+    monkeypatch.setattr(recording, 'Recorder', Recorder)
+    monkeypatch.setattr(runner, 'OwnedLaunch', Process)
+    monkeypatch.setattr(runner, 'run_window', fail)
+    monkeypatch.setattr(runner, '_git', lambda: {'revision': 'test'})
+    before = {k: os.environ.get(k) for k in
+              ['ROS_DOMAIN_ID', 'GZ_PARTITION', 'GZ_IP', 'ROS_LOG_DIR']}
+    result = runner.run_one(spec, spec['variants'][0], 917, tmp_path / 'run', SHARE)
+    status = json.loads((tmp_path / 'run/status.json').read_text())
+    assert status['execution_status'] == 'failed' and status['error']['code'] == 'readiness_timeout'
+    assert Process.stopped == 1 and status['cleanup']['survivors'] == []
+    assert status['acceptance'] is None
+    assert (tmp_path / 'run/resolved_configuration.json').exists()
+    resolved = json.loads((tmp_path / 'run/resolved_configuration.json').read_text())
+    sources = resolved['system']['sensor_inventory']['sources']
+    assert sources['target_position']['simulated_effects']['random_seed'] == 917
+    assert sources['imu']['producer']['configured'] is False
+    assert sources['imu']['fusion']['subscription_configured'] is True
+    assert result['artifacts'] == 'runs/run'
+    assert {k: os.environ.get(k) for k in before} == before
 
 def test_compute_only_does_not_wait_for_unpublished_commands():
  plan={'runtime':{'publish_commands':False}}

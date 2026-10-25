@@ -12,7 +12,7 @@ The authoritative inputs are normalized `telemetry/*.jsonl` envelopes (`source_t
 - Seed 917: `results/experiments/m08_final_seed917/paired_seed917_20261018T061032_929053Z_750v4ffu/runs/{cv_seed917,imm_seed917}`.
 - M09: `results/m09_headless_verified/headless_20261018T095903_806517Z_e0e8kb9e`.
 
-[Machine-readable evidence, source hashes and event rows](m09_target_estimation_20261018_refinement_final/m09_target_diagnostic_evidence.json) retain unrounded values. These are short, reactive closed-loop recordings; repeated seeds share synthetic noise sequences and are not independent experiments or identical physical paths. CV/IMM names select the **predictor**, while target estimation uses the same CV Kalman filter in every capture.
+[Machine-readable evidence, source hashes and event rows](../../results/validation/m09_target_estimation_20261018_refinement_final/m09_target_diagnostic_evidence.json) retain unrounded values. These are short, reactive closed-loop recordings; repeated seeds share synthetic noise sequences and are not independent experiments or identical physical paths. CV/IMM names select the **predictor**, while target estimation uses the same CV Kalman filter in every capture.
 
 All target truth, measurement, posterior and prediction samples declare `world`. Measurement/posterior epochs pair one-to-one within 2 ns, allowing the observed 1 ns floating-point/ROS stamp serialization loss. Truth is evaluated at measurement source epochs using exact observations or linear interpolation between truth samples separated by at most 60 ms. There is no extrapolation or recorder-wall-time substitution. The first 1 s after the first target observation is excluded from scored windows; replay still starts from the first observation. M09 truth stops at 11.628 s, leaving **16** later target observations without truth; these are excluded from all truth comparisons.
 
@@ -54,7 +54,7 @@ The estimate is 11–12 times rougher than truth at 100 ms, while measurements a
 
 Turn analysis finds axis extrema with at least .01 m excursion on either side within ±.5 s. It compares the local truth shape with `estimate(t + delay)`, searching 0–1 s at 50 ms resolution. Among interior optima with the complete search supported, per-capture median fitted shifts are .300/.150/.375/.350/.150 s in the table order; individual shifts span .05–.75 s. JSON retains every event, search-support boundary and local RMSE. These descriptive shifts mix filter lag, noise, amplitude bias and local shape. They are not identified causal latency; several shifts give only small error improvements and some optima lie at search boundaries.
 
-![M09 truth, noisy measurement, posterior and covariance scale](m09_target_estimation_20261018_refinement_final/m09_headless_target_timeseries.png)
+![M09 truth, noisy measurement, posterior and covariance scale](../../results/validation/m09_target_estimation_20261018_refinement_final/m09_headless_target_timeseries.png)
 
 ## Actual filter and covariance contracts
 
@@ -118,7 +118,7 @@ The largest position-correction event in each scored capture illustrates the var
 
 Values rounded to 1.5000 are not automatically physical limit violations; the unchanged tolerance and physical spike analysis are in [joint diagnostics](joint_motion_and_actuation_diagnostics.md). These events support real estimator-to-prediction coupling and some temporal association with command changes, while leaving the cause of the much larger physical wrist excursions unresolved.
 
-![M09 innovations, forecast revisions, commands and physical wrist samples](m09_target_estimation_20261018_refinement_final/m09_headless_coupling_timeseries.png)
+![M09 innovations, forecast revisions, commands and physical wrist samples](../../results/validation/m09_target_estimation_20261018_refinement_final/m09_headless_coupling_timeseries.png)
 
 All five target and coupling plots are retained beside the JSON. Physical velocities are displayed as individual measured points, avoiding invented interpolation across feedback gaps.
 
@@ -147,7 +147,7 @@ PYTHONPATH=src/robot_experiments:$PYTHONPATH python3 -m pytest \
   src/robot_experiments/test/test_target_diagnostics.py -q \
   -p no:launch_testing -p no:launch_ros
 MPLCONFIGDIR=/tmp/m09_target_mpl PYTHONPATH=src/robot_experiments:$PYTHONPATH \
-  python3 docs/validation/m09_target_diagnostics.py \
+  python3 tools/validation/m09_target_diagnostics.py \
   --output /tmp/m09_target_diagnostics_reproduction
 ```
 

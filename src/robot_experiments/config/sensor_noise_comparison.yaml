@@ -1,0 +1,26 @@
+extends: nominal.yaml
+experiment:
+  name: sensor_noise_comparison
+  description: Bounded sensing comparison, not a ranking or identical-trajectory experiment.
+  duration: 8.0
+  settling_time: 3.0
+  seeds: [42]
+  variants:
+    - name: baseline
+      system_config: {package: robot_bringup, path: config/system_manipulation_D_localized.yaml}
+    - name: higher_noise
+      system_config: {package: robot_bringup, path: config/system_localization_noise_study.yaml}
+  comparison:
+    schema_version: 1
+    domain: sensor_parameters
+    variables:
+      - name: pose_white_noise_std
+        path: localization_sensor.localization_sensor.white_noise_std
+        values:
+          - [0.04, 0.04, 0.03490658503988659]
+          - [0.08, 0.08, 0.06981317007977318]
+  # Common offline alignment/readiness budget accommodates the existing 80 ms
+  # robot-filter holdback. Runtime freshness, physics and physical limits do not change.
+  execution:
+    max_skew: 0.15
+    record_actuator_trace: true

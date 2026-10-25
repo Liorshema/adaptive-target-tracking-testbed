@@ -1,7 +1,12 @@
 """Causal physical base sample contract for context-dependent acceleration fields."""
 from dataclasses import dataclass
+from bisect import bisect_left
 
 import numpy as np
+
+
+class ContextUnavailable(ValueError):
+    """A causal physical sample is absent or expired, rather than invalid physics."""
 
 
 @dataclass(frozen=True)
@@ -32,14 +37,14 @@ class PhysicalBaseContext:
         age = time-self.timestamp
         if (not np.isfinite(time) or reference_frame != self.reference_frame
                 or age < -1e-9 or age > self.max_age):
-            raise ValueError('physical base context frame/time is unavailable')
+            raise ContextUnavailable('physical base context frame/time is unavailable')
         return self.position_world
 
 
 class PhysicalPositionHistory:
     """Bounded source-time buffer selecting latest nonfuture physical position."""
 
-    def __init__(self, reference_frame, provenance, max_age, history_duration=None):
+    def __init__(self, reference_frame, provenance, max_age, history_duration=None, capacity=None):
         """Validate explicit constructor parameters."""
         self.reference_frame = reference_frame
         self.provenance = provenance
@@ -47,19 +52,36 @@ class PhysicalPositionHistory:
         self.history_duration = 2*max_age if history_duration is None else history_duration
         if not np.isfinite(self.history_duration) or self.history_duration < max_age:
             raise ValueError('history duration must be finite and at least max_age')
+        if capacity is not None and (type(capacity) is not int or capacity <= 0):
+            raise ValueError('history capacity must be a positive integer')
+        self.capacity = capacity
         self._samples = []
 
-    def add(self, position, timestamp, reference_frame):
-        """Ignore wrong frames/out-of-order arrivals; caller clears on clock reset."""
+    def add(self, position, timestamp, reference_frame, receipt_time=None):
+        """Insert delayed samples within retained history; caller clears on reset."""
         if reference_frame != self.reference_frame:
             return
         sample = PhysicalBaseContext(position, timestamp, reference_frame,
                                      self.provenance, self.max_age)
-        if self._samples and timestamp <= self._samples[-1].timestamp:
+        # DDS callbacks from independent topics need not follow /clock callback
+        # order. Buffer bounded arrivals ahead of local clock; at() still never
+        # selects a future sample. Anchor eviction to clock, not a future stamp.
+        if receipt_time is not None:
+            if not np.isfinite(receipt_time) or timestamp > receipt_time + self.max_age:
+                return
+        index = bisect_left([s.timestamp for s in self._samples], timestamp)
+        if index < len(self._samples) and self._samples[index].timestamp == timestamp:
             return
-        self._samples.append(sample)
+        newest = max(timestamp, self._samples[-1].timestamp) if self._samples else timestamp
+        if receipt_time is not None:
+            newest = receipt_time
+        if newest - timestamp > self.history_duration:
+            return
+        self._samples.insert(index, sample)
         self._samples = [s for s in self._samples
-                         if timestamp - s.timestamp <= self.history_duration]
+                         if newest - s.timestamp <= self.history_duration]
+        if self.capacity is not None:
+            self._samples = self._samples[-self.capacity:]
 
     def at(self, time):
         """Return causal fresh context or absence; never fabricate/extrapolate a pose."""

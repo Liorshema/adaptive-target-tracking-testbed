@@ -325,16 +325,16 @@ ros2 launch robot_bringup closed_loop.launch.py \
 python3 -m pytest src --import-mode=importlib \
   -p no:launch_testing -p no:launch_ros -q \
   -k 'not flake8 and not pep257 and not copyright'
-python3 -m pytest src/robot_estimation/test docs/validation/test_m03_analysis.py -q
+python3 -m pytest src/robot_estimation/test tools/validation/test_m03_analysis.py -q
 
 # Recompute derived audits from preserved evidence, without running Gazebo.
-python3 docs/validation/m03_replay.py docs/validation/m03_wide_before
-python3 docs/validation/m03_localization_audit.py \
-  docs/validation/m03_drive_before docs/validation/m03_drive_after \
-  docs/validation/m03_nominal_after docs/validation/m03_wide_final
+python3 tools/validation/m03_replay.py results/validation/m03_wide_before
+python3 tools/validation/m03_localization_audit.py \
+  results/validation/m03_drive_before results/validation/m03_drive_after \
+  results/validation/m03_nominal_after results/validation/m03_wide_final
 
 # Optional fresh finite physical capture; choose unused output/domain/partition.
-ROS_DOMAIN_ID=147 GZ_PARTITION=m03_repeat python3 docs/validation/v2_tracking_gazebo.py \
+ROS_DOMAIN_ID=147 GZ_PARTITION=m03_repeat python3 tools/validation/v2_tracking_gazebo.py \
   --case reactive --config config/reactive_tracking_oscillatory.yaml \
   --strategy-config config/whole_body.yaml --physical-ground-truth --without-markers \
   --shoulder-posture --estimator-trace --duration 60 --settling-time 10 \
@@ -343,7 +343,7 @@ ROS_DOMAIN_ID=147 GZ_PARTITION=m03_repeat python3 docs/validation/v2_tracking_ga
 
 Append `--before-m03-estimation` to select archived pre-M03 estimation only. For
 aggressive tracking use `config/reactive_tracking_oscillatory_aggressive.yaml`.
-For the safe-command drive use `--drive-fixture docs/validation/m03_drive.yaml
+For the safe-command drive use `--drive-fixture tools/validation/m03_drive.yaml
 --duration 38 --settling-time 5` and a fresh output; the fixture sets
 `publish_commands=false` for the controller. Independent physical pose publication
 is enabled only for observing validation. Exact original final-run commands,
@@ -352,7 +352,7 @@ domains and return codes are in `validation/m03_remaining_runs.json`.
 ## Changed files and evidence
 
 The exact M03 implementation/documentation list is
-[`validation/m03_modified_files.txt`](validation/m03_modified_files.txt), with final
+[`validation/m03_modified_files.txt`](../results/validation/m03_modified_files.txt), with final
 source hashes in `validation/m03_source_hashes.json`. The machine-readable evidence
 file inventory is `validation/m03_evidence_files.txt`; it includes preserved raw
 captures, provisional performance evidence and derived analysis. Existing dirty

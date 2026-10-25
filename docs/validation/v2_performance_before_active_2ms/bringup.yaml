@@ -1,5 +1,0 @@
-actuation_config: config/actuation.yaml
-control_config: config/control.yaml
-robot_estimator_config: config/robot_estimator.yaml
-simulation_config: /home/user/ros2_ws/docs/validation/v2_performance_before_active_2ms/simulation.yaml
-target_estimator_config: config/target_estimator.yaml

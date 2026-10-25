@@ -148,7 +148,7 @@ recorded interval. Peak measured joint speeds were [0.1361, 0.4935, 0.3413,
 orientation-success claim is made. Startup blocked cycles: eight active and
 eight hold-only, with waiting-for-input reasons retained in the result files.
 
-![Measured tracking and joint response](validation/closed_loop_tracking.png)
+![Measured tracking and joint response](../results/validation/closed_loop_tracking.png)
 
 The separate actuator smoke test moved the base 0.3520 m while rotating, and
 all four joints responded by [0.4359, 0.4101, 0.4216, 0.6558] rad. With publication
@@ -169,23 +169,23 @@ tests additionally cover startup without complete feedback, wall-clock timeout
 during a clock pause, malformed/unsafe commands, feedback ordering watermarks,
 source competition, timestamp ordering and reset races.
 
-Evidence: [comparison](validation/closed_loop_comparison.json),
-[limits](validation/closed_loop_limits.json),
-[smoke](validation/closed_loop_smoke/result.json),
-[final failures/recovery](validation/closed_loop_failures_final/result.json).
-Build/test summaries are in [the check log](validation/closed_loop_checks.txt);
-the complete file list is in [the change manifest](validation/closed_loop_changed_files.txt).
+Evidence: [comparison](../results/validation/closed_loop_comparison.json),
+[limits](../results/validation/closed_loop_limits.json),
+[smoke](../results/validation/closed_loop_smoke/result.json),
+[final failures/recovery](../results/validation/closed_loop_failures_final/result.json).
+Build/test summaries are in [the check log](../results/validation/closed_loop_checks.txt);
+the complete file list is in [the change manifest](../results/validation/closed_loop_changed_files.txt).
 The corresponding directories contain runtime logs; active/baseline directories
 also contain target histories, base commands and full `samples.jsonl` telemetry.
 
 Reproduce validation after building/sourcing:
 
 ```bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=89 python3 docs/validation/closed_loop_gazebo.py --case active --output /tmp/tracking-active
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=90 python3 docs/validation/closed_loop_gazebo.py --case baseline --output /tmp/tracking-baseline
-python3 docs/validation/compare_closed_loop.py --active /tmp/tracking-active --baseline /tmp/tracking-baseline --output /tmp/tracking-comparison.json
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=91 python3 docs/validation/closed_loop_safety.py --case smoke --output /tmp/tracking-smoke
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=92 python3 docs/validation/closed_loop_safety.py --case failures --output /tmp/tracking-failures
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=89 python3 tools/validation/closed_loop_gazebo.py --case active --output /tmp/tracking-active
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=90 python3 tools/validation/closed_loop_gazebo.py --case baseline --output /tmp/tracking-baseline
+python3 tools/validation/compare_closed_loop.py --active /tmp/tracking-active --baseline /tmp/tracking-baseline --output /tmp/tracking-comparison.json
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=91 python3 tools/validation/closed_loop_safety.py --case smoke --output /tmp/tracking-smoke
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 ROS_DOMAIN_ID=92 python3 tools/validation/closed_loop_safety.py --case failures --output /tmp/tracking-failures
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros -m 'not linter' -q
 ```
 

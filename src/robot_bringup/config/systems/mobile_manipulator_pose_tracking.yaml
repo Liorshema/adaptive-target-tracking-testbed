@@ -1,0 +1,35 @@
+# Pose-aided saturated Fight/Flight manipulation; equivalent to historical localized D.
+# Physical wrist +/-15 degrees is explicit in the authoritative description reference.
+# This composition represents this experiment setup, not every mobile manipulator.
+schema_version: 2
+robot:
+  type: mobile_manipulator
+  description: {package: robot_description, path: config/robot/robot_wrist15.yaml}
+  model: {base: differential_drive, manipulator: serial_arm}
+estimation:
+  robot:
+    type: robot_ekf
+    config: {package: robot_estimation, path: config/robot_localized.yaml}
+  target:
+    type: kalman
+    config: {package: robot_estimation, path: config/target_estimator.yaml}
+  calibration: {package: robot_bringup, path: config/calibration/manipulation_pose.yaml}
+prediction:
+  type: imm
+  config: {package: robot_prediction, path: config/prediction.yaml}
+  adaptation: residual
+  fusion: weighted_correction
+control:
+  type: weighted_least_squares
+  config: {package: robot_control, path: config/control.yaml}
+  strategy: {package: robot_control, path: config/whole_body_manipulation_arm_priority.yaml}
+simulation:
+  config: {package: robot_simulation, path: config/scenarios/base_relative_manipulation.yaml}
+  robot: {package: robot_simulation, path: config/gazebo/robot_wrist15.yaml}
+  actuation: {package: robot_simulation, path: config/actuation.yaml}
+  localization_sensor: {package: robot_simulation, path: config/sensors/planar_localization.yaml}
+  tracking_tf: {rate_hz: 20.0, max_age: 0.2, max_skew: 0.05, future_tolerance: 0.01}
+runtime:
+  enable_actuation: false
+  gui: false
+  publish_ground_truth: true

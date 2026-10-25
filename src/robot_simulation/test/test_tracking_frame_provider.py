@@ -150,3 +150,16 @@ def test_direct_tf_history_retains_causal_samples_while_pose_request_is_pending(
     provider._clock.now.return_value.nanoseconds=1_000_000_000
     provider._receive_direct(TFMessage(transforms=[sample(1.3,100.),sample(1.,3.)]))
     np.testing.assert_equal(provider.position_at(1.,refresh=False),[3.,0.,0.])
+
+
+def test_direct_tf_ahead_of_clock_waits_for_causal_integration_time():
+    from geometry_msgs.msg import TransformStamped
+    from tf2_msgs.msg import TFMessage
+    provider,_=make_provider(max_age=.2,future_tolerance=0.,history_duration=1.)
+    provider._clock.now.return_value.nanoseconds=1_000_000_000
+    value=TransformStamped();value.header.frame_id='world';value.child_frame_id='tracking_frame'
+    value.header.stamp.sec=1;value.header.stamp.nanosec=10_000_000
+    value.transform.translation.x=4.
+    provider._receive_direct(TFMessage(transforms=[value]))
+    assert provider.position_at(1.,refresh=False) is None
+    np.testing.assert_equal(provider.position_at(1.01,refresh=False),[4.,0.,0.])

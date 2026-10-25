@@ -372,19 +372,20 @@ def main(
         args=args
     )
 
-    node = PredictionNode()
-
+    node = None
     try:
+        node = PredictionNode()
         rclpy.spin(
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
 
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

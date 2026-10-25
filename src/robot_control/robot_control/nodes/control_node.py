@@ -373,9 +373,6 @@ class ControlNode(Node):
                     f"last={self._last_robot_timestamp:.6f}",
                     throttle_duration_sec=5.0,
                 )
-                if self._command_publisher is not None:
-                    self._robot_state = None
-                    self._stop('out-of-order robot estimate')
                 return
 
             self._robot_state = state
@@ -412,9 +409,6 @@ class ControlNode(Node):
                     "Ignoring duplicate or out-of-order prediction.",
                     throttle_duration_sec=5.0,
                 )
-                if self._command_publisher is not None:
-                    self._prediction = None
-                    self._stop('duplicate or out-of-order prediction')
                 return
 
             self._prediction = prediction
@@ -584,6 +578,12 @@ class ControlNode(Node):
         message.header.stamp = self.get_clock().now().to_msg()
         message.reason = reason
         message.valid = result is not None
+        # These are input source epochs, including on invalid decisions. A
+        # negative value means absent; never substitute publication/arrival time.
+        message.robot_state_time = (self._robot_state.timestamp
+                                   if self._robot_state is not None else -1.)
+        message.prediction_reference_time = (self._prediction_reference_timestamp
+                                            if self._prediction_reference_timestamp is not None else -1.)
         if result is not None:
             message.header.frame_id = self._robot_state.frame_id
             diagnostic = result.diagnostics
@@ -632,7 +632,10 @@ def main(args=None) -> None:
             if rclpy.ok():
                 node._timer.cancel()
                 node._stop('Shutdown')
-                rclpy.spin_once(node, timeout_sec=0.05)
+                # Flush transport without dispatching a queued control timer
+                # after the final inactive command.
+                if node._command_publisher is not None:
+                    node._command_publisher.wait_for_all_acked(Duration(seconds=.05))
             node.destroy_node()
 
         if rclpy.ok():

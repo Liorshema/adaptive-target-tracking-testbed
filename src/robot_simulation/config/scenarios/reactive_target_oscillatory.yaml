@@ -1,4 +1,0 @@
-extends: reactive_target_3d.yaml
-
-simulation:
-  environment_config: config/scenarios/environment_oscillatory.yaml

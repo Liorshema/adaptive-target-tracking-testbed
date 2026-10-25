@@ -1,0 +1,4 @@
+# Experimental source only; the baseline remains unchanged.
+extends: planar_localization.yaml
+localization_sensor:
+  white_noise_std: [0.08, 0.08, 0.06981317007977318]

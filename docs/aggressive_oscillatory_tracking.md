@@ -42,7 +42,7 @@ Configured initial conditions match, but ROS readiness starts the oscillator at 
 | Watchdog events, total / settled | 0 / 0 | 0 / 0 | 0 / 0 |
 | Observed geometrically unreachable events | 0 | 0 | 0 |
 
-B's last ten seconds still span **.525 m in Y / .234 m in Z**. Its peak sampled speed increases, while its Y range is slightly smaller than A: higher forcing frequency does not guarantee larger displacement. B stays within **.516 m of the centering field**, with full-run Z **.767–1.182 m**. No runaway or parameter sweep occurred; the initial candidate was retained. [Measured XYZ and pointing traces](validation/aggressive_oscillatory_tracking.png).
+B's last ten seconds still span **.525 m in Y / .234 m in Z**. Its peak sampled speed increases, while its Y range is slightly smaller than A: higher forcing frequency does not guarantee larger displacement. B stays within **.516 m of the centering field**, with full-run Z **.767–1.182 m**. No runaway or parameter sweep occurred; the initial candidate was retained. [Measured XYZ and pointing traces](../results/validation/aggressive_oscillatory_tracking.png).
 
 All observed target positions have a static geometric certificate: authoritative FK constructs `p_target = p_camera + R * optical_axis` using a valid straight-arm posture plus free base XY placement on flat ground. The certified height interval is **.430–2.310 m**; representative bounded IK residuals are below 1e-12 m. This does not certify dynamic/nonholonomic feasibility or complete collision avoidance. No IK logic was added to Control.
 
@@ -59,7 +59,7 @@ Peak vectors below are ordered `[arm yaw, shoulder, elbow, wrist]`; authoritativ
 | C | 0.525 / 1.086 / 1.902 / 2.392 | 0.416 / 0.927 / 1.902 / 1.565 |
 | B GUI | 0.373 / 1.097 / 1.790 / 2.592 | 0.310 / 0.531 / 1.390 / 1.552 |
 
-C increases settled wrist peak **1.545 → 1.565 rad/s** and observed wrist overspeed interval duration **.010 → .042 s**, despite reducing its full-run peak. Full shoulder peak also increases. B itself has significant elbow/wrist violations; it is an opt-in simulation experiment, not a safe actuator milestone. Bounds on commanded velocity pass, while actual effort-PID joint speeds fail. Per-joint samples, episodes and interval-duration estimates for every measured violation are in [the full comparison](validation/aggressive_oscillatory_comparison.json); durations across missing samples are estimates, not continuous-time proofs.
+C increases settled wrist peak **1.545 → 1.565 rad/s** and observed wrist overspeed interval duration **.010 → .042 s**, despite reducing its full-run peak. Full shoulder peak also increases. B itself has significant elbow/wrist violations; it is an opt-in simulation experiment, not a safe actuator milestone. Bounds on commanded velocity pass, while actual effort-PID joint speeds fail. Per-joint samples, episodes and interval-duration estimates for every measured violation are in [the full comparison](../results/validation/aggressive_oscillatory_comparison.json); durations across missing samples are estimates, not continuous-time proofs.
 
 Position/command bounds, first-link clearance and live TF gates pass within existing tolerances. Shoulder minimum remains configured at 0; A/C briefly measure −.000127 rad, within the existing tolerance. First-link box clearance remains approximately 4 cm. A/B/C command rejections are **0/1/15**, feedback rejections **0/1/1**, and watchdog totals **0/0/0**. Guards were retained. B's log still reports **5,855 timestamp rejections**; shared estimator timestamp ordering remains open. No stale-update acceptance, PID tuning, limit widening or actuation redesign was introduced.
 
@@ -115,8 +115,8 @@ For A select `config:=config/reactive_tracking_oscillatory.yaml`. C reproduction
 Reproduce the direct B observation (nonzero exit is expected for physical speed failures):
 
 ```bash
-python3 docs/validation/v2_tracking_gazebo.py --case v2 --config config/reactive_tracking_oscillatory_aggressive.yaml --strategy-config config/whole_body.yaml --physical-ground-truth --without-markers --shoulder-posture --duration 30 --wall-timeout 210 --output /tmp/aggressive_check
-MPLCONFIGDIR=/tmp/aggressive-matplotlib python3 docs/validation/analyze_aggressive_oscillatory.py
+python3 tools/validation/v2_tracking_gazebo.py --case v2 --config config/reactive_tracking_oscillatory_aggressive.yaml --strategy-config config/whole_body.yaml --physical-ground-truth --without-markers --shoulder-posture --duration 30 --wall-timeout 210 --output /tmp/aggressive_check
+MPLCONFIGDIR=/tmp/aggressive-matplotlib python3 tools/validation/analyze_aggressive_oscillatory.py
 ```
 
 The analyzer regenerates the saved A/B/C comparison; the fresh observation is in `/tmp/aggressive_check/result.json`.
@@ -124,10 +124,10 @@ The analyzer regenerates the saved A/B/C comparison; the fresh observation is in
 **Created/modified source, configuration, test and report files**
 
 - `docs/aggressive_oscillatory_tracking.md`
-- `docs/validation/aggressive_modified_files.txt`
-- `docs/validation/analyze_aggressive_oscillatory.py`
-- `docs/validation/test_aggressive_analysis.py`
-- `docs/validation/v2_tracking_gazebo.py`
+- `results/validation/aggressive_modified_files.txt`
+- `tools/validation/analyze_aggressive_oscillatory.py`
+- `tools/validation/test_aggressive_analysis.py`
+- `tools/validation/v2_tracking_gazebo.py`
 - `src/robot_bringup/config/reactive_tracking_oscillatory_aggressive.yaml`
 - `src/robot_bringup/launch/closed_loop.launch.py`
 - `src/robot_bringup/test/test_aggressive_oscillatory.py`
@@ -136,4 +136,4 @@ The analyzer regenerates the saved A/B/C comparison; the fresh observation is in
 - `src/robot_simulation/config/scenarios/reactive_target_oscillatory_aggressive.yaml`
 - `src/robot_simulation/test/test_oscillatory_experiment.py`
 
-Generated evidence: `docs/validation/aggressive_*` directories/logs, `aggressive_oscillatory_comparison.json` and `aggressive_oscillatory_tracking.png`. [Exact file manifest](validation/aggressive_modified_files.txt). No commit or push.
+Generated evidence: `docs/validation/aggressive_*` directories/logs, `aggressive_oscillatory_comparison.json` and `aggressive_oscillatory_tracking.png`. [Exact file manifest](../results/validation/aggressive_modified_files.txt). No commit or push.

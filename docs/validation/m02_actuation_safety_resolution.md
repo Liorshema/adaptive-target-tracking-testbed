@@ -132,7 +132,7 @@ Baseline directory:
 Final directory:
 `results/m02_resolution_governed/m02_actuator_20261019T035546_061962Z_oda65sm7`.
 Each contains immutable inputs, plugin hash, telemetry, launch log, local physics
-trace and results. [Full recomputed metrics and source pointers](m02_resolution_final_figures/summary.json)
+trace and results. [Full recomputed metrics and source pointers](../../results/validation/m02_resolution_final_figures/summary.json)
 include all four joint tables, startup/tracking splits, RMS/p95, violation samples
 and duration, reference errors, physical-vs-command discrepancy and base motion.
 
@@ -220,9 +220,9 @@ ros2 launch robot_bringup visualization.launch.py \
 # The normal standalone simulator also uses the same default holding backend:
 ros2 launch robot_simulation simulation.launch.py gui:=false
 # Controlled before/after, fresh collision-safe study directory:
-python3 docs/validation/m02_resolution_run.py --output results/m02_repeat \
+python3 tools/validation/m02_resolution_run.py --output results/m02_repeat \
   --duration 12 --settling 2
-python3 docs/validation/m02_resolution_reset.py --output results/m02_reset_repeat
+python3 tools/validation/m02_resolution_reset.py --output results/m02_reset_repeat
 ```
 
 Do not run deployments in the same ROS domain/Gazebo partition concurrently.
@@ -244,8 +244,8 @@ existing guards. Shoulder tolerance does not replace self-collision avoidance.
 
 No controller/estimator/predictor/target/geometry/limit change, no commit or push.
 The exact M02-only changes, preserving M09 separately, are in
-[m02_resolution_modified_files.txt](m02_resolution_modified_files.txt), and the
-machine-readable closure is [m02_resolution_final_verification.json](m02_resolution_final_verification.json).
+[m02_resolution_modified_files.txt](../../results/validation/m02_resolution_modified_files.txt), and the
+machine-readable closure is [m02_resolution_final_verification.json](../../results/validation/m02_resolution_final_verification.json).
 
 ### Per-joint measured comparison
 
@@ -282,7 +282,7 @@ their position references. Effort panels show PID requested/written commands,
 unchanged effort bounds and explicitly unavailable native torque. Effort uses a
 labelled symmetric logarithmic scale to retain startup saturation and later detail.
 
-![CV seed42](m02_resolution_final_figures/cv_42_comparison.png)
-![CV seed917](m02_resolution_final_figures/cv_917_comparison.png)
-![IMM seed42](m02_resolution_final_figures/imm_42_comparison.png)
-![IMM seed917](m02_resolution_final_figures/imm_917_comparison.png)
+![CV seed42](../../results/validation/m02_resolution_final_figures/cv_42_comparison.png)
+![CV seed917](../../results/validation/m02_resolution_final_figures/cv_917_comparison.png)
+![IMM seed42](../../results/validation/m02_resolution_final_figures/imm_42_comparison.png)
+![IMM seed917](../../results/validation/m02_resolution_final_figures/imm_917_comparison.png)

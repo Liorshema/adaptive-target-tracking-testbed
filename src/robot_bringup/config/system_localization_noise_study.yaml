@@ -1,0 +1,3 @@
+extends: system_manipulation_D_localized.yaml
+simulation:
+  config: {package: robot_bringup, path: config/reactive_manipulation_noise_study.yaml}

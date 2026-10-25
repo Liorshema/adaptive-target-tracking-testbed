@@ -222,7 +222,7 @@ def fake_ros(monkeypatch, fail_subscription=False):
             self.node = node
 
         def spin_once(self, timeout_sec):
-            self.timeouts.append(timeout_sec)
+            self.timeouts.append(timeout_sec.timeout)
 
         def shutdown(self, timeout_sec):
             self.closed = True
@@ -230,13 +230,17 @@ def fake_ros(monkeypatch, fail_subscription=False):
         def remove_node(self, node):
             pass
 
+    class TimeoutObject:
+        def __init__(self, timeout):
+            self.timeout = timeout
+
     class QoS:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
     modules = {
         'rclpy.context': {'Context': Context}, 'rclpy.node': {'Node': Node},
-        'rclpy.executors': {'SingleThreadedExecutor': Executor},
+        'rclpy.executors': {'SingleThreadedExecutor': Executor, 'TimeoutObject': TimeoutObject},
         'rclpy.qos': {'QoSProfile': QoS, 'ReliabilityPolicy': NS(BEST_EFFORT='best_effort'),
                       'DurabilityPolicy': NS(VOLATILE='volatile')},
     }
@@ -287,7 +291,7 @@ def queued_executor(resources, monkeypatch, messages):
     queue = list(messages)
 
     def spin_once(timeout_sec):
-        executor.timeouts.append(timeout_sec)
+        executor.timeouts.append(timeout_sec.timeout)
         if queue:
             topic, message = queue.pop(0)
             callbacks[topic](message)

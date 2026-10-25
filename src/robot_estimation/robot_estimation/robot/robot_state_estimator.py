@@ -50,6 +50,7 @@ class RobotStateEstimator(EstimatorInterface):
         imu_measurement_model: ImuYawRateMeasurementModel,
         joint_measurement_model: JointEncoderMeasurementModel,
         state_constraint=None,
+        pose_acceptance=None,
     ) -> None:
         if (
             initial_state.dimension
@@ -114,7 +115,9 @@ class RobotStateEstimator(EstimatorInterface):
         )
         self._state_constraint = state_constraint
         self._pose_model = PlanarPoseModel(joint_count)
-        self.pose_diagnostics = {"accepted": False, "updates": 0, "rejected": 0}
+        self._pose_acceptance = pose_acceptance
+        self.pose_diagnostics = {"accepted": False, "updates": 0, "rejected": 0,
+                                 "pending": 0, "recoveries": 0}
 
     @property
     def state(self) -> StateEstimate:
@@ -255,10 +258,35 @@ class RobotStateEstimator(EstimatorInterface):
                 or not np.allclose(R, R.T) or np.linalg.eigvalsh(R).min() <= 0):
             raise ValueError('Invalid pose covariance, value or innovation gate')
         state = self.state
+        if self._pose_acceptance is not None and (
+                measurement.timestamp is None or not np.isfinite(measurement.timestamp)
+                or measurement.timestamp < 0 or (state.timestamp is not None
+                    and measurement.timestamp < state.timestamp)):
+            raise ValueError('Pose observation must be in the current causal epoch')
         H = self._pose_model.jacobian(state.mean)
         innovation = self._pose_model.innovation(measurement.value, state.mean)
         S = H @ state.covariance @ H.T + R
         nis = float(innovation @ np.linalg.solve(S, innovation))
+        self.pose_diagnostics.update(accepted=False, nis=nis)
+        policy = self._pose_acceptance
+        if policy is not None:
+            if not policy.consider(measurement, innovation, nis, nis_limit,
+                    lambda dt: self._process_model.process_covariance(dt, state.mean)[:3, :3]):
+                name = 'rejected' if policy.reason in ['inconsistent_source', 'nonincreasing_source_time'] else 'pending'
+                self.pose_diagnostics[name] += 1
+                return state
+            if nis > nis_limit:
+                # Confirmed model failure, not a relaxed likelihood gate. A PSD
+                # rank-one increment gives the configured target NIS analytically.
+                direction = H.T @ innovation
+                increment = (1/policy.nis_target-1/nis)*np.outer(direction, direction)
+                self._filter.add_process_uncertainty(increment)
+                state = self.state
+                self.pose_diagnostics.update(nis_before_recovery=nis,
+                    added_pose_covariance=increment[:3, :3].tolist(),
+                    recoveries=self.pose_diagnostics['recoveries']+1)
+                S = H @ state.covariance @ H.T + R
+                nis = float(innovation @ np.linalg.solve(S, innovation))
         accepted = nis <= nis_limit
         self.pose_diagnostics.update(accepted=accepted, nis=nis,
             updates=self.pose_diagnostics['updates'] + int(accepted),
@@ -267,8 +295,18 @@ class RobotStateEstimator(EstimatorInterface):
             return state
         equivalent = Measurement(self._pose_model.predict_measurement(state.mean) + innovation,
                                  R.copy(), measurement.timestamp)
-        return self._filter.update(equivalent, self._pose_model.predict_measurement,
-                                   self._pose_model.jacobian)
+        updated = self._filter.update(equivalent, self._pose_model.predict_measurement,
+                                      self._pose_model.jacobian)
+        self.pose_diagnostics['correction'] = (updated.mean[:3]-state.mean[:3]).tolist()
+        if policy is not None:
+            policy.commit(measurement.timestamp)
+        return updated
+
+    def localization_health(self, now):
+        """Report independent-source trust separately from aggregate freshness."""
+        if self._pose_acceptance is None:
+            return {'mode': 'legacy', 'trusted': True}
+        return self._pose_acceptance.health(now)
 
     def _process_function(
         self,

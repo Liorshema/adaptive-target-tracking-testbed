@@ -38,7 +38,7 @@ simulation compliance, not hardware certification or a general hard bound.
 
 See [the full resolution report](validation/m02_actuation_safety_resolution.md)
 for mechanisms, instrumentation, per-joint metrics, plots, exact artifacts and
-commands. [M02-only changed files](validation/m02_resolution_modified_files.txt)
+commands. [M02-only changed files](../results/validation/m02_resolution_modified_files.txt)
 separate this work from the preserved, uncommitted M09 changes. No commit/push.
 
 Everything below preserves the earlier closure as historical evidence. Its
@@ -288,19 +288,19 @@ For the original oscillatory baseline, replace config with `config/reactive_trac
 The exact final capture commands and return codes are in `validation/m02_comparison_runs.json`. The sequential runner is:
 
 ```bash
-python3 docs/validation/run_m02_comparison.py
-python3 docs/validation/m02_metrics.py docs/validation/m02_quiet_{A_before,A_after,B_before,B_after}
+python3 tools/validation/run_m02_comparison.py
+python3 tools/validation/m02_metrics.py results/validation/m02_quiet_{A_before,A_after,B_before,B_after}
 ```
 
 The runner intentionally refuses to overwrite existing evidence directories. Use new output paths when repeating. For an individual case, use the observer directly; e.g. final wide test:
 
 ```bash
-ROS_DOMAIN_ID=133 python3 docs/validation/v2_tracking_gazebo.py \
+ROS_DOMAIN_ID=133 python3 tools/validation/v2_tracking_gazebo.py \
   --case reactive --config config/reactive_tracking_oscillatory_aggressive.yaml \
   --strategy-config config/whole_body.yaml --physical-ground-truth --without-markers \
   --shoulder-posture --actuation-trace --duration 90 --settling-time 10 \
   --wall-timeout 300 --output /tmp/m02_wide_repeat
-python3 docs/validation/m02_metrics.py /tmp/m02_wide_repeat
+python3 tools/validation/m02_metrics.py /tmp/m02_wide_repeat
 ```
 
 Add `--before-m02-actuation` for the archived pre-fix actuator reproduction. That option loads the archived reference/adapter source only in the observational validation wrapper; normal launch always uses production code. Safety-check failures return a nonzero exit code and are retained as failures even when capture completes.
@@ -310,14 +310,14 @@ Product regression command:
 ```bash
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros -q \
   -k 'not flake8 and not pep257 and not copyright'
-PYTHONPATH="$PWD/docs/validation:$PYTHONPATH" python3 -m pytest \
-  docs/validation/test_m02_metrics.py docs/validation/test_shoulder_experiment_metrics.py \
+PYTHONPATH="$PWD/tools/validation:$PYTHONPATH" python3 -m pytest \
+  tools/validation/test_m02_metrics.py tools/validation/test_shoulder_experiment_metrics.py \
   --import-mode=importlib -p no:launch_testing -p no:launch_ros -q
 ```
 
 ## Changed files and remaining limitations
 
-The exact M02 source/test/document list is [m02_modified_files.txt](validation/m02_modified_files.txt); prior dirty workspace work is retained and is not claimed as M02 work. Raw outputs and logs live under `validation/m02_*`. The approved user launch and its surviving Gazebo child were stopped for the final controlled tests; no unrelated processes were terminated. No commit or push was made.
+The exact M02 source/test/document list is [m02_modified_files.txt](../results/validation/m02_modified_files.txt); prior dirty workspace work is retained and is not claimed as M02 work. Raw outputs and logs live under `validation/m02_*`. The approved user launch and its surviving Gazebo child were stopped for the final controlled tests; no unrelated processes were terminated. No commit or push was made.
 
 Open limitations: physical speed acceptance; unconstrained estimator behavior near a hard stop and existing out-of-order rejection; no general self-collision avoidance; process-local fault persistence; sampled rather than physics-step safety observations; unmeasured actual motor effort; and reference-envelope discontinuities deliberately produce a diagnosed safe hold rather than an automatic resynchronization outside this narrow boundary-recovery policy. Successful tracking of every wide target pose is not asserted.
 

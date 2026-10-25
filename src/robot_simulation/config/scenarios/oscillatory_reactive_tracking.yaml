@@ -1,0 +1,53 @@
+# Oscillatory reactive deployment; physical and algorithm parameters remain with their owners.
+paths:
+  base: package
+world:
+  source: worlds/tracking_testbed.sdf.xacro
+  terrain_config: config/terrain/flat.yaml
+  output_name: world.sdf
+  physics:
+    engine: dartsim_recovery
+    max_step_size: 0.002
+    real_time_factor: 1.0
+  system_plugins:
+  - filename: gz-sim-physics-system
+    name: gz::sim::systems::Physics
+  - filename: gz-sim-user-commands-system
+    name: gz::sim::systems::UserCommands
+  - filename: gz-sim-scene-broadcaster-system
+    name: gz::sim::systems::SceneBroadcaster
+target:
+  config: config/scenarios/target_3d.yaml
+  entity_name: target
+  initial_position:
+  - 2.0
+  - 0.25
+  - 1.0
+  initial_velocity:
+  - 0.0
+  - 0.1
+  - -0.12
+robot:
+  enabled: true
+  config: config/gazebo/robot.yaml
+  joint_position_hold: config/gazebo/joint_position_hold.yaml
+tracking:
+  source: tf
+  position:
+  - 0.0
+  - 0.0
+  - 1.0
+  reference_frame: world
+  tracking_frame: tracking_frame
+  max_age: 0.2
+  future_tolerance: 0.01
+simulation:
+  config: config/simulation.yaml
+  environment_config: config/scenarios/environment_oscillatory.yaml
+  measurement_config: config/measurements.yaml
+gazebo:
+  gui: true
+  start_running: true
+  clock_topic: /clock
+  pose_service_template: /world/{world}/set_pose
+  pose_service_type: ros_gz_interfaces/srv/SetEntityPose

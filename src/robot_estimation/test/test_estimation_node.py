@@ -388,3 +388,31 @@ def test_disabled_localization_preserves_legacy_subscriptions(node):
     node._create_subscriptions()
     assert '/localization/odometry' not in subscriptions
     assert len(subscriptions)==4
+
+
+def test_robust_localization_withholds_full_state_until_trusted_and_after_timeout(node):
+    from robot_estimation.robot.planar_pose import PoseAcceptance
+    node._robot_estimator._pose_acceptance=PoseAcceptance(5,4,.3,.8,.35,3.)
+    node._wheel_odometry_callback(wheel_message())
+    node._joint_state_callback(joint_message())
+    assert not node.robot_messages
+    policy=node._robot_estimator._pose_acceptance
+    policy.commit(10.)
+    node._publish_robot_state()
+    assert len(node.robot_messages)==1
+    node.test_now=10.4
+    node._publish_robot_state()
+    assert len(node.robot_messages)==1
+    assert policy.mode=='degraded'
+
+
+def test_clock_reset_recreates_consensus_and_discards_old_reference(node):
+    node._pose_policy_parameters=dict(localization_enabled=True,localization_nis_limit=11.345,
+        localization_consensus_window=5,localization_consensus_inliers=4,
+        localization_consensus_span=.3,localization_consensus_max_age=.8,
+        localization_trust_timeout=.35,localization_recovery_nis_target=3.)
+    node._robot_estimator=node._create_robot_estimator()
+    node._robot_estimator._pose_acceptance.commit(10.)
+    node._on_time_jump(None)
+    assert not node._robot_estimator.localization_health(.1)['trusted']
+    assert not node._robot_estimator._pose_acceptance.history

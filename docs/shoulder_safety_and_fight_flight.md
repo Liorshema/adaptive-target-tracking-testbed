@@ -172,7 +172,7 @@ issue was corrected and its package suite rerun successfully. `git diff --check`
 passed. Control algorithms, gains, estimation, prediction and actuator safety
 implementation were preserved.
 
-Raw evidence and results are in `docs/validation/shoulder_reactive_verified`,
+Raw evidence and results are in `results/validation/shoulder_reactive_verified`,
 `shoulder_reactive_low_damping`, and `shoulder_normal_v2_final`.
 `shoulder_fight_flight_comparison.json` recomputes the reactive comparison from
 raw streams. Initial observation attempts had native JSON timestamp/serialization
@@ -209,25 +209,25 @@ rviz2 -d install/robot_bringup/share/robot_bringup/config/tracking_axes.rviz \
 Use separate terminals for the two viewers. Headless reproduction and analysis:
 
 ```bash
-python3 docs/validation/v2_tracking_gazebo.py --case reactive \
+python3 tools/validation/v2_tracking_gazebo.py --case reactive \
   --config config/reactive_tracking.yaml --physical-ground-truth --shoulder-posture \
   --duration 40 --output /tmp/shoulder_baseline
-python3 docs/validation/v2_tracking_gazebo.py --case reactive \
+python3 tools/validation/v2_tracking_gazebo.py --case reactive \
   --config config/reactive_tracking_low_damping.yaml --physical-ground-truth --shoulder-posture \
   --duration 40 --output /tmp/shoulder_experiment
-python3 docs/validation/compare_shoulder_experiments.py \
+python3 tools/validation/compare_shoulder_experiments.py \
   --baseline /tmp/shoulder_baseline --experiment /tmp/shoulder_experiment \
   --output /tmp/shoulder_comparison.json
-python3 docs/validation/v2_tracking_gazebo.py --case v2 \
+python3 tools/validation/v2_tracking_gazebo.py --case v2 \
   --physical-ground-truth --shoulder-posture --output /tmp/shoulder_normal
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros \
   -q -k 'not flake8 and not pep257 and not copyright'
-python3 -m pytest docs/validation/test_shoulder_experiment_metrics.py \
+python3 -m pytest tools/validation/test_shoulder_experiment_metrics.py \
   -p no:launch_testing -p no:launch_ros -q
 ```
 
 The validator returns nonzero on measured-speed violations and retains its
 metrics; the analyzer reports these failures rather than treating the experiment
 as passing. The exact task-specific edited-file list is
-[shoulder_fight_flight_modified_files.txt](validation/shoulder_fight_flight_modified_files.txt).
+[shoulder_fight_flight_modified_files.txt](../results/validation/shoulder_fight_flight_modified_files.txt).
 Previous uncommitted work and evidence were preserved. No commit or push was made.

@@ -1,0 +1,8 @@
+# Preserve the historical study identity, seeds, metrics, timing and strict comparison policy.
+extends: paired_prediction.yaml
+experiment:
+  variants:
+    - name: imm
+      system_config: {package: robot_bringup, path: config/systems/nominal_tracking.yaml}
+    - name: cv
+      system_config: {package: robot_bringup, path: config/systems/cv_prediction.yaml}

@@ -1,9 +1,0 @@
-docs/m04_m05_performance_control_acceptance.md
-docs/validation/m04_m05_baseline.json
-docs/validation/m04_m05_baseline.log
-docs/validation/m04_m05_baseline.py
-docs/validation/m04_m05_evidence_verification.log
-docs/validation/m04_m05_focused_tests.log
-docs/validation/m04_m05_focused_tests_command.txt
-docs/validation/m04_m05_modified_files.txt
-docs/validation/m04_m05_source_hashes.json

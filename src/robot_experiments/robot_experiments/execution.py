@@ -199,6 +199,7 @@ class OwnedLaunch:
             raise ValueError('grace must be finite and nonnegative')
         started = time.monotonic()
         signals = []
+        phases = []
         if self.process is None:
             return {'returncode': None, 'survivors': [], 'signals': [], 'elapsed': 0.0}
         # Each phase has a share of a single bounded shutdown budget.
@@ -208,7 +209,14 @@ class OwnedLaunch:
             if not alive:
                 break
             signals.append(signum.name)
-            for candidate in alive:
+            # Launch owns graceful child ordering. Only bypass it if the owner
+            # has already exited or its bounded graceful phase did not finish.
+            recipients = alive
+            if signum == signal.SIGINT and self.process.poll() is None:
+                recipients = [p for p in alive if p.pid == self.process.pid]
+            phases.append({'signal': signum.name, 'recipients': [
+                {'pid': p.pid, 'created': self._known[p.pid]} for p in recipients]})
+            for candidate in recipients:
                 try:
                     candidate.send_signal(signum)
                 except psutil.Error:
@@ -227,7 +235,7 @@ class OwnedLaunch:
         if self._output is not None:
             self._output.close()
         return {'returncode': returncode, 'survivors': survivors, 'signals': signals,
-                'elapsed': time.monotonic() - started}
+                'phases': phases, 'elapsed': time.monotonic() - started}
 
 
 def run_window(process, recorder, *, required_streams: list, duration: float,

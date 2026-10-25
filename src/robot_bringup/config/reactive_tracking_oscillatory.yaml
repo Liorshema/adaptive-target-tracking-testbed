@@ -1,3 +1,3 @@
 extends: reactive_tracking_3d.yaml
 
-simulation_config: config/scenarios/reactive_target_oscillatory.yaml
+simulation_config: config/scenarios/oscillatory_reactive_tracking.yaml

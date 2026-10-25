@@ -56,7 +56,7 @@ Errors below use native Gazebo base/wrist poses composed with the authoritative 
 
 Compared with 3D/original, ×2 base penalties reduce base travel **17.0%**, increase arm-yaw travel **51.7%**, and change shoulder/elbow/wrist travel by **+3.6% / −0.3% / +3.6%**. Net base displacement is .245 m versus .244 m; reduced path length does not imply reduced net displacement. More elbow/wrist articulation is not established by this modest reallocation. The ×4 trial increased all arm travel substantially but worsened wrist overspeed. Neither setting meets the no-increased-physical-speed-violation requirement, so the longer run retains original weights.
 
-Maximum target displacement from configured start was .506 m saturated-after, .518 m 3D/original, and .410 m ×2. Maximum displacement from the centering field stayed below .356 m in these short runs. Full precision metrics, per-joint excess-speed duration estimates, net displacement, and ten-second XYZ windows are in [reactive_v3_comparison.json](validation/reactive_v3_comparison.json).
+Maximum target displacement from configured start was .506 m saturated-after, .518 m 3D/original, and .410 m ×2. Maximum displacement from the centering field stayed below .356 m in these short runs. Full precision metrics, per-joint excess-speed duration estimates, net displacement, and ten-second XYZ windows are in [reactive_v3_comparison.json](../results/validation/reactive_v3_comparison.json).
 
 **Long run through the permanent launch**
 
@@ -80,7 +80,7 @@ Maximum target displacement from configured start was .506 m saturated-after, .5
 | Accepted / rejected commands / timeout events | 1797 / 0 / 0 |
 | Reference-limit / feedback-rejection / inactive events | 4 / 1 / 2; existing guards retained |
 
-The added force changes vertical motion and the equilibrium location, but **persistent substantial 3D excitation fails**: Y largely settles to an offset, while X dominates. A constant circulation force relative to a nearly fixed camera-target direction can balance the centering force. Merely adding this tangent does not guarantee an orbit. [XYZ traces](validation/reactive_v3_xyz.png) show that limitation rather than hiding it with scaled animation.
+The added force changes vertical motion and the equilibrium location, but **persistent substantial 3D excitation fails**: Y largely settles to an offset, while X dominates. A constant circulation force relative to a nearly fixed camera-target direction can balance the centering force. Merely adding this tangent does not guarantee an orbit. [XYZ traces](../results/validation/reactive_v3_xyz.png) show that limitation rather than hiding it with scaled animation.
 
 **Performance diagnosis and the single optimization**
 
@@ -133,9 +133,9 @@ For saturated baseline use `config:=config/reactive_tracking_saturated.yaml`. Fo
 Reproduce the direct long observation (a nonzero exit is expected for physical speed failures):
 
 ```bash
-python3 docs/validation/v2_tracking_gazebo.py --case v2 --config config/reactive_tracking_3d.yaml --strategy-config config/whole_body.yaml --physical-ground-truth --shoulder-posture --duration 90 --wall-timeout 260 --output /tmp/reactive_v3_check
+python3 tools/validation/v2_tracking_gazebo.py --case v2 --config config/reactive_tracking_3d.yaml --strategy-config config/whole_body.yaml --physical-ground-truth --shoulder-posture --duration 90 --wall-timeout 260 --output /tmp/reactive_v3_check
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros -q -k 'not flake8 and not pep257 and not copyright'
-MPLCONFIGDIR=/tmp/reactive-v3-matplotlib python3 docs/validation/analyze_reactive_v3.py
+MPLCONFIGDIR=/tmp/reactive-v3-matplotlib python3 tools/validation/analyze_reactive_v3.py
 ```
 
 **Exact source/config/test/document changes for this task**
@@ -150,10 +150,10 @@ MPLCONFIGDIR=/tmp/reactive-v3-matplotlib python3 docs/validation/analyze_reactiv
 8. `src/robot_control/config/whole_body_arm_preferred.yaml`
 9. `src/robot_models/robot_models/common/rotations.py`
 10. `src/robot_models/test/test_rotation_validation.py`
-11. `docs/validation/v2_tracking_gazebo.py` — reusable strategy/GUI/profile selection, correct selected-weight snapshot/cost, and estimate/prediction rate observations.
-12. `docs/validation/control_compute_profile.py`
-13. `docs/validation/analyze_reactive_v3.py`
-14. `docs/validation/reactive_v3_modified_files.txt`
+11. `tools/validation/v2_tracking_gazebo.py` — reusable strategy/GUI/profile selection, correct selected-weight snapshot/cost, and estimate/prediction rate observations.
+12. `tools/validation/control_compute_profile.py`
+13. `tools/validation/analyze_reactive_v3.py`
+14. `results/validation/reactive_v3_modified_files.txt`
 15. `docs/reactive_tracking_v3.md`
 
-Generated evidence is under `docs/validation/v3_*`, plus `reactive_v3_comparison.json`, `reactive_v3_analysis_console.log` and `reactive_v3_xyz.png`. Resolved configuration snapshots preserve both rejected weight sets; archived launch paths describe their original recording locations. Earlier uncommitted work and validation artifacts were preserved.
+Generated evidence is under `results/validation/v3_*`, plus `reactive_v3_comparison.json`, `reactive_v3_analysis_console.log` and `reactive_v3_xyz.png`. Resolved configuration snapshots preserve both rejected weight sets; archived launch paths describe their original recording locations. Earlier uncommitted work and validation artifacts were preserved.

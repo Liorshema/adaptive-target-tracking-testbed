@@ -9,7 +9,7 @@ import rclpy
 
 from geometry_msgs.msg import PointStamped
 from nav_msgs.msg import Odometry
-from robot_simulation.state.physical_context import PhysicalPositionHistory
+from robot_simulation.state.physical_context import PhysicalPositionHistory, ContextUnavailable
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -86,6 +86,7 @@ class SimulationNode(Node):
 
         self._declare_parameters()
         self.declare_parameter("physical_base_max_age", .2)
+        self.declare_parameter('context_history_capacity', Parameter.Type.INTEGER)
 
         target_config = load_yaml(
             required_string(self, "target_config")
@@ -160,6 +161,7 @@ class SimulationNode(Node):
                 history_duration=(self._context_history_duration
                     + self.get_parameter('physical_base_max_age').value
                     if engine.dynamics.environment_field.context_requirements else None),
+                history_capacity=self.get_parameter('context_history_capacity').value,
             )
 
         self._physical_history = None
@@ -169,7 +171,8 @@ class SimulationNode(Node):
             self._physical_history = PhysicalPositionHistory(
                 self._reference_frame, topic, self.get_parameter('physical_base_max_age').value,
                 history_duration=self._context_history_duration
-                + self.get_parameter('physical_base_max_age').value)
+                + self.get_parameter('physical_base_max_age').value,
+                capacity=self.get_parameter('context_history_capacity').value)
             self.create_subscription(Odometry, topic, self._on_physical_base, 30)
             if self._tracking_provider is None:
                 raise ValueError('contextual guidance requires live tracking TF')
@@ -177,6 +180,7 @@ class SimulationNode(Node):
         self._epoch = 0
         self._state: SimulationState | None = None
         self._pending = False
+        self._pending_since = None
 
         self._adapter = GazeboTargetAdapter()
         self._pose_client = GazeboPoseClient(
@@ -376,23 +380,32 @@ class SimulationNode(Node):
         pose = message.pose.pose.position
         timestamp = stamp.sec+stamp.nanosec*1e-9
         now = self.get_clock().now().nanoseconds*1e-9
-        # Old-epoch messages after reset must not poison the monotonic history.
-        if timestamp > now + self.get_parameter('tracking_future_tolerance').value:
+        if timestamp < 0:
             return
         try:
             self._physical_history.add(
                 np.array([pose.x, pose.y, pose.z]), timestamp,
-                message.header.frame_id)
+                message.header.frame_id, receipt_time=now)
         except ValueError as error:
             self.get_logger().error(f'Invalid physical base feedback: {error}')
 
     def _refresh_physical_context(self, current):
         """Select only source samples preceding each integration substep."""
         base = self._physical_history.at(current.time)
-        camera = self._tracking_provider.position_at(current.time, refresh=False)
+        camera = self._tracking_provider.position_at(
+            current.time, refresh=False, valid_until=current.time+self._dt)
         if base is None or camera is None:
-            raise ValueError(f'Physical context unavailable at t={current.time:.6f}')
+            raise ContextUnavailable(f'Physical context unavailable at t={current.time:.6f}')
+        base.position_at(current.time+self._dt, self._reference_frame)
         return replace(current, physical_base=base, tracking_position_world=camera)
+
+    def _report_context_wait(self, waiting, now):
+        """Log context transitions without rebroadcasting an old target state."""
+        if waiting != getattr(self, '_context_waiting', False):
+            self.get_logger().info(f'Target context {"waiting" if waiting else "available"}: '
+                f'epoch={self._epoch}, state_time={None if self._state is None else self._state.time}, '
+                f'clock={now:.6f}')
+        self._context_waiting = waiting
 
     def _on_clock(self, message: Clock) -> None:
         """Advance the target to the current Gazebo time."""
@@ -411,10 +424,22 @@ class SimulationNode(Node):
                 self._tracking_provider.clear_history()
             self._state = None
             self._epoch += 1
+            self._context_waiting = False
             self._last_measurement_time = None
+            if self._pending:
+                self._pending_since = now
         self._last_clock = now
+        time_tolerance = 16 * np.spacing(max(abs(now), 1.))
         if self._pending:
+            if now - self._pending_since > self._context_history_duration + time_tolerance:
+                raise RuntimeError('Target pose acknowledgement exceeded integration lookback; terminating run')
             return
+
+        if (self._state is not None
+                and now - self._state.time > self._context_history_duration + time_tolerance):
+            raise RuntimeError(
+                f'Irrecoverable target context/time gap: state={self._state.time:.6f}, '
+                f'clock={now:.6f}; terminating run without reinitializing target')
 
         try:
             sample_time = self._state.time if self._state is not None else now
@@ -423,6 +448,7 @@ class SimulationNode(Node):
                 physical_base = self._physical_history.at(sample_time)
                 tracking_position = self._tracking_provider.position_at(sample_time)
                 if physical_base is None:
+                    self._report_context_wait(True, now)
                     return
             else:
                 tracking_position = self._read_tracking_position()
@@ -433,6 +459,7 @@ class SimulationNode(Node):
             return
 
         if tracking_position is None:
+            self._report_context_wait(True, now)
             return
 
         if self._state is None:
@@ -472,6 +499,7 @@ class SimulationNode(Node):
                 target_time=now,
                 refresh_context=(self._refresh_physical_context
                                  if self._physical_history is not None else None),
+                allow_partial=True,
             )
         except ValueError as error:
             self.get_logger().error(
@@ -479,10 +507,15 @@ class SimulationNode(Node):
             )
             return
 
+        self._report_context_wait(candidate.time < now - 1e-9, now)
+        if candidate.time <= self._state.time:
+            return
+
         pose = self._adapter.to_pose(candidate.target)
 
         try:
             self._pending = True
+            self._pending_since = now
             future = self._pose_client.send_pose(pose)
 
             future.add_done_callback(

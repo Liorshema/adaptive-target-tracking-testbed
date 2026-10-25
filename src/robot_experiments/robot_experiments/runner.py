@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import time
 
 import psutil
@@ -16,6 +17,7 @@ import yaml
 
 from .benchmarking import summarize
 from .configuration import materialize_run
+from .preparation import complete_preparation, _metric_definition_hash
 from .execution import DomainLease, OwnedLaunch, RunFailure, run_window
 from .metrics import evaluate
 from .reporting import create_study_directory, plain, write_json
@@ -92,11 +94,12 @@ def required_streams(plan, enabled):
     return required
 
 
-def run_one(spec,variant,seed,directory,share):
+def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False):
     from .recording import Recorder
     directory.mkdir()
     started=datetime.now(timezone.utc).isoformat()
     write_json(directory/'status.json',{'schema_version':1,'execution_status':'preparing','acceptance':None,'started_utc':started})
+    observer=None
     process=recorder=None;window=None;cleanup=None;error=None;metrics=None;actual={};availability={};events=[]
     metadata={'schema_version':1,'variant':variant['name'],'seed':seed,'started_utc':started,
               'git':_git(),'package_versions':_versions(share),
@@ -106,25 +109,34 @@ def run_one(spec,variant,seed,directory,share):
               'platform':{'system':os.uname().sysname,'release':os.uname().release,'cpu_count':os.cpu_count()},
               'artifacts':{'metrics':'metrics.json','time_series':'time_series.json','telemetry':'telemetry','log':'launch.log'}}
     comparison_contract=None
+    comparison=None
+    configuration_identity=None
+    prepared={}
     try:
         prepared=materialize_run(variant,seed,directory,share,spec['runtime'],
             record_actuator_trace=spec['execution']['record_actuator_trace'])
+        complete_preparation(spec, prepared, metadata['git'].get('worktree_source_sha256'))
         context=prepared['context'];plan=prepared['plan']
-        context['readiness_max_age']=spec['execution']['max_skew']
-        comparison_contract={**prepared['comparison_contract'],'duration':spec['duration'],'settling_time':spec['settling_time'],
-          'max_skew':spec['execution']['max_skew'],'physical_tolerance':context['physical_numerical_tolerance'],
-          'enable_actuation':spec['runtime']['enable_actuation']}
+        comparison_contract=prepared['comparison_contract']
+        comparison=prepared['comparison']
+        configuration_identity=prepared['configuration_identity']
         metadata.update(expected_component_types=plan['identities'],seed_consumers=prepared['snapshot']['seed_consumers'],
                         reproducibility=prepared['snapshot']['reproducibility'])
         write_json(directory/'resolved_configuration.json',{'experiment':{k:v for k,v in spec.items() if k!='variants'},
-          'system':plan,'context':context,'owner_snapshot':prepared['snapshot'],'comparison_contract':comparison_contract})
+          'system':plan,'context':context,'owner_snapshot':prepared['snapshot'],
+          'comparison_contract':comparison_contract, 'comparison': comparison})
         with DomainLease(log_dir=directory/'ros-log') as lease:
             metadata['isolation']={'ros_domain_id':lease.domain_id,'gazebo_partition':lease.partition}
             # rclpy owns a private Context, but its domain/log configuration comes from the environment.
             old={k:os.environ.get(k) for k in ['ROS_DOMAIN_ID','GZ_PARTITION','GZ_IP','ROS_LOG_DIR']}
             try:
                 os.environ.update({k:lease.env[k] for k in old})
-                recorder=Recorder(context,directory/'telemetry')
+                if observer_diagnostics:
+                    from .recording.observer_timing import ObserverTiming
+                    observer=ObserverTiming(directory/'diagnostics', context['topics'])
+                    recorder=Recorder(context,directory/'telemetry',diagnostics=observer)
+                else:
+                    recorder=Recorder(context,directory/'telemetry')
                 # Refuse a domain already publishing a source stream before owning a launch.
                 probe_deadline=time.monotonic()+.35
                 while time.monotonic()<probe_deadline:recorder.spin_once(.02)
@@ -168,15 +180,37 @@ def run_one(spec,variant,seed,directory,share):
                 if cleanup['survivors']:raise RunFailure('cleanup_failed',cleanup)
                 metrics=evaluate(recorder.streams,context,window['window_start'],window['window_end'],spec['execution']['max_skew'])
             finally:
-                if process is not None and cleanup is None:cleanup=process.stop(spec['execution']['shutdown_timeout'])
-                if recorder is not None:
-                    availability=recorder.availability;events=recorder.events
-                    recorder.close()
-                for k,value in old.items():
-                    if value is None:os.environ.pop(k,None)
-                    else:os.environ[k]=value
+                try:
+                    if process is not None and cleanup is None:cleanup=process.stop(spec['execution']['shutdown_timeout'])
+                    if recorder is not None:
+                        availability=recorder.availability;events=recorder.events
+                        if observer is None:
+                            recorder.close()
+                        else:
+                            primary=sys.exception()
+                            try:recorder.close()
+                            except Exception as close_error:
+                                observer.failed(close_error)
+                                if primary is None:raise
+                finally:
+                    for k,value in old.items():
+                        if value is None:os.environ.pop(k,None)
+                        else:os.environ[k]=value
     except (Exception,KeyboardInterrupt) as exc:
         error={'type':type(exc).__name__,'code':'interrupted' if isinstance(exc,KeyboardInterrupt) else getattr(exc,'code','exception'),'message':str(exc),'details':getattr(exc,'details',{})}
+    if observer is not None:
+        try:
+            diagnostic=observer.finalize(complete=error is None,error=error)
+            if observer.failure is not None and error is None:
+                error={'type':'RuntimeError','code':'observer_diagnostics_failed',
+                       'message':observer.failure,'details':{}}
+            metadata['observer_diagnostics']={'artifact':'diagnostics/observer_timing.json',
+                'complete':diagnostic['complete'],'failure':observer.failure}
+        except Exception as diagnostic_error:
+            metadata['observer_diagnostics']={'complete':False,'failure':str(diagnostic_error)}
+            if error is None:error={'type':type(diagnostic_error).__name__,
+                'code':'observer_diagnostics_failed','message':str(diagnostic_error),'details':{}}
+    comparison_contract=prepared.get('comparison_contract', comparison_contract)
     accepted,gates=_acceptance(metrics,spec['runtime']['enable_actuation']) if metrics else (None,{})
     if metrics:
         time_series=metrics.pop('time_series')
@@ -190,12 +224,14 @@ def run_one(spec,variant,seed,directory,share):
       'acceptance_gates':gates,'safety_status':metrics['safety'] if metrics else {'accepted':None,'reason':'evaluation unavailable'},
       'started_utc':started,'ended_utc':datetime.now(timezone.utc).isoformat(),'window':window,'error':error,'cleanup':cleanup}
     write_json(directory/'status.json',status)
+    write_json(directory/'comparison.json', comparison)
     return {'variant':variant['name'],'seed':seed,'execution_status':status['execution_status'],'acceptance':accepted,
        'comparison_contract':hashlib.sha256(json.dumps(plain(comparison_contract),sort_keys=True).encode()).hexdigest(),
+       'comparison':comparison, 'configuration_identity':configuration_identity,
        'metrics':metrics or {},'artifacts':str(Path('runs')/directory.name),'status':status}
 
 
-def run_experiment(spec,share):
+def run_experiment(spec,share,*,observer_diagnostics=False):
     directory=create_study_directory(spec['output']['directory'],spec['name'])
     shutil.copyfile(spec['source'],directory/'experiment.yaml')
     write_json(directory/'resolved_experiment.json',spec)
@@ -203,9 +239,14 @@ def run_experiment(spec,share):
     runs=[]
     for seed in spec['seeds']:
         for variant in spec['variants']:
-            run=run_one(spec,variant,seed,directory/'runs'/f'{variant["name"]}_seed{seed}',share)
+            if observer_diagnostics:
+                run=run_one(spec,variant,seed,directory/'runs'/f'{variant["name"]}_seed{seed}',share,
+                            observer_diagnostics=True)
+            else:
+                run=run_one(spec,variant,seed,directory/'runs'/f'{variant["name"]}_seed{seed}',share)
             runs.append(run)
-            summary=summarize(runs,[v['name'] for v in spec['variants']],spec['seeds'])
+            summary=summarize(runs,[v['name'] for v in spec['variants']],spec['seeds'],
+                              comparison_policy=spec.get('comparison'), experiment_name=spec['name'])
             summary['runs']=runs;write_json(directory/'summary.json',summary)
             interrupted=(run.get('status',{}).get('error') or {}).get('type')=='KeyboardInterrupt'
             if interrupted or (run['execution_status']=='failed' and spec['execution']['failure_policy']=='abort'):break

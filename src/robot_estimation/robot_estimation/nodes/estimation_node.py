@@ -17,7 +17,8 @@ from rclpy.clock import JumpThreshold
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-from robot_estimation.parameter_schema import PARAMETERS, LOCALIZATION_PARAMETERS
+from robot_estimation.parameter_schema import (
+    PARAMETERS, LOCALIZATION_PARAMETERS, POSE_POLICY_PARAMETERS)
 from robot_estimation.robot.planar_pose import transform_observation
 from scipy.spatial.transform import Rotation
 from rclpy.time import Time
@@ -121,10 +122,16 @@ class EstimationNode(Node):
         for name, kind in LOCALIZATION_PARAMETERS.items():
             default = (False if name == 'localization_enabled' else 0.
                        if name in ['planar_slip_noise_std', 'yaw_slip_noise_std'] else getattr(Parameter.Type, kind))
+            if name in POSE_POLICY_PARAMETERS:
+                default = 0 if kind == 'INTEGER' else 0.
             self.declare_parameter(name, default)
         self._localization_enabled = self.get_parameter('localization_enabled').value
         self._slip_parameters = {name: self.get_parameter(name).value
                                 for name in ['planar_slip_noise_std', 'yaw_slip_noise_std']}
+        self._pose_policy_parameters = {name: self.get_parameter(name).value for name in POSE_POLICY_PARAMETERS}
+        self._pose_policy_parameters['localization_enabled'] = self._localization_enabled
+        if self._pose_policy_parameters['localization_consensus_window'] > 0:
+            self._pose_policy_parameters['localization_nis_limit'] = self.get_parameter('localization_nis_limit').value
         missing = [
             name for name in self._PARAMETERS
             if self.get_parameter(name).value is None
@@ -154,6 +161,7 @@ class EstimationNode(Node):
         """Resolve the physical description and delegate pure filter assembly."""
         parameters = {name: self.get_parameter(name).value for name in self._PARAMETERS}
         parameters.update(getattr(self, '_slip_parameters', {}))
+        parameters.update(getattr(self, '_pose_policy_parameters', {}))
         physical = None
         if parameters['joint_bounds_enabled']:
             path = parameters['robot_description_file']
@@ -482,10 +490,15 @@ class EstimationNode(Node):
             'raw_joint_time': self._raw_joint_time,
         }
         if getattr(self, '_localization_enabled', False):
+            health = self._robot_estimator.localization_health(data['time'])
             data['localization'] = {**self._robot_estimator.pose_diagnostics,
+                **health,
+                'estimate_time': state.timestamp,
+                'estimate_pose': state.mean[:3].tolist(),
+                'pose_covariance': state.covariance[:3, :3].tolist(),
+                'withheld_full_states': getattr(self, '_localization_withheld', 0),
                 'last_accepted_time': self._last_localization_time,
-                'available': self._last_localization_time is not None and
-                    data['time'] - self._last_localization_time <= self.get_parameter('localization_max_age').value}
+                'available': health['trusted'] and self._last_localization_time is not None}
         if constraint is not None:
             data['joint_bounds'] = {
                 'physical_valid': constraint.physical_valid,
@@ -545,6 +558,9 @@ class EstimationNode(Node):
         # A fresh aggregate filter timestamp alone does not prove all
         # configuration components have been observed recently.
         now = self.get_clock().now().nanoseconds * 1e-9
+        if not self._robot_estimator.localization_health(now)['trusted']:
+            self._localization_withheld = getattr(self, '_localization_withheld', 0)+1
+            return
         for name, timestamp, max_age in [
             ('wheel odometry', self._last_wheel_time,
              float(self.get_parameter('max_wheel_odometry_age').value)),
@@ -635,12 +651,16 @@ def main(args=None) -> None:
     ROS 2 node entry point.
     """
     rclpy.init(args=args)
-    node = EstimationNode()
+    node = None
     try:
+        node = EstimationNode()
         rclpy.spin(node)
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

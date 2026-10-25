@@ -2,20 +2,23 @@
 """Launch the simulation from an external YAML configuration."""
 
 from pathlib import Path
+import math
 import tempfile
+import xml.etree.ElementTree as ET
 
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    IncludeLaunchDescription,
+    ExecuteProcess,
+    RegisterEventHandler,
     OpaqueFunction,
 )
-from launch.launch_description_sources import (
-    PythonLaunchDescriptionSource,
-)
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, FindExecutable
+from launch.event_handlers import OnProcessExit
+from launch.actions import EmitEvent
+from launch.events import Shutdown
 from launch_ros.actions import Node
 
 from robot_configuration.yaml_loader import load_yaml
@@ -84,7 +87,7 @@ def configure(context):
     integration_data = load_yaml(resolve_path(cfg['simulation']['config']))
     validate_deployment_configuration(cfg, target_data, environment_data, integration_data,
                                      load_yaml(resolve_path(cfg['simulation']['measurement_config'])))
-    SimulationFactory.with_defaults().create(target_data, environment_data, integration_data)
+    _, integration_dt = SimulationFactory.with_defaults().create(target_data, environment_data, integration_data)
 
     sensor_path = None
     sensor = None
@@ -139,32 +142,23 @@ def configure(context):
         models=[] if robot_model is None else [robot_model],
         physics=world_cfg.get('physics'),
     )
-
-    # Start Gazebo.
-    gz_share = Path(
-        get_package_share_directory("ros_gz_sim")
-    )
-
-    gz_args = str(world_path)
-
-    if gazebo_cfg["start_running"]:
-        gz_args = "-r " + gz_args
+    # Read the effective world step, including the existing source-world value
+    # when the optional deployment physics override is absent.
+    physical_step = float(ET.parse(world_path).getroot().find(
+        'world/physics/max_step_size').text)
 
     gui_override = LaunchConfiguration('gui').perform(context).lower()
     if gui_override not in ['', 'true', 'false']:
         raise ValueError('gui must be true or false')
     gui_enabled = gazebo_cfg['gui'] if not gui_override else gui_override == 'true'
-    if not gui_enabled:
-        gz_args = "-s " + gz_args
-
-    gazebo = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            str(gz_share / "launch" / "gz_sim.launch.py")
-        ),
-        launch_arguments={
-            "gz_args": gz_args,
-        }.items(),
-    )
+    # Supervise the actual headless server, without ros_gz's shell wrapper.
+    # Separate GUI mode avoids the vendor CLI's forked server/GUI pair too.
+    gazebo = ExecuteProcess(
+        cmd=[FindExecutable(name='gz'), 'sim', '-s',
+             *(['-r'] if gazebo_cfg['start_running'] else []),
+             str(world_path)], name='gazebo_server', output='screen')
+    gui = (ExecuteProcess(cmd=[FindExecutable(name='gz'), 'sim', '-g'],
+                          name='gazebo_gui', output='screen') if gui_enabled else None)
 
     # Gazebo service and clock bridge.
     pose_service = gazebo_cfg[
@@ -265,6 +259,12 @@ def configure(context):
                 'physical_base_max_age': .2 if not physical_context else physical_context['max_age'],
                 'tracking_max_age': tracking_cfg.get('max_age', 0.2),
                 'tracking_future_tolerance': tracking_cfg.get('future_tolerance', 0.01),
+                # Sources cannot acquire more than once per physical step.
+                # Include the maximum integration lookback plus sample freshness.
+                'context_history_capacity': math.ceil((
+                    integration_dt * integration_data['simulation']['integration']['max_steps']
+                    + 2 * max(tracking_cfg['max_age'], cfg.get('physical_context', {}).get('max_age', 0.)))
+                    / physical_step) + 2,
             }
         ],
     )
@@ -273,7 +273,11 @@ def configure(context):
     if sensor and sensor['enabled']:
         nodes.append(Node(package='robot_simulation', executable='localization_sensor',
             parameters=[{'use_sim_time': True, 'configuration_file': str(sensor_path)}], output='screen'))
-    return nodes
+    essential = [node for node in nodes if isinstance(node, (Node, ExecuteProcess))]
+    guards = [RegisterEventHandler(OnProcessExit(target_action=node, on_exit=[
+        EmitEvent(event=Shutdown(reason='Essential simulation process exited'))]))
+        for node in essential]
+    return [*guards, *nodes, *([gui] if gui is not None else [])]
 
 
 def generate_launch_description():

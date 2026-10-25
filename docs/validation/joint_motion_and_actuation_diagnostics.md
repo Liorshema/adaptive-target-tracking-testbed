@@ -4,7 +4,7 @@
 
 ## Reproducible evidence and alignment
 
-Derived data: [complete JSON, source hashes and event traces](m09_refinement_joint_20261018.json). From the workspace, source `install/setup.bash` and run `MPLCONFIGDIR=/tmp/m09_joint_matplotlib python3 docs/validation/m09_joint_diagnostics.py --output-prefix results/m09_joint_diagnostics_repeat/diagnostics`. Choose a fresh prefix on subsequent runs; the CLI refuses to overwrite existing evidence. The reusable pure math is in `robot_experiments.metrics.joint_diagnostics`; 11 analytical fixtures cover irregular integration, gaps, limits/tolerance, causal alignment, joint-name reordering, quaternion rotation, reset epochs and invalid samples.
+Derived data: [complete JSON, source hashes and event traces](../../results/validation/m09_refinement_joint_20261018.json). From the workspace, source `install/setup.bash` and run `MPLCONFIGDIR=/tmp/m09_joint_matplotlib python3 tools/validation/m09_joint_diagnostics.py --output-prefix results/m09_joint_diagnostics_repeat/diagnostics`. Choose a fresh prefix on subsequent runs; the CLI refuses to overwrite existing evidence. The reusable pure math is in `robot_experiments.metrics.joint_diagnostics`; 11 analytical fixtures cover irregular integration, gaps, limits/tolerance, causal alignment, joint-name reordering, quaternion rotation, reset epochs and invalid samples.
 
 Exact recorded directories, relative to workspace:
 
@@ -60,7 +60,7 @@ All received arm positions remain inside their description limits in these recor
 | cv_seed917 | 0.004–10.344 | 3.4761 | 1.9761 | 0.030 |
 | imm_seed917 | 0.004–10.738 | 2.3919 | 0.8919 | 0.016 |
 
-[CV42 joint time series](m09_refinement_joint_20261018_cv_seed42_joint_activity.png), [IMM42 joint time series](m09_refinement_joint_20261018_imm_seed42_joint_activity.png), [CV917 joint time series](m09_refinement_joint_20261018_cv_seed917_joint_activity.png), [IMM917 joint time series](m09_refinement_joint_20261018_imm_seed917_joint_activity.png). Plot lines break at feedback gaps >0.010 s. Description limits are red; classification uses the additional tolerance.
+[CV42 joint time series](../../results/validation/m09_refinement_joint_20261018_cv_seed42_joint_activity.png), [IMM42 joint time series](../../results/validation/m09_refinement_joint_20261018_imm_seed42_joint_activity.png), [CV917 joint time series](../../results/validation/m09_refinement_joint_20261018_cv_seed917_joint_activity.png), [IMM917 joint time series](../../results/validation/m09_refinement_joint_20261018_imm_seed917_joint_activity.png). Plot lines break at feedback gaps >0.010 s. Description limits are red; classification uses the additional tolerance.
 
 ## Command semantics and velocity discrepancy
 
@@ -109,7 +109,7 @@ No timeout, command rejection or feedback rejection counter increments occur wit
 
 The direction-changing target observations, estimate/prediction response and bounded wrist-command changes are temporally related. Across the six-second windows, Pearson correlations between controller-grid target-position step norm and raw-wrist command step magnitude are **0.037 (CV42), −0.028 (IMM42), 0.064 (CV917), 0.271 (IMM917)**. This descriptive test uses latest nonfuture estimates ≤0.15 s old; an estimate step is neither an actual Kalman correction nor an innovation. It cannot separate target motion, robot feedback, reference geometry or plant effects. The data support a potential upstream trigger for some requested transients and downstream physical amplification; they do not prove that estimator jaggedness causes every wrist spike or that Q/R retuning would solve overspeed.
 
-[CV917 event and all available pipeline signals](m09_refinement_joint_20261018_cv_seed917_wrist_event.png), [CV42 event](m09_refinement_joint_20261018_cv_seed42_wrist_event.png), [IMM42 event](m09_refinement_joint_20261018_imm_seed42_wrist_event.png), [IMM917 event](m09_refinement_joint_20261018_imm_seed917_wrist_event.png). The JSON retains additional events near ±1.5 rad/s that do **not** exceed the existing acceptance tolerance. IMM917's largest reported evaluation magnitude spans a 0.004 s feedback interval; the averaged q-difference is smaller, so that individual peak is less independently resolved. Its 5.844 s peak −1.53053 rad/s does match a contiguous 0.002 s position increment.
+[CV917 event and all available pipeline signals](../../results/validation/m09_refinement_joint_20261018_cv_seed917_wrist_event.png), [CV42 event](../../results/validation/m09_refinement_joint_20261018_cv_seed42_wrist_event.png), [IMM42 event](../../results/validation/m09_refinement_joint_20261018_imm_seed42_wrist_event.png), [IMM917 event](../../results/validation/m09_refinement_joint_20261018_imm_seed917_wrist_event.png). The JSON retains additional events near ±1.5 rad/s that do **not** exceed the existing acceptance tolerance. IMM917's largest reported evaluation magnitude spans a 0.004 s feedback interval; the averaged q-difference is smaller, so that individual peak is less independently resolved. Its 5.844 s peak −1.53053 rad/s does match a contiguous 0.002 s position increment.
 
 ## Base versus arm allocation
 
@@ -126,7 +126,7 @@ Requested RMS here is sample weighted at controller cadence; physical RMS integr
 
 The base travels **1.15–1.50 m** across six seconds despite only ~0.49–0.52 m maximum displacement from its first evaluation pose. It is not stationary in these motion-enabled runs. All wheels rotate: paired left/right RMS speeds are CV42 1.712/1.246, IMM42 1.859/1.576, CV917 2.224/1.546, IMM917 1.984/1.464 rad/s; front/rear values agree within each side. WLS requests substantial base motion, and raw/safe equality rules out additional high-level safety clipping as the explanation for low apparent base displacement in these intervals. Reversal/scenario requirements and imperfect physical tracking both matter. Angular/linear velocity components must not be combined into an unweighted norm to claim a percentage allocation.
 
-[CV917 base commands/feedback](m09_refinement_joint_20261018_cv_seed917_base_allocation.png), [CV42](m09_refinement_joint_20261018_cv_seed42_base_allocation.png), [IMM42](m09_refinement_joint_20261018_imm_seed42_base_allocation.png), [IMM917](m09_refinement_joint_20261018_imm_seed917_base_allocation.png).
+[CV917 base commands/feedback](../../results/validation/m09_refinement_joint_20261018_cv_seed917_base_allocation.png), [CV42](../../results/validation/m09_refinement_joint_20261018_cv_seed42_base_allocation.png), [IMM42](../../results/validation/m09_refinement_joint_20261018_imm_seed42_base_allocation.png), [IMM917](../../results/validation/m09_refinement_joint_20261018_imm_seed917_base_allocation.png).
 
 ## Supported conclusions and next action
 

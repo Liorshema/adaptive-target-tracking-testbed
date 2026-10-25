@@ -15,7 +15,9 @@ ALLOWED = {
     'robot_prediction': {'robot_interfaces', 'robot_configuration'},
     'robot_control': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
     'robot_simulation': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
-    'robot_experiments': {'robot_bringup','robot_configuration','robot_description','robot_models','robot_interfaces'},
+    # Experiment materialization reuses the actual simulation sensor-owner validators.
+    'robot_experiments': {'robot_bringup', 'robot_configuration', 'robot_description',
+                          'robot_models', 'robot_interfaces', 'robot_simulation'},
     'robot_bringup': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration',
                       'robot_simulation', 'robot_estimation', 'robot_prediction', 'robot_control'},
 }

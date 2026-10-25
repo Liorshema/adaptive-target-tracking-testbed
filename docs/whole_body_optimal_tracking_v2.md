@@ -46,7 +46,7 @@ explicit experiment overrides; the latter failed the measured-speed check.
 
 **Measured diagnosis and performance**
 
-The [pre-change audit](validation/v2_performance_before_default/audit.md) measured
+The [pre-change audit](../results/validation/v2_performance_before_default/audit.md) measured
 the actual production v1 launch before performance changes. A 1 ms physics step
 generated 1,000 joint-state/clock updates per simulation second, including costly
 Python estimation updates and transport. Headless RTF was 0.385. Setting BLAS/OMP
@@ -165,7 +165,7 @@ Control linearly samples position and velocity at now + configured lookahead,
 with bounded initial-interval reconstruction and no future-horizon extrapolation.
 Distance and pointing target rates provide physical feedforward.
 
-[Recorded-path replay](validation/v2_target_replay.json) used the actual target
+[Recorded-path replay](../results/validation/v2_target_replay.json) used the actual target
 filter and active predictor. Sensor covariance is 0.01 m², hence sigma=0.1 m;
 it already matches target-estimator R and was preserved. Sweeping process
 acceleration std 0.1/0.3/0.5/1/2 gave mean estimated-position errors
@@ -244,9 +244,9 @@ slightly improved range/pointing, and disabling feedforward reduced cost/pointin
 error but briefly exceeded wrist speed (1.5197 versus 1.5 rad/s). That alternative
 failed the preset physical-speed check; no limit or tolerance was relaxed.
 
-![Measured tracking and motion comparison](validation/whole_body_v2_comparison.png)
+![Measured tracking and motion comparison](../results/validation/whole_body_v2_comparison.png)
 
-![v2 actuator command chain](validation/whole_body_v2_actuation.png)
+![v2 actuator command chain](../results/validation/whole_body_v2_actuation.png)
 
 Final v2 maximum distance error was 0.146 m and maximum pointing
 error 12.15°. Arm excursions were
@@ -259,13 +259,13 @@ limitation events and two startup inactive commands. Actuation was active in all
 500 settled evaluation samples. Telemetry is sampled asynchronously, so actor
 and Control traces are not exact packet-by-packet acknowledgements.
 
-Acceptance thresholds were defined in [v2_thresholds.yaml](validation/v2_thresholds.yaml)
+Acceptance thresholds were defined in [v2_thresholds.yaml](../tools/validation/v2_thresholds.yaml)
 before the comparisons: mean/max distance .20/.45 m, mean/max pointing 10/25°,
 minimum base/arm motion .1, mean RTF >=.5, zero settled watchdog timeouts, physical
 limits with .001 numerical tolerance. Final v2 passed every check. Failed earlier
 uncalibrated/latency trials are retained rather than hidden.
 
-The [failure/recovery test](validation/v2_safety/result.json) passed controller
+The [failure/recovery test](../results/validation/v2_safety/result.json) passed controller
 stall, stale prediction, stale robot feedback, physical base stopping, arm hold,
 clock reset/new session, retired-session replay rejection, controller restart and
 single actuator ownership. Command/feedback simulation age .25/.2 s, independent
@@ -274,7 +274,7 @@ are unchanged. At much lower RTF, legitimate command spacing can exceed the wall
 watchdog (20 Hz simulation Control implies .5 s spacing at RTF=.1); supporting
 that regime would require a separate design, not relaxing the safety deadline.
 
-The [normal simulation Compute Only fixture](validation/v2_compute_only/result.json)
+The [normal simulation Compute Only fixture](../results/validation/v2_compute_only/result.json)
 passed 682 safety-checked cycles with `publish_commands=false` and no actuator
 command publisher. Across simulation seconds 5–35, maximum holding error was
 .03988 rad, maximum joint speed .00139 rad/s and minimum tracking height above
@@ -290,8 +290,8 @@ pre-existing style checks in robot_description (Flake8), robot_prediction
 (Flake8/PEP257), and robot_simulation (Flake8/PEP257). The same failures were
 reproduced from an archive of HEAD. New Models, Control and Bringup checks pass;
 no new style failure is being accepted. The shared files were checked with
-`git diff --check`. Logs are archived under docs/validation/v2_*_final.log and
-[v2_head_lint_summary.json](validation/v2_head_lint_summary.json).
+`git diff --check`. Logs are archived under results/validation/v2_*_final.log and
+[v2_head_lint_summary.json](../results/validation/v2_head_lint_summary.json).
 
 Reproduce functional regression and live acceptance:
 
@@ -301,18 +301,18 @@ source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros \
   -q -k 'not flake8 and not pep257 and not copyright'
-python3 docs/validation/v2_tracking_gazebo.py --case v2 --output /tmp/v2_acceptance
-python3 docs/validation/closed_loop_safety.py --case failures \
+python3 tools/validation/v2_tracking_gazebo.py --case v2 --output /tmp/v2_acceptance
+python3 tools/validation/closed_loop_safety.py --case failures \
   --config config/optimal_tracking.yaml --strategy-config config/whole_body.yaml \
   --output /tmp/v2_safety
-python3 docs/validation/compute_only_gazebo.py
+python3 tools/validation/compute_only_gazebo.py
 ```
 
 The validation scripts isolate domains/partitions and clean up only their own
 launch groups. The final process audit found only the two pre-existing user
 Gazebo servers; no validation process remains. Run performance comparisons sequentially; the baseline audit is
 already preserved. The final acceptance includes a configuration snapshot.
-Plots/comparison JSON are reproducible with `python3 docs/validation/compare_v2.py`.
+Plots/comparison JSON are reproducible with `python3 tools/validation/compare_v2.py`.
 
 Remaining limits: local optimization does not guarantee global reachability,
 obstacle avoidance or long-horizon stability; pointing is undefined at coincidence
@@ -327,7 +327,7 @@ and feedforward-disabled speed overshoot remain explicit limitations. The
 measurements establish this independent-target milestone, not general robot or
 scenario performance.
 
-The complete [modified-file manifest](validation/v2_modified_files.txt) lists 71
+The complete [modified-file manifest](../results/validation/v2_modified_files.txt) lists 71
 implementation/document files. Main changes are:
 
 - robot_models: distance/pointing geometry and injected whole-body construction.

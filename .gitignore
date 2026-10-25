@@ -24,28 +24,9 @@ rosbag2_*/
 .pytest_cache/
 *.bak
 
-# File-scoped rollback snapshots for architecture hardening (preserve locally).
-docs/validation/m06_1_before/
-docs/validation/m06_1_semantic_before/
-
-# Local migration snapshots
-docs/validation/m06_migration_before/
-
-# Generated experiment outputs and logs
-docs/validation/**/*.log
-docs/validation/*.log
-docs/validation/**/ros-log/
-docs/validation/**/samples.jsonl
-
-# Local workspace tree export
-project_tree.txt
+# Local workspace tree exports (tools/show_architecture.py is authoritative).
+project_tree*.txt
 
 # Native Gazebo actuator produced by setuptools develop builds.
 src/robot_simulation/robot_simulation/gazebo/_actuator*.so
 src/robot_simulation/robot_simulation/gazebo/_dartsim_recovery*.so
-
-# Raw validation recordings (retained locally)
-docs/validation/**/gazebo_poses.jsonl
-docs/validation/**/experiment_streams.json
-docs/validation/**/processing.json
-docs/validation/**/streams.json

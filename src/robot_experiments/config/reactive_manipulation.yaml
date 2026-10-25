@@ -10,7 +10,7 @@ experiment:
   seeds: [42, 917]
   variants:
     - name: A
-      system_config: {package: robot_bringup, path: config/system_manipulation_A.yaml}
+      system_config: {package: robot_bringup, path: config/system_nominal.yaml}
     - name: B
       system_config: {package: robot_bringup, path: config/system_manipulation_B.yaml}
     - name: C

@@ -119,29 +119,29 @@ From `/home/user/ros2_ws`, with one controlled simulator at a time:
 source install/setup.bash
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 # RED: explicit stock engine, same configured robot/native actuator.
-python3 docs/validation/joint_limit_recovery_probe.py \
+python3 tools/validation/joint_limit_recovery_probe.py \
   --output results/joint_limit_recovery_reproduce_red --variants C \
   --joints wrist shoulder --sides lower upper --engine dartsim
 # Physical GREEN and independent starts; no direct state edits.
-python3 docs/validation/joint_limit_recovery_probe.py \
+python3 tools/validation/joint_limit_recovery_probe.py \
   --output results/joint_limit_recovery_reproduce_green --variants A C E \
   --joints wrist --sides lower upper --engine dartsim_recovery --starts 2
-python3 docs/validation/joint_limit_recovery_probe.py \
+python3 tools/validation/joint_limit_recovery_probe.py \
   --output results/joint_limit_recovery_reproduce_shoulder --variants C \
   --joints shoulder --sides lower upper --engine dartsim_recovery --starts 2
 # Real ROS authority -> adapter -> native physics -> recovery release.
-python3 docs/validation/joint_limit_recovery_authority_probe.py \
+python3 tools/validation/joint_limit_recovery_authority_probe.py \
   --output results/joint_limit_recovery_reproduce_authority --variants C D E \
   --joints wrist --sides lower upper --seeds 42 917 --engine dartsim_recovery
 # Unchanged challenge definitions; longer observation, not a tuned scenario.
-python3 docs/validation/joint_limit_recovery_challenge.py \
+python3 tools/validation/joint_limit_recovery_challenge.py \
   --output results/joint_limit_recovery_reproduce_challenge \
   --variants C D E --seeds 42 917 --duration 90
 # Existing real reset and compute-only gates.
-python3 docs/validation/m02_resolution_reset.py \
+python3 tools/validation/m02_resolution_reset.py \
   --output results/joint_limit_recovery_reproduce_reset \
   --system-config config/system_manipulation_C.yaml
-python3 docs/validation/m09_live.py \
+python3 tools/validation/m09_live.py \
   --output results/joint_limit_recovery_reproduce_compute_only \
   --compute-only --duration 4 --settling-time 2
 ```
@@ -334,7 +334,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   python3 -m pytest src -q --import-mode=importlib \
   -p no:launch_testing -p no:launch_ros \
   -k 'not copyright and not flake8 and not pep257'
-python3 -W error::ResourceWarning docs/validation/joint_limit_recovery_analysis_test.py
+python3 -W error::ResourceWarning tools/validation/joint_limit_recovery_analysis_test.py
 ```
 
 The saved functional regression is **1,279 passed, 18 deselected**, plus 105 focused passes and 55 architecture passes. The validation continuity helper has three passing tests (short invalid intervals, a stale tail after one valid sample, and missing coverage); the helper is used only to prevent an incomplete validation run being promoted to success. The unfiltered suite still has the documented 12 style failures; these are not reported as passing.
@@ -438,7 +438,7 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
 source /opt/ros/jazzy/setup.bash
 source /tmp/joint_limit_recovery_copy_reproduce/install/local_setup.bash
 cd /tmp
-python3 /home/user/ros2_ws/docs/validation/joint_limit_recovery_verify_installation.py \
+python3 /home/user/ros2_ws/tools/validation/joint_limit_recovery_verify_installation.py \
   --prefix /tmp/joint_limit_recovery_copy_reproduce/install \
   --output /home/user/ros2_ws/results/joint_limit_recovery_reproduced_installation.json'
 ```
@@ -451,7 +451,7 @@ Final comparison reproduction (substitute fresh result roots for new experiments
 
 ```bash
 source install/setup.bash
-OPENBLAS_NUM_THREADS=1 python3 docs/validation/joint_limit_recovery_compare.py \
+OPENBLAS_NUM_THREADS=1 python3 tools/validation/joint_limit_recovery_compare.py \
   --study \
   results/joint_limit_recovery_final_challenge/challenge_recovery_20261021T182453_142101Z_a7qyagur \
   results/joint_limit_recovery_final_challenge_retry/challenge_recovery_20261021T183754_411014Z_5hc_cy0z \

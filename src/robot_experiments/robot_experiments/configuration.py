@@ -3,12 +3,16 @@ from copy import deepcopy
 import hashlib
 from pathlib import Path
 import re
+from tempfile import TemporaryDirectory
 
 import yaml
 
 from robot_configuration.yaml_loader import load_yaml
 from robot_configuration.resources import resolve_resource
 from robot_bringup.factory.system_configuration import load_system_configuration
+
+from robot_experiments.assignments import apply_assignments, bind_assignments, check_parameter_keys
+from robot_experiments.comparison import validate_policy
 
 METRICS = {'tracking_distance', 'pointing_error', 'prediction_rmse', 'estimation_error',
            'joint_speed_violation', 'joint_position_violation', 'realtime_factor', 'control_compute'}
@@ -34,24 +38,39 @@ def positive(value, label, zero=False):
 def load_experiment(path, share, output_override=None):
     """Resolve variant resources at their declaring document before inheritance."""
     source = Path(path).resolve()
+    source_ancestry = []
+    baseline_sources, parameter_sources = [], {}
     def normalize(data, origin):
+        source_ancestry.append(str(origin))
         experiment = data.get('experiment')
+        if isinstance(experiment, dict) and 'system_config' in experiment:
+            baseline_sources.append((deepcopy(experiment['system_config']), origin))
         if isinstance(experiment, dict) and isinstance(experiment.get('variants'), list):
             for variant in experiment['variants']:
+                if isinstance(variant, dict) and 'parameters' in variant:
+                    parameter_sources.setdefault(variant.get('name'), str(origin))
                 if isinstance(variant, dict) and 'system_config' in variant:
                     variant['system_config'] = resolve_resource(variant['system_config'], origin.parent, share)
         return data
     try:
         data = load_yaml(source, transform=normalize)
         mapping(data, {'schema_version', 'experiment'}, {'schema_version', 'experiment'}, str(source))
-        if type(data['schema_version']) is not int or data['schema_version'] != 1:
-            raise ValueError('schema_version: supported integer 1')
-        ex = mapping(data['experiment'], {'name','description','duration','settling_time','seeds','variants','metrics','output','execution','runtime'},
-                     {'name','duration','settling_time','seeds','variants','metrics','output'}, 'experiment')
+        version = data['schema_version']
+        if type(version) is not int or version not in (1, 2):
+            raise ValueError('schema_version: supported integer 1 or 2')
+        allowed = {'name', 'description', 'duration', 'settling_time', 'seeds', 'variants',
+                   'metrics', 'output', 'execution', 'runtime', 'comparison'}
+        required = {'name', 'duration', 'settling_time', 'seeds', 'variants', 'metrics', 'output'}
+        if version == 2:
+            allowed |= {'system_config'}
+            required |= {'system_config', 'comparison'}
+        ex = mapping(data['experiment'], allowed, required, 'experiment')
         if not isinstance(ex['name'], str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}', ex['name']):
             raise ValueError('experiment.name: use 1-80 alphanumeric, underscore or hyphen characters')
         if 'description' in ex and not isinstance(ex['description'], str):
             raise ValueError('experiment.description: expected string')
+        if 'comparison' in ex:
+            ex['comparison'] = validate_policy(ex['comparison'])
         ex['duration'] = positive(ex['duration'], 'duration')
         ex['settling_time'] = positive(ex['settling_time'], 'settling_time', zero=True)
         seeds = ex['seeds']
@@ -78,16 +97,40 @@ def load_experiment(path, share, output_override=None):
         variants = ex['variants']
         if not isinstance(variants,list) or not variants:
             raise ValueError('variants: expected nonempty list')
+        if version == 2:
+            for origin in source_ancestry:
+                check_parameter_keys(origin)
+            baseline, origin = baseline_sources[0]
+            ex['system_config'] = resolve_resource(baseline, origin.parent, share)
+            ex['schema_version'] = 2
         names = set()
         for v in variants:
-            mapping(v, {'name','system_config'}, {'name','system_config'}, 'variant')
+            fields = {'name', 'system_config'} if version == 1 else {'name', 'parameters'}
+            mapping(v, fields, fields, 'variant')
             if not isinstance(v['name'],str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}',v['name']) or v['name'] in names:
                 raise ValueError('variant.name: expected unique safe identifier')
             names.add(v['name'])
+            if version == 2:
+                bind_assignments(ex['comparison'], v['parameters'])
+                v['system_config'] = ex['system_config']
+                v['assignment_policy'] = deepcopy(ex['comparison'])
+                v['parameter_sources'] = {
+                    key: {'document': parameter_sources[v['name']],
+                          'variant': v['name'], 'parameter': key} for key in v['parameters']}
             v['plan'] = load_system_configuration(v['system_config'],share,overrides={
                 'enable_actuation':str(ex['runtime']['enable_actuation']).lower(),
                 'publish_ground_truth':'true','gui':'false','visualize_tracking':'false'})
         ex['source'] = source
+        ex['source_ancestry'] = source_ancestry
+        if version == 2:
+            # Validate every modified owner before any variant can acquire runtime.
+            # Reuse actual materialization/preflight, not a second owner resolver.
+            with TemporaryDirectory(prefix='robot_experiment_assignments_') as temporary:
+                for variant in variants:
+                    directory = Path(temporary) / variant['name']
+                    directory.mkdir()
+                    materialize_run(variant, seeds[0], directory, share, ex['runtime'],
+                                    ex['execution']['record_actuator_trace'])
         return ex
     except (ValueError, TypeError, KeyError, OSError) as error:
         raise ValueError(f'{source}: {error}') from error
@@ -115,6 +158,7 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
         declared=yaml.safe_load(path.read_text())
         parents=declared.get('extends',[]) if isinstance(declared,dict) else []
         if isinstance(parents,str):parents=[parents]
+        snapshots[str(path)]['parents'] = [str((path.parent/parent).resolve()) for parent in parents]
         for parent in parents:
             parent_path=(path.parent/parent).resolve()
             if str(parent_path) not in snapshots:read(parent_path)
@@ -138,9 +182,20 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
         resource=resolve_resource(sim[section][key],base,share)
         value=read(resource)
         sim[section][key]=str(resource)
-    localization_sensor = None
+    localization_sensor, measurements, assignment_records = None, None, {}
+    localization_source = None
     if sim.get('localization_sensor_config'):
-        localization_sensor = read(resolve_resource(sim['localization_sensor_config'],base,share))
+        localization_source = resolve_resource(sim['localization_sensor_config'], base, share)
+        localization_sensor = read(localization_source)
+    if 'assignment_policy' in variant:
+        measurements = read(sim['simulation']['measurement_config'])
+        bound = bind_assignments(variant['assignment_policy'], variant['parameters'])
+        assignment_records = apply_assignments(
+            bound, localization_sensor, measurements,
+            {'localization_sensor': str(localization_source),
+             'measurements': sim['simulation']['measurement_config']},
+            variant['parameter_sources'])
+    if localization_sensor is not None:
         localization_sensor['localization_sensor']['random_seed'] = int.from_bytes(
             hashlib.sha256(f'{seed}:localization'.encode()).digest()[:4], 'little')
         sim['localization_sensor_config'] = _write(inputs/'localization_sensor.yaml',localization_sensor)
@@ -156,8 +211,9 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
     physical_deployment.pop('description')
     robot['description']['config']=description_file
     sim['robot']['config']=_write(inputs/'robot.yaml',{'robot':robot})
-    measurements=read(sim['simulation']['measurement_config'])
-    # The only deployed RNG consumer: SyntheticMeasurementGenerator in simulation.
+    if measurements is None:
+        measurements=read(sim['simulation']['measurement_config'])
+    # Target and localization retain their existing independent seed policies.
     measurements['measurements']['target_position']['random_seed']=seed
     sim['simulation']['measurement_config']=_write(inputs/'measurements.yaml',measurements)
     sim['paths']['base']='config'
@@ -219,7 +275,29 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
     snapshot={'schema_version':1,'resources':snapshots,'seed_consumers':{'measurements.target_position.random_seed':seed},
       'initial_conditions':{'robot_pose':robot['pose'],'target_position':sim['target']['initial_position'],'target_velocity':sim['target']['initial_velocity']},
       'reproducibility':'Owner config replay and sensor RNG control; asynchronous ROS/Gazebo, contact/skid dynamics and reactive target trajectories are not bitwise deterministic.'}
+    if 'assignment_policy' in variant:
+        snapshot['assignments'] = assignment_records
     if localization_sensor:
         snapshot['seed_consumers']['localization_sensor.random_seed']=localization_sensor['localization_sensor']['random_seed']
+    # Resource filenames are provenance; their resolved contents are protected.
+    estimator_settings = deepcopy(resolved['estimation_parameters'])
+    controller_settings = deepcopy(resolved['control_parameters'])
+    for settings in [estimator_settings, controller_settings]:
+        for key in ['robot_description_file', 'robot_description_config',
+                    'robot_description_package', 'strategy_config_file']:
+            settings.pop(key, None)
+    scientific_conditions = {
+        'physics': deepcopy(sim['world'].get('physics', {})),
+        'world_plugins': deepcopy(sim['world'].get('system_plugins', [])),
+        'gazebo_transport': deepcopy(sim['gazebo']),
+        'component_selection': deepcopy(resolved['selection']),
+        'estimator_parameters': estimator_settings,
+        'controller_parameters': controller_settings,
+        'controller_strategy': read(plan['strategy_path']) if plan['strategy_path'] else None,
+        'prediction_configuration': prediction_configuration,
+        'tracking_feedback': deepcopy(profile['tracking_tf']),
+        'runtime': deepcopy(resolved['runtime']),
+        'seed_consumers': deepcopy(snapshot['seed_consumers']),
+    }
     return {'plan':resolved,'context':context,'snapshot':snapshot,'system_path':system_path,'simulation_path':simulation_file,
-            'comparison_contract':comparison_contract}
+            'comparison_contract':comparison_contract, 'scientific_conditions':scientific_conditions}

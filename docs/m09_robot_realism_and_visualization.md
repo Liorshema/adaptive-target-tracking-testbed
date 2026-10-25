@@ -60,7 +60,7 @@ visualization adapter. Pure `visualization/configuration.py`, `geometry.py`,
 geometry, bounded semantic state, and RViz-template binding. ROS message handling,
 source-time TF lookup and standard MarkerArray/Path publication stay in the node.
 `launch/visualization.launch.py` composes existing bringup plus read-only clients.
-The actual tree is [m09_bringup_tree.txt](validation/m09_bringup_tree.txt).
+The actual tree is [m09_bringup_tree.txt](../results/validation/m09_bringup_tree.txt).
 
 robot_description owns the schematic camera visuals attached to its existing
 tracking frame. robot_simulation retains world generation, existing ground,
@@ -313,18 +313,18 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
     source /opt/ros/jazzy/setup.bash
     source /tmp/m09_copy/install/local_setup.bash
     cd /tmp
-    python3 /home/user/ros2_ws/docs/validation/m09_verify_installation.py \
+    python3 /home/user/ros2_ws/tools/validation/m09_verify_installation.py \
       --prefix /tmp/m09_copy/install --output /tmp/m09_install_repeat.json'
 # These bounded checks explicitly enable actuation inside their owned session:
-python3 docs/validation/m09_live.py --output results/m09_headless_repeat
-python3 docs/validation/m09_live.py --gui --output results/m09_gui_repeat
+python3 tools/validation/m09_live.py --output results/m09_headless_repeat
+python3 tools/validation/m09_live.py --gui --output results/m09_gui_repeat
 ```
 
 New study directories are collision-safe. Live validation reuses M08 session
 ownership, recording and evaluation; production visualization does not depend on
 M08. The runtime probe is read-only apart from explicitly requested launch actuation.
 Exact commands/source windows, actual geometry, safety metrics and artifact paths
-are in [m09_live_evidence.json](validation/m09_live_evidence.json). Successful raw
+are in [m09_live_evidence.json](../results/validation/m09_live_evidence.json). Successful raw
 runs are under results/m09_headless_verified and results/m09_gui_observer_verified.
 No black capture is embedded as a screenshot.
 
@@ -337,8 +337,8 @@ no surviving owned process, not a claim that every child returns zero. No unrela
 ROS/Gazebo session was stopped. These teardown/graphics limitations remain explicit.
 
 The exact source/resource/test/doc and generated-evidence inventory is
-[m09_modified_files.txt](validation/m09_modified_files.txt), with captured
-[m09_git_status_short.txt](validation/m09_git_status_short.txt). The workspace
+[m09_modified_files.txt](../results/validation/m09_modified_files.txt), with captured
+[m09_git_status_short.txt](../results/validation/m09_git_status_short.txt). The workspace
 remains on feature/m09-visualization at bf71fdb with reviewable, uncommitted edits.
 No M10 dashboard or unrelated milestone was started.
 
@@ -388,7 +388,7 @@ Physical startup overspeed also occurs before tracking measurements/commands.
 PID torque and exact consumed-input lineage are unobserved, and sparse seed917
 feedback limits duration/RMS conclusions. The reports distinguish observed-duration
 integrals from complete-window RMS and never fill missing motion with zeros.
-An [independent raw-data cross-check](validation/m09_refinement_independent_crosscheck.json)
+An [independent raw-data cross-check](../results/validation/m09_refinement_independent_crosscheck.json)
 recomputed the largest spike from q differences and CV917 target RMSE.
 
 Next engineering ownership: `robot_simulation` for physics-step actuator/torque
@@ -438,19 +438,19 @@ The safe compute-only and explicit `enable_actuation:=true` GUI commands in
 ROS_LOG_DIR=/tmp/m09-refinement-tests python3 -m pytest src -q \
   --import-mode=importlib -p no:launch_testing -p no:launch_ros \
   -k 'not flake8 and not pep257 and not copyright'
-python3 docs/validation/m09_live.py \
+python3 tools/validation/m09_live.py \
   --output results/m09_compute_repeat --compute-only --duration 4 --settling-time 1
-python3 docs/validation/m09_live.py \
+python3 tools/validation/m09_live.py \
   --output results/m09_gui_repeat --gui --duration 6 --settling-time 1
-MPLCONFIGDIR=/tmp/m09-target-plots python3 docs/validation/m09_target_diagnostics.py \
+MPLCONFIGDIR=/tmp/m09-target-plots python3 tools/validation/m09_target_diagnostics.py \
   --output results/m09_target_diagnostics_repeat
-MPLCONFIGDIR=/tmp/m09-joint-plots python3 docs/validation/m09_joint_diagnostics.py \
+MPLCONFIGDIR=/tmp/m09-joint-plots python3 tools/validation/m09_joint_diagnostics.py \
   --output-prefix results/m09_joint_diagnostics_repeat/diagnostics
 ```
 
 Choose fresh diagnostic output names on repeats; existing evidence is protected
 from overwriting. The exact refinement file inventory and preservation checks are
-[m09_refinement_modified_files.txt](validation/m09_refinement_modified_files.txt)
-and [m09_refinement_preservation.json](validation/m09_refinement_preservation.json).
+[m09_refinement_modified_files.txt](../results/validation/m09_refinement_modified_files.txt)
+and [m09_refinement_preservation.json](../results/validation/m09_refinement_preservation.json).
 The machine-readable closure is
-[m09_refinement_final_verification.json](validation/m09_refinement_final_verification.json).
+[m09_refinement_final_verification.json](../results/validation/m09_refinement_final_verification.json).

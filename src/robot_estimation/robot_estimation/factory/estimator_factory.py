@@ -1,7 +1,8 @@
 """Pure construction of the currently supported robot and target estimators."""
 
 import numpy as np
-from robot_estimation.robot.planar_pose import validate_localization_parameters
+from robot_estimation.robot.planar_pose import (
+    PoseAcceptance, pose_acceptance_options, validate_localization_parameters)
 from robot_estimation.state import StateEstimate
 from robot_estimation.filters.kalman_filter import KalmanFilter
 from robot_estimation.robot.joint_bounds import JointBoundsConditioner
@@ -68,12 +69,14 @@ def create_robot_estimator(parameters, physical=None, estimator_type='robot_ekf'
             [joint['upper'] for joint in physical.values()],
             parameters['joint_bounds_numerical_tolerance'],
             parameters['max_joint_state_age'])
+    options = pose_acceptance_options(parameters) if parameters.get('localization_enabled', False) else None
     estimator = RobotStateEstimator(
         initial_state=initial_state, process_model=process_model,
         wheel_measurement_model=wheel_measurement_model,
         imu_measurement_model=imu_measurement_model,
         joint_measurement_model=joint_measurement_model,
-        state_constraint=constraint)
+        state_constraint=constraint,
+        pose_acceptance=PoseAcceptance(**options) if options else None)
     return estimator, constraint
 
 def create_target_estimator(parameters, estimator_type='kalman'):

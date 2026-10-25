@@ -225,7 +225,7 @@ def test_node_startup_constraints_also_fail_during_preflight(tmp_path, section, 
     # Keep the profile calibration from masking an explicitly invalid optional value.
     if section != 'control':
         profile = yaml.safe_load((share('robot_bringup') / 'config/closed_loop.yaml').read_text())
-        profile['simulation_config'] = 'config/scenarios/reactive_target_oscillatory.yaml'
+        profile['simulation_config'] = 'config/scenarios/oscillatory_reactive_tracking.yaml'
         (tmp_path / 'profile.yaml').write_text(yaml.safe_dump(profile))
     path = owner_override(tmp_path, section, content)
     if section != 'control':

@@ -6,8 +6,6 @@ from pathlib import Path
 from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.factory.simulation_factory import SimulationFactory
 
-import yaml
-
 SOURCE = Path(__file__).resolve().parents[2]
 
 
@@ -37,8 +35,7 @@ def test_reactive_3d_uses_live_tf_same_initial_state_and_environment():
 def test_arm_preference_changes_only_existing_base_motion_weights():
     """Tasks, physical bounds, posture, damping and arm penalties are retained."""
     baseline = load_yaml(SOURCE / 'robot_control/config/whole_body.yaml')
-    experiment = yaml.safe_load(
-        (SOURCE / 'robot_control/config/whole_body_arm_preferred.yaml').read_text())
+    experiment = load_yaml(SOURCE / 'robot_control/config/whole_body_arm_preferred.yaml')
     expected = deepcopy(baseline)
     expected['controller']['parameters']['motion_weights'] = [2., 4., 3., 3., 3., 2.]
     assert experiment == expected

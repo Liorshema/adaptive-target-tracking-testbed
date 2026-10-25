@@ -3,6 +3,8 @@ from collections import defaultdict
 import math
 import statistics
 
+from .comparison import comparison_reasons
+
 
 def _aggregate(values, unit):
     """Give each seed's metric equal weight; dispersion is unknown for n=1."""
@@ -11,24 +13,9 @@ def _aggregate(values, unit):
             'min': min(values), 'max': max(values)}
 
 
-def summarize(runs, variants, seeds):
+def summarize(runs, variants, seeds, comparison_policy=None, experiment_name=None):
     """Compare matching physical/time contracts, preserving prediction horizons."""
-    reasons = []
-    seen = {}
-    for run in runs:
-        key = (run['variant'], run['seed'])
-        if key in seen:
-            reasons.append(f'duplicate run {key}')
-        seen[key] = run
-    for seed in seeds:
-        paired = [seen.get((variant, seed)) for variant in variants]
-        if any(run is None for run in paired):
-            reasons.append(f'seed {seed}: incomplete variant pair')
-            continue
-        if any(run['execution_status'] != 'completed' for run in paired):
-            reasons.append(f'seed {seed}: interrupted execution')
-        if len({run['comparison_contract'] for run in paired}) != 1:
-            reasons.append(f'seed {seed}: scenario/physical/measurement-window mismatch')
+    reasons = comparison_reasons(runs, variants, seeds, comparison_policy)
     result = {'schema_version': 1, 'comparable': not reasons,
               'incomparability_reasons': reasons, 'seed_count': len(seeds),
               'run_count': len(runs), 'variants': {},
@@ -41,7 +28,8 @@ def summarize(runs, variants, seeds):
         for run in group:
             if run['execution_status'] != 'completed':
                 continue
-            for name, metric in run.get('metrics', {}).get('metrics', {}).items():
+            metrics_document = run.get('metrics') or {}
+            for name, metric in metrics_document.get('metrics', {}).items():
                 statistic = 'rmse' if name == 'prediction_rmse' else 'mean'
                 value = metric.get(statistic)
                 if metric.get('available') and isinstance(value, (int, float)) and math.isfinite(value):
@@ -65,4 +53,17 @@ def summarize(runs, variants, seeds):
             'prediction_horizons': {key: _aggregate(values, 'm') for key, values in horizons.items()} if not reasons else {},
             'prediction_horizon_unit': 's',
             'unavailable_reason': 'incomparable runs' if reasons else None}
+    result['runs'] = runs
+    result['comparison'] = {
+        'schema_version': 1, 'experiment': experiment_name, 'policy': comparison_policy,
+        'eligible': not reasons, 'rejection_reasons': reasons,
+        'run_index': [{'variant': run['variant'], 'seed': run['seed'],
+                       'result_pointer': f'/runs/{index}', 'artifacts': run.get('artifacts'),
+                       'execution_status': run['execution_status'],
+                       'outcome': ((run.get('status', {}).get('error') or {}).get('code')
+                                   or run['execution_status'])}
+                      for index, run in enumerate(runs)],
+        'trajectory_caveat': ('Matched setup and seed policy do not imply identical reactive '
+                              'physical trajectories or identical random draw sequences.'),
+    }
     return result

@@ -11,9 +11,14 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 from launch_ros.actions import Node
+from launch.actions import RegisterEventHandler, EmitEvent
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
+
+from robot_bringup.factory.sensor_inventory import format_sensor_inventory
+from robot_bringup.factory.system_configuration import load_system_configuration
 
 from robot_configuration.yaml_loader import load_yaml
-from robot_bringup.factory.system_configuration import load_system_configuration
 
 
 def configure(context):
@@ -186,11 +191,19 @@ def configure(context):
                                'parent_frame': pose_feedback['frame_id'],
                                'child_frame': simulation_cfg['tracking']['tracking_frame']}]))
     if plan:
+        nodes.insert(0, LogInfo(msg=format_sensor_inventory(plan['sensor_inventory'])))
         nodes.insert(0, LogInfo(msg='System assembly: ' + json.dumps({
             'identities': plan['identities'], 'manifest': str(plan['source']),
             'profile': str(plan['profile_path']), 'description': str(plan['description_path']),
             'prediction': str(plan['prediction_path']), 'runtime': plan['runtime']}, sort_keys=True)))
-    return nodes
+    # All pipeline nodes are required for a meaningful experiment. A failed
+    # child must terminate the composition rather than leave launch alive.
+    essential = [node for node in nodes if isinstance(node, Node)
+                 and node.node_executable != 'tracking_visualization']
+    guards = [RegisterEventHandler(OnProcessExit(target_action=node, on_exit=[
+        EmitEvent(event=Shutdown(reason='Essential tracking process exited'))]))
+        for node in essential]
+    return [*guards, *nodes]
 
 
 def generate_launch_description():

@@ -316,18 +316,18 @@ Diagnostic tools are not installed and cannot be selected accidentally by normal
 ```bash
 source /home/user/ros2_ws/install/setup.bash
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-python3 docs/validation/tracking_loss_test.py
-python3 docs/validation/tracking_loss_context_test.py
-python3 docs/validation/tracking_loss_run.py \
-  --config docs/validation/tracking_loss_experiments.yaml \
+python3 tools/validation/tracking_loss_test.py
+python3 tools/validation/tracking_loss_context_test.py
+python3 tools/validation/tracking_loss_run.py \
+  --config tools/validation/tracking_loss_experiments.yaml \
   --output results/tracking_loss_reproduce
-python3 docs/validation/tracking_loss_analysis.py \
+python3 tools/validation/tracking_loss_analysis.py \
   --run results/joint_limit_recovery_final_challenge/challenge_recovery_20261021T182453_142101Z_a7qyagur/D_seed42 \
   --output results/tracking_loss_reproduce_analysis
-MPLCONFIGDIR=/tmp/tracking_loss_matplotlib python3 docs/validation/tracking_loss_plot.py \
+MPLCONFIGDIR=/tmp/tracking_loss_matplotlib python3 tools/validation/tracking_loss_plot.py \
   --analysis results/tracking_loss_reproduce_analysis/0_D_seed42 \
   --output results/tracking_loss_reproduce_figures
-python3 docs/validation/tracking_loss_feasibility.py \
+python3 tools/validation/tracking_loss_feasibility.py \
   --run results/tracking_loss_interventions/tracking_loss_20261022T054116_446391Z_ipp96q8v/oracle_both \
   --output results/tracking_loss_reproduce_rate_feasibility
 python3 -m pytest src -q --import-mode=importlib \

@@ -279,3 +279,53 @@ def test_delayed_cycle_enforces_joint_limits_for_elapsed_interval(node):
     assert 1.565 + 0.14 * outputs[-1].safe_output.command[3] <= 1.57 + 1e-12
     node._compute_control(10.19, prediction)
     assert len(outputs) == 2
+
+
+@pytest.mark.parametrize('stream', ['robot', 'prediction'])
+def test_old_valid_message_does_not_evict_newer_fresh_cache(node, stream):
+    """Transport reordering is not revocation of a newer validated observation."""
+    commands = []
+    node._command_publisher = SimpleNamespace(publish=commands.append)
+    node._robot_callback(robot_message())
+    node._prediction_callback(prediction_message())
+    if stream == 'robot': node._robot_callback(robot_message(9.95))
+    else:
+        node._prediction_callback(prediction_message(10.))
+        node._prediction_callback(prediction_message(9.95))
+    node._validate_inputs()
+    assert commands[-1].active
+    node.test_now = 10.6
+    node._validate_inputs()
+    assert not commands[-1].active
+
+
+def test_telemetry_exposes_actual_input_reference_times_during_stale_hold(node):
+    messages = []
+    node._telemetry_publisher = SimpleNamespace(publish=messages.append)
+    node._robot_callback(robot_message())
+    node._prediction_callback(prediction_message(9.9))
+    node.test_now = 10.6
+    node._validate_inputs()
+    assert not messages[-1].valid
+    assert getattr(messages[-1], 'robot_state_time', None) == 10.
+    assert getattr(messages[-1], 'prediction_reference_time', None) == 9.9
+
+
+def test_shutdown_does_not_dispatch_queued_active_control(monkeypatch):
+    """A stop must remain the final output even with a queued timer callback."""
+    from robot_control.nodes import control_node as module
+    outputs=[]
+    publisher=SimpleNamespace(wait_for_all_acked=lambda timeout:True)
+    fake=SimpleNamespace(_timer=SimpleNamespace(cancel=lambda:None),
+        _command_publisher=publisher, _stop=lambda reason:outputs.append(False),
+        destroy_node=lambda:None)
+    monkeypatch.setattr(module,'ControlNode',lambda:fake)
+    monkeypatch.setattr(module.signal,'signal',lambda *args:None)
+    monkeypatch.setattr(module.rclpy,'init',lambda **kwargs:None)
+    def interrupted(node): raise KeyboardInterrupt
+    monkeypatch.setattr(module.rclpy,'spin',interrupted)
+    monkeypatch.setattr(module.rclpy,'spin_once',lambda *args,**kwargs:outputs.append(True))
+    monkeypatch.setattr(module.rclpy,'ok',lambda:True)
+    monkeypatch.setattr(module.rclpy,'shutdown',lambda:None)
+    module.main()
+    assert outputs == [False]

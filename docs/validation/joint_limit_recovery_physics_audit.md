@@ -5,7 +5,7 @@ were performed by this audit. This file is the audit's only added artifact.
 
 ## Evidence and scope
 
-The historical loaded-library capture `docs/validation/m02_physics_engine.json:5–9`
+The historical loaded-library capture `results/validation/m02_physics_engine.json:5–9`
 identifies gz-physics 7.6.0's DART plugin and DART 6.13.2. This proves that captured
 run's backend; a new reproduction must capture its own process mappings.
 

@@ -52,8 +52,10 @@ seeded inputs. `execution.py` owns isolation, processes and monotonic deadlines.
 `metrics/` owns ROS-free numerical evaluation/alignment. `benchmarking.py` combines
 comparable seeds. `reporting.py` owns atomic JSON and unique directories.
 `runner.py` coordinates those responsibilities; `cli.py` is the installed adapter.
+`comparison.py` owns the versioned authorization of experimental variables and
+the original/invariant comparison views; it does not compute metrics.
 Small cohesive modules stay flat rather than gaining one-file directories.
-The actual tree is [m08_final_tree.txt](validation/m08_final_tree.txt).
+The actual tree is [m08_final_tree.txt](../results/validation/m08_final_tree.txt).
 
 The runner invokes the existing `robot_bringup closed_loop.launch.py` with a
 materialized M07 manifest. It neither recreates launch assembly nor imports a
@@ -108,6 +110,75 @@ before merging. Output-directory relative paths are interpreted from the caller'
 working directory. M07 remains responsible for component compatibility and all
 owner files retain their numerical parameters and physical limits.
 
+## Experiment schema, version 2: sensor assignments
+
+`config/sensor_noise_study.yaml` expresses the existing localization-noise study
+using one `experiment.system_config` and variants containing `{name, parameters}`.
+Each parameter name must match exactly one declared comparison variable; every
+variable requires explicit permitted `values` and an assignment in every variant.
+The nested comparison policy remains version 1. Assignments grant no permissions:
+its existing sensor-leaf allowlist and protected-condition checks remain authoritative.
+Schema 1 and `config/sensor_noise_comparison.yaml` retain their existing semantics.
+
+```bash
+ros2 run robot_experiments run --config config/sensor_noise_study.yaml --validate-only
+ros2 run robot_experiments run --config config/sensor_noise_study.yaml --explain
+ros2 run robot_experiments run --config config/sensor_noise_study.yaml \
+  --output results/sensor_assignments_s2
+```
+
+Schema 2 rejects missing/unknown/duplicate assignments, unpermitted values,
+non-numeric or nonfinite inputs, mixed global/per-variant system selection, and
+YAML merge keys in declaration mappings. Use the shared `extends` mechanism for
+inheritance; variant lists replace. A system resource reference is atomic and
+resolves at its declaring document: supply the complete `{package, path}` mapping
+or a relative filename, including when overriding an inherited selection.
+
+`assignments.py` routes only existing authorized leaves into the actual selected
+planar localization or target-measurement owner. It reuses robot_simulation's
+producer validators through an explicit package dependency. All variant owners
+are checked using temporary materialization and M07 preflight while loading a
+schema-2 experiment, before results or runtime acquisition, including with
+`--validate-only`. Schema-1 validation depth is unchanged. Runtime materialization
+rechecks the detached owners, applies assignments before independent seed wiring,
+and writes the existing isolated run inputs. Neither source YAML nor estimator
+covariance assumptions change. Owner-specific vector, range, covariance and
+producer-availability checks remain mandatory.
+
+The existing explain output shows requested assignments, original baseline values,
+source owner, declaring experiment/variant/parameter, actual materialized values,
+and original/invariant hashes. Compatibility is configuration-only before execution;
+`runtime_eligibility` remains null until measurements exist. Saved
+`resolved_configuration.json` retains assignment provenance separately from the
+scientific comparison views. The new entry needs zero noise-only forwarding files
+instead of four. All old resources remain available. See the
+[S2 closure](validation/configuration_sensor_assignments_s2_closure.md) for equivalence,
+regression, installation and live comparison evidence.
+
+## Explicit composition migration example
+
+`config/sensor_noise_composition.yaml` inherits the unchanged S2
+`config/sensor_noise_study.yaml` and selects the new M07 schema-2 composition.
+The experiment identity, variants, exact sensor values, seeds, metrics and execution
+settings remain inherited. This is a composition migration, not another noise
+policy or experiment runner.
+
+```bash
+ros2 run robot_experiments run --config config/sensor_noise_composition.yaml --validate-only
+ros2 run robot_experiments run --config config/sensor_noise_composition.yaml --explain
+ros2 run robot_experiments run --config config/sensor_noise_composition.yaml \
+  --output results/configuration_composition_s3a
+```
+
+For schema-2 systems, explain adds `runs[].system.composition`: direct deployment,
+robot/actuation/localization resources, calibration and tracking policy. The existing
+`profile_source` is the manifest owning the in-memory adapter, identified by
+`profile_source_kind: system_manifest`; it is not a selected legacy profile.
+M08 still writes its existing run-local schema-1 profile/system execution inputs
+and preflights those exact files. Original/invariant comparisons and runtime
+coverage gates remain unchanged. Configuration equivalence is separate from live
+scientific eligibility, including the open S2 joint-observation coverage limitation.
+
 ## Time, seeds and reproducibility
 
 Readiness requires all selected required streams with source epochs within
@@ -119,7 +190,8 @@ they never substitute for source time. A backward clock invalidates the run;
 source observations arriving out of order remain recorded, sorted only for
 bounded offline alignment. Paused or absent clocks produce explicit failures.
 
-The deployed stochastic consumer is SyntheticMeasurementGenerator's NumPy RNG.
+The deployed stochastic consumers are the target measurement generator and,
+when selected, the simulated planar localization source.
 Each run writes `inputs/measurements.yaml` with the requested
 `measurements.target_position.random_seed`, and wires it through an input
 simulation/profile/M07 system manifest. The original owner YAML is unchanged.
@@ -245,6 +317,80 @@ aggregates. Dispersion is sample standard deviation across seeds, null for n=1.
 No statistical significance or unconditional winning run is inferred. Safety
 failures disable winner eligibility regardless of tracking error.
 
+## Explicit sensor experiments
+
+Strict comparison remains the default. To compare deliberate sensing differences,
+select ordinary M07 manifests through M08 variants and add this optional declaration:
+
+```yaml
+experiment:
+  comparison:
+    schema_version: 1
+    domain: sensor_parameters
+    variables:
+      - name: pose_white_noise_std
+        path: localization_sensor.localization_sensor.white_noise_std
+        values:                         # Optional permitted effective values
+          - [0.04, 0.04, 0.03490658503988659]
+          - [0.08, 0.08, 0.06981317007977318]
+```
+
+This is an exact path into the resolved materialized **comparison contract**, not
+a filename, wildcard or list-index expression. An array is one atomic variable.
+Names and paths must be unique. The version-1 `sensor_parameters` domain authorizes
+only localization `white_noise_std`, `calibration_bias_std`, `latency`,
+`latency_jitter`, `dropout_probability`, `outlier_probability`, `outlier_offset`,
+and target `measurements.measurements.target_position.noise.covariance`.
+Parent mappings, seed settings, frames, publication rates, age limits, physics,
+safety, scenarios and arbitrary algorithm fields cannot be declared variables.
+Algorithm comparisons under this mechanism need a separately designed domain;
+existing undeclared strict IMM/CV studies retain their original behavior.
+
+Every new run retains the original contract and its original hash. For an explicit
+policy, only authorized, present leaves are removed from a copy; all sibling values
+remain invariant. Additional resolved conditions freeze algorithm settings/types,
+physics/plugins, feedback, seed consumers, experiment execution and metric settings.
+Metric implementation content is fingerprinted independently of Git/install paths;
+the returned metric definition and units must also agree. Filename identity alone
+does not determine experimental equivalence. Inherited owners with equivalent
+effective settings remain comparable.
+
+`comparison.json` and `resolved_configuration.json.comparison` contain versioned
+original/invariant views and hashes plus named effective variable values. The
+existing `summary.json` adds `comparison` eligibility/reasons and a `run_index`
+pointing into its existing `runs` array. Each run retains metrics/units/coverage,
+configuration identity, status/error/cleanup and artifact paths. No second results
+database or UI engine is needed. New views do not reinterpret historical hashes;
+old strict run records remain readable.
+
+Eligibility is checked per matched seed. Required metrics need valid observations,
+existing physical joint observation coverage must be complete, and completed
+scoring durations/metric definitions must match. Unavailable/incomplete evidence
+withholds pooled metrics but remains recorded. Runtime `failed` plus error code
+`interrupted` remains distinct from `completed`; no partial run is promoted.
+Poor tracking and invalid-control fractions are outcomes, not accuracy gates for
+scientific eligibility. Physical/actuation acceptance remains separately reported
+and continues to govern winner eligibility.
+
+The installed bounded example is:
+
+```bash
+ros2 run robot_experiments run --config config/sensor_noise_comparison.yaml --validate-only
+ros2 run robot_experiments run --config config/sensor_noise_comparison.yaml
+```
+
+It uses inherited source/system children; baseline owners remain unchanged. Its
+common offline skew/readiness budget accommodates the already configured robot
+reorder holdback; it does not change runtime freshness or physical tolerances.
+Target seed equals the run seed. Optional localization retains its independent
+SHA-256-derived seed (`first four bytes of sha256(f'{seed}:localization'), little
+endian`). Equal seeds do not imply equal random draws after changed source behavior.
+Matched setup/seed policy also does not imply identical realized reactive target
+trajectories. A one-seed example cannot support statistical model rankings.
+
+See [measured scientific-comparison closure](validation/m08_scientific_sensor_comparison_closure.md)
+for accepted/rejected examples, real-run outcomes and limitations.
+
 To add a variant, reference another compatible M07 manifest in YAML. To add a
 metric, implement a pure function in metrics/, define its units/frame/alignment
 and missing-data contract, add analytical tests, then register its family in
@@ -271,7 +417,7 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
     source /opt/ros/jazzy/setup.bash
     source /tmp/m08_copy/install/local_setup.bash
     cd /tmp
-    python3 /home/user/ros2_ws/docs/validation/m08_verify_installation.py \
+    python3 /home/user/ros2_ws/tools/validation/m08_verify_installation.py \
       --prefix /tmp/m08_copy/install --output /tmp/m08_install_repeat.json'
 ```
 
@@ -412,9 +558,120 @@ return 1 and preserve a failed status with cleanup results. Duration 0 is a
 configuration error, returning 2 before output creation. Use new output parents
 if repeating evidence; invocation-level unique study naming also prevents reuse.
 
-See [m08_live_evidence.json](validation/m08_live_evidence.json) for exact artifact
+See [m08_live_evidence.json](../results/validation/m08_live_evidence.json) for exact artifact
 paths, identities, streams, source windows, gates and numeric values. The exact
 changed/new source, resources, tests, docs and generated evidence paths are listed
-in [m08_modified_files.txt](validation/m08_modified_files.txt). Captured Git status
-is [m08_git_status_short.txt](validation/m08_git_status_short.txt). M08 remains
+in [m08_modified_files.txt](../results/validation/m08_modified_files.txt). Captured Git status
+is [m08_git_status_short.txt](../results/validation/m08_git_status_short.txt). M08 remains
 uncommitted on its dedicated branch; no M09/M10 work was started.
+
+## Inspect effective inputs before running
+
+For a controlled reliability investigation, opt into bounded observer diagnostics:
+
+```bash
+ros2 run robot_experiments run --config config/paired_prediction_composition.yaml \
+  --observer-diagnostics --output results/runtime_reliability_r1b1
+```
+
+The default remains disabled. The flag does not change the experiment YAML,
+materialized inputs, required streams, QoS, executor timeouts/budgets, timestamps,
+coverage policy or metrics. Each enabled run adds a separate versioned
+`diagnostics/observer_timing.json`: bounded callback-stage summaries, batch/service
+history, supported middleware metadata and a 2 Hz recorder-root resource sampler.
+Scientific telemetry/status remain authoritative. Partial runs and diagnostic
+faults are explicit; a collector/finalization fault cannot make a run eligible.
+`--explain` and `--validate-only` continue to acquire no runtime or diagnostics.
+
+Instrumentation overhead must be measured on equivalent work. A diagnostic run
+whose overhead budget is not demonstrated is potentially perturbed and supports
+diagnosis only, not a baseline performance claim. See the
+[R1B1 closure](validation/runtime_reliability_r1b1_closure.md) for schema, capability
+limits, actual overhead, evidence and the distinction from a reliability fix.
+
+The additive `config/paired_prediction_composition.yaml` inherits the original
+`paired_prediction.yaml` and replaces only its IMM/CV system references with
+the shared schema-2 nominal family. It preserves the study name
+`paired_prediction`, variants `imm`/`cv`, seed 42, six-second duration,
+three-second settling window, metrics and strict historical comparison policy.
+It also preserves the original 80 ms observation-coverage budget. This is not
+an authorization domain for arbitrary algorithm overrides.
+
+```bash
+ros2 run robot_experiments run --config config/paired_prediction_composition.yaml --explain
+ros2 run robot_experiments run --config config/paired_prediction_composition.yaml \
+  --output results/paired_prediction_composition
+```
+
+The original `nominal.yaml` and `paired_prediction.yaml` remain byte-identical
+rollback entries. DLS is directly launchable through M07; S3B1 uses test fixtures
+for its M08 materialization/explain rather than adding a redundant production
+study. Corresponding old/new contracts and protected conditions match at the
+same source revision. Source identities and resource ancestry legitimately
+change; reactive trajectories need not be identical. For the historical strict
+paired policy, a compatible/comparable result alone does not establish complete
+physical observation coverage or safety acceptance. Read those runtime gates
+separately in status/metrics. See the
+[S3B1 closure](validation/configuration_nominal_composition_s3b1_closure.md).
+
+```bash
+ros2 run robot_experiments run \
+  --config config/sensor_noise_comparison.yaml --explain
+```
+
+`--explain` writes one JSON document (`schema_version: 1`, `mode: explain`) to
+stdout. It expands every seed/variant through the same `materialize_run` →
+`complete_preparation` boundary used by execution, including materialized M07
+preflight, sensor inventory, seed injection and existing comparison views.
+Temporary inputs are cleaned on success or failure. This command creates no
+study, recorder, ROS domain, launch or Gazebo process. `--output` remains a
+prospective output-directory override shown in the explanation; it does not
+create that directory. `--validate-only` retains its lighter identity/preflight
+output and is mutually exclusive with `--explain`.
+
+The stable navigation fields are:
+
+| JSON field | Meaning |
+|---|---|
+| `experiment` | Effective experiment settings, source/child-to-parent ancestry, seeds, duration, settling and prospective output |
+| `runs[].variant`, `seed` | Every configured run, in execution's seed-major order |
+| `runs[].system` | Original manifest/profile resources, selected component identifiers and actual preflight implementation identities |
+| `runs[].scenario` | Effective dynamics/environment, initial conditions, tracking/context, integration, physics, terrain and world hash |
+| `runs[].robot` | Actual physical deployment, full authoritative description/limits and holding configuration |
+| `runs[].estimation`, `prediction`, `control` | Effective owner parameters and implementations, strategy and actuation settings |
+| `runs[].sensors` | Existing M07 inventory: configured producers/fusion, noise/R, timing, routing and provenance; not live health |
+| `runs[].sources` | Selected original owner resources, captured hashes/parent ancestry, and explicit runtime/seed overrides |
+| `runs[].seed_consumers` | Effective target and independently derived localization seeds, when selected |
+| `runs[].experimental_variables` | Actual materialized values, exact paths, declared permitted sets and selected owner documents |
+| `runs[].comparison` | Complete unmodified original/invariant contracts, hashes, protected conditions and configuration decision |
+| `comparison.configuration_compatibility` | Whole-experiment input compatibility and specific rejection reasons |
+| `comparison.runtime_eligibility` | Always null: runtime evidence has not been evaluated |
+
+For the noise study, `pose_white_noise_std.value` is
+`[0.04, 0.04, 0.03490658503988659]` versus
+`[0.08, 0.08, 0.06981317007977318]`. Its original hashes differ and its invariant
+hashes match. `declared_values` is an allowed set, **not a variant assignment**;
+S1 does not change parameter values. Paths labeled `<materialized>` are stable
+display identities for deleted temporary inputs. Original source paths remain
+visible; scientific contract contents and hashes are never display-normalized.
+
+Window start/end are null because readiness has not happened. Configuration
+compatibility does not establish completion, measured control validity, sensor
+health, metrics, physical safety coverage or runtime scientific acceptance.
+The manipulation A–E study can explain successfully while reporting incompatible
+physical configurations. Exit 0 means a complete explanation, including an
+honest incompatible decision. Invalid configuration/materialization returns 2,
+leaves stdout empty and reports an error on stderr; diagnostics also use stderr.
+Normal execution/validate-only errors retain their existing output behavior.
+
+Parameter dictionaries show validated owner/preflight inputs. Read the actual
+implementation identities and strategy alongside them: a strategy can select
+WLS even when the base ROS parameter file defaults to DLS. Likewise,
+`runtime.settings` and `control.runtime` show effective launch flags, which take
+precedence over owner defaults for command and ground-truth publication.
+
+Provenance covers selected resources, their captured inheritance ancestry and
+M07's final calibration-resource ownership; it does not provide full per-key
+ancestry. Hashes identify recorded inputs, not deterministic physical replay or
+artifact authenticity. Source-tree identity can be unavailable outside Git;
+metric-definition hashing remains independent of installation location.

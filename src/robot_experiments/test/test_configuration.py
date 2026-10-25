@@ -9,19 +9,33 @@ SHARE=lambda name:SRC/name
 
 
 def test_localization_materialization_uses_independent_seed_and_records_contract(tmp_path):
- spec=load_experiment(document(tmp_path, variants=[{'name':'localized', 'system_config':
-     {'package':'robot_bringup','path':'config/system_manipulation_D_localized.yaml'}}]), SHARE)
- run=tmp_path/'run';run.mkdir()
- prepared=materialize_run(spec['variants'][0],917,run,SHARE,spec['runtime'])
- from robot_configuration.yaml_loader import load_yaml
- sim=load_yaml(prepared['simulation_path'])
- sensor=load_yaml(sim['localization_sensor_config'])['localization_sensor']
- target=load_yaml(sim['simulation']['measurement_config'])['measurements']['target_position']
- assert sensor['random_seed'] != target['random_seed']
- assert target['random_seed'] == 917
- assert prepared['context']['topics']['localization_measurement'] == sensor['topic']
- assert prepared['comparison_contract']['localization_sensor']['localization_sensor'] == sensor
- assert prepared['snapshot']['seed_consumers']['localization_sensor.random_seed'] == sensor['random_seed']
+    """The resolved-run inventory must describe materialized resources and seeds."""
+    spec = load_experiment(document(tmp_path, variants=[{
+        'name': 'localized', 'system_config': {
+            'package': 'robot_bringup',
+            'path': 'config/system_manipulation_D_localized.yaml'}}]), SHARE)
+    run = tmp_path / 'run'
+    run.mkdir()
+    prepared = materialize_run(spec['variants'][0], 917, run, SHARE, spec['runtime'])
+    from robot_configuration.yaml_loader import load_yaml
+    sim = load_yaml(prepared['simulation_path'])
+    sensor = load_yaml(sim['localization_sensor_config'])['localization_sensor']
+    target = load_yaml(sim['simulation']['measurement_config'])['measurements']['target_position']
+    assert sensor['random_seed'] != target['random_seed']
+    assert target['random_seed'] == 917
+    assert prepared['context']['topics']['localization_measurement'] == sensor['topic']
+    assert prepared['comparison_contract']['localization_sensor']['localization_sensor'] == sensor
+    assert prepared['snapshot']['seed_consumers']['localization_sensor.random_seed'] == (
+        sensor['random_seed'])
+
+    assert 'sensor_inventory' in prepared['plan'], (
+        'resolved-run metadata must include M07 inventory')
+    sources = prepared['plan']['sensor_inventory']['sources']
+    assert sources['external_planar_localization']['simulated_effects']['random_seed'] == (
+        sensor['random_seed'])
+    assert sources['target_position']['simulated_effects']['random_seed'] == 917
+    assert sources['external_planar_localization']['configuration']['producer_resource'] == (
+        sim['localization_sensor_config'])
 
 def document(tmp_path,**changes):
  data={'schema_version':1,'experiment':{'name':'paired','duration':2.,'settling_time':1.,'seeds':[42],

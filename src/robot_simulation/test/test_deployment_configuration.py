@@ -10,7 +10,7 @@ from robot_configuration.yaml_loader import load_yaml
 
 def configurations():
     root = Path(__file__).parents[1]
-    deployment = load_yaml(root / 'config/scenarios/reactive_target_oscillatory.yaml')
+    deployment = load_yaml(root / 'config/scenarios/oscillatory_reactive_tracking.yaml')
     return [deployment, load_yaml(root / deployment['target']['config']),
             load_yaml(root / deployment['simulation']['environment_config']),
             load_yaml(root / deployment['simulation']['config']),

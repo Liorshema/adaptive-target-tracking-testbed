@@ -67,7 +67,10 @@ def test_arm_priority_changes_only_normalized_base_yaw_cost():
 def test_nominal_remains_identical_and_challenge_direct_launch_has_physical_feedback():
     """Wrist selection must preserve challenge deployment, including enabled truth."""
     root = share('robot_bringup') / 'config'
-    assert load_yaml(root / 'system_manipulation_A.yaml') == load_yaml(root / 'system_nominal.yaml')
+    experiment = load_experiment(
+        share('robot_experiments') / 'config/reactive_manipulation.yaml', share)
+    nominal = next(v for v in experiment['variants'] if v['name'] == 'A')
+    assert nominal['system_config'] == root / 'system_nominal.yaml'
     base_deployment = load_yaml(share('robot_simulation') / 'config/gazebo/robot_manipulation.yaml')
     for name in ['B', 'C', 'D', 'E']:
         plan = load_system_configuration(root / f'system_manipulation_{name}.yaml', share)

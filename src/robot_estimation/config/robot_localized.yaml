@@ -13,4 +13,10 @@ estimation_node:
     localization_frame: world
     localization_max_age: 0.15
     localization_nis_limit: 11.345
+    localization_consensus_window: 5
+    localization_consensus_inliers: 4
+    localization_consensus_span: 0.30
+    localization_consensus_max_age: 0.80
+    localization_trust_timeout: 0.35
+    localization_recovery_nis_target: 3.0
     localization_transform_tolerance: 0.000001

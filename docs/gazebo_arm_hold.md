@@ -76,7 +76,7 @@ Compute Only nodes and the appropriate world/odom TF for integration checks.
 ```bash
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 docs/validation/compute_only_gazebo.py
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 tools/validation/compute_only_gazebo.py
 ```
 
 `--gui` exercises the default GUI launch without a gui override. GUI startup
@@ -84,8 +84,8 @@ was exercised and delivered real feedback, but that session exited cleanly at
 about 28 simulated seconds. Quantitative sustained verification completed with
 the same permanent launch using `gui:=false` and the final tuned configuration.
 
-Recorded results in [validation/arm_hold_result.json](validation/arm_hold_result.json)
-and [validation/arm_hold_runtime.log](validation/arm_hold_runtime.log):
+Recorded results in [validation/arm_hold_result.json](../results/validation/arm_hold_result.json)
+and [validation/arm_hold_runtime.log](../results/validation/arm_hold_runtime.log):
 
 - 35 simulated seconds of running physics; 1,776 observed samples during the
   settled interval from t=5.0 through t=34.957 seconds.
@@ -125,7 +125,7 @@ terrain configuration.
 - Extended robot_simulation/gazebo/world_builder.py to accept additional initial-world models.
 - Updated setup.py to install nested Gazebo YAML and package.xml dependencies.
 - Added test/test_robot_builder.py and extended test/test_world_builder.py.
-- Updated docs/validation/compute_only_gazebo.py to verify permanent holding.
+- Updated tools/validation/compute_only_gazebo.py to verify permanent holding.
 - Added this report and arm_hold_result.json / arm_hold_runtime.log; updated
   Control milestone documentation and the implementation plan.
 

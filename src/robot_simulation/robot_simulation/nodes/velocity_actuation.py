@@ -431,8 +431,11 @@ def main(args=None):
         signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if node is not None:
             if rclpy.ok():
+                node._timer.cancel()
                 node._halt('Shutdown')
-                rclpy.spin_once(node, timeout_sec=0.05)
+                # Do not dispatch queued feedback/commands after the final hold.
+                if node._base_publisher is not None:
+                    node._base_publisher.wait_for_all_acked(Duration(seconds=.05))
             node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

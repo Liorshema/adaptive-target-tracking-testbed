@@ -1,8 +1,8 @@
 # Current architecture
 
-Authoritative navigation guide, updated 2026-10-18 through M09. The earlier M06 audit,
+Authoritative navigation guide, updated 2026-10-25. The earlier M06 audit,
 target tree and compatibility-migration report describe historical states. Current
-source has ten ROS packages, seven executable ROS adapters plus one experiment CLI, and no M06 Python
+source has ten ROS packages, ROS adapters and an experiment CLI, and no M06 Python
 compatibility aliases. See [hardening verification](m06_1_architecture_hardening.md).
 M07 selection and runtime validation are documented in
 [the unified configuration guide](m07_unified_system_configuration.md).
@@ -158,7 +158,7 @@ stubs have been removed. No aerial implementation is advertised.
 
 All architecture views use the actual filesystem through
 [`tools/show_architecture.py`](../tools/show_architecture.py). Generate the full
-current [canonical tree](validation/m09_workspace_tree.txt), or inspect one package:
+current canonical tree, or inspect one package (stored tree exports are historical):
 
 ```bash
 python3 tools/show_architecture.py
@@ -313,17 +313,23 @@ canonical records/contracts. Active historical-estimator loaders translate only
 old import statements in memory; archived file bytes stay unchanged and no old
 runtime package aliases are installed.
 
-Current validation utilities live in `docs/validation/`. Historical captures there
-may be version controlled or local/untracked; check `git ls-files` rather than
-assuming every linked artifact ships with a clone. New large raw outputs belong
-in ignored `results/<run>/`. Never delete prior evidence to clean the source tree.
+Reusable validation utilities and fixtures live in [`tools/validation/`](../tools/validation/README.md).
+Permanent reports live in `docs/validation/`; captured data and source snapshots
+live in ignored `results/validation/`, with experiments in `results/<study>/`.
+Large historical studies and copied workspaces use verified `results/archives/`
+archives. See the [cleanup report](repository_cleanup.md) and root README for
+restore commands and the explicit removal of unused buffer subclasses. Historical
+architecture reports describe their original states. Local evidence is preserved
+but does not ship with a source clone.
 
-Known limitations remain: effort-PID physical overspeed, skid localization drift,
-aggressive covariance overconfidence, prediction gaps and imperfect aggressive
-tracking/RTF. The robot family is still planar mobile-manipulator. Standalone
-profile joint ordering/mount metadata needs future validation. Learned adapters
-and alternate fusion libraries are not all deployed factory choices. No real-hardware
-safety, SLAM, unified experiment runner or dashboard is claimed.
+The robot family remains a planar mobile manipulator. Learned adapters and
+alternate fusion libraries are not all deployed factory choices. Physical safety
+and localization results have progressed since M06; use the
+[actuation resolution](validation/m02_actuation_safety_resolution.md) and
+[localization closure](validation/m03_robustness_closure.md) for measured status.
+[R1C benchmarking remains CONDITIONAL](validation/runtime_reliability_r1c_closure.md)
+because incomplete observation coverage prevents unconditional comparative
+acceptance. No real-hardware safety certification or SLAM is claimed.
 
 Metadata provenance is preserved: estimation declares MIT without a bundled license
 text; prediction's existing LICENSE is empty; description, interfaces and estimation

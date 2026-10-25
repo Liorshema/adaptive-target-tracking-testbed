@@ -124,7 +124,7 @@ of the intended +X camera or true world pose.
 
 **Visualization and ownership**
 
-![Actual Gazebo axes before and after](validation/orientation_axes.png)
+![Actual Gazebo axes before and after](../results/validation/orientation_axes.png)
 
 `visualize_tracking:=true` enables a small ROS MarkerArray publisher in the
 existing robot_bringup package and an observational Gazebo OdometryPublisher in
@@ -231,25 +231,25 @@ Run these GUI commands in separate terminals if both views are desired. For
 headless acceptance, raw-frame capture and safety regression:
 
 ```bash
-python3 docs/validation/v2_tracking_gazebo.py --case v2 --physical-ground-truth \
+python3 tools/validation/v2_tracking_gazebo.py --case v2 --physical-ground-truth \
   --output /tmp/camera_physical_acceptance
-python3 docs/validation/v2_orientation_probe.py --visualization --output /tmp/camera_probe
-python3 docs/validation/closed_loop_safety.py --case failures \
+python3 tools/validation/v2_orientation_probe.py --visualization --output /tmp/camera_probe
+python3 tools/validation/closed_loop_safety.py --case failures \
   --config config/optimal_tracking.yaml --strategy-config config/whole_body.yaml \
   --visualization --output /tmp/camera_safety
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros \
   -q -k 'not flake8 and not pep257 and not copyright'
-python3 docs/validation/analyze_orientation.py
-MPLCONFIGDIR=/tmp/orientation_plot python3 docs/validation/plot_orientation.py
+python3 tools/validation/analyze_orientation.py
+MPLCONFIGDIR=/tmp/orientation_plot python3 tools/validation/plot_orientation.py
 ```
 
 The capture writes native Gazebo poses, raw streams, processing order and a full
 snapshot. Its before/after source data are preserved in orientation_z_baseline
 and orientation_x_corrected; final acceptance and safety results are in
 orientation_final_physical and orientation_safety. Failed diagnostic attempts
-remain separate. The complete exact [changed-file list](validation/orientation_modified_files.txt)
+remain separate. The complete exact [changed-file list](../results/validation/orientation_modified_files.txt)
 contains 21 implementation/document files; logs, JSON and figure artifacts are
-under docs/validation/orientation*. Existing untracked evidence was preserved.
+under results/validation/orientation*. Existing untracked evidence was preserved.
 No commit or push was made. Wheel/world localization mismatch and the proposed
 reorder buffer remain explicit follow-up work; this change corrects the optical
 axis and makes physical versus inferred tracking visible.

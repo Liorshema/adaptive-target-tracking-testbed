@@ -154,14 +154,14 @@ The original baseline remains `system_config:=config/system_manipulation_D.yaml`
 ```bash
 source /home/user/ros2_ws/install/setup.bash
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-python3 docs/validation/m03_localization_run.py \
+python3 tools/validation/m03_localization_run.py \
   --output results/m03_localization_reproduce --duration 90 --seeds 42 917
-python3 docs/validation/m03_localization_metrics.py \
+python3 tools/validation/m03_localization_metrics.py \
   --study results/m03_localization_reproduce/REPLACE_WITH_CREATED_STUDY \
   --output results/m03_localization_reproduce_analysis
-python3 docs/validation/m03_localization_run.py \
+python3 tools/validation/m03_localization_run.py \
   --output results/m03_localization_reproduce_degraded --duration 18 --seeds 42 --modes degraded
-python3 docs/validation/m02_resolution_reset.py \
+python3 tools/validation/m02_resolution_reset.py \
   --output results/m03_localization_reproduce_reset \
   --system-config config/system_manipulation_D_localized.yaml
 ROS_LOG_DIR=/tmp/m03_reproduce_tests python3 -m pytest src -q --import-mode=importlib \
@@ -185,10 +185,10 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
 source /opt/ros/jazzy/setup.bash
 source /tmp/m03_localization_copy/install/local_setup.bash
 cd /tmp
-python3 /home/user/ros2_ws/docs/validation/m03_localization_verify_installation.py \
+python3 /home/user/ros2_ws/tools/validation/m03_localization_verify_installation.py \
   --prefix /tmp/m03_localization_copy/install --copied \
   --output /tmp/m03_localization_installation.json
-python3 /home/user/ros2_ws/docs/validation/m03_localization_run.py \
+python3 /home/user/ros2_ws/tools/validation/m03_localization_run.py \
   --output /home/user/ros2_ws/results/m03_localization_copied_reproduce \
   --duration 10 --seeds 42 --modes localized'
 ```

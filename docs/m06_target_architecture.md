@@ -6,7 +6,7 @@
 
 2026-10-15 design, approved and implemented 2026-10-16.
 See [structural consolidation results](m06_structural_consolidation.md) for actual
-verification and [the final tree](validation/m06_final_tree.txt). The proposed tree
+verification and [the final tree](../results/validation/m06_final_tree.txt). The proposed tree
 below is retained as the approved design record. Implementation additionally added
 missing `robot_control/factory/__init__.py` and `pipeline/__init__.py` package markers
 after the copied-install check exposed their omission, plus direct `launch` and

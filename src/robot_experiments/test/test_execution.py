@@ -259,3 +259,24 @@ def test_poll_does_not_scan_process_tree(monkeypatch, tmp_path):
     for _ in range(100):
         assert launch.poll() is None
     assert time.monotonic() - started < .1
+
+
+def test_stop_allows_launch_to_order_child_shutdown(tmp_path):
+    """Runner SIGINT must reach the launch owner before its managed children."""
+    ready = tmp_path/'ready'
+    signal_file = tmp_path/'child-int'
+    child = ('import signal,time,pathlib; '
+             f'signal.signal(signal.SIGINT,lambda *a:pathlib.Path({str(signal_file)!r}).write_text("unexpected")); '
+             f'pathlib.Path({str(ready)!r}).write_text("ready"); time.sleep(60)')
+    parent = ('import signal,subprocess,time,sys; '
+              f'p=subprocess.Popen([sys.executable,"-c",{child!r}]); '
+              'signal.signal(signal.SIGINT,lambda *a:(time.sleep(.1),p.terminate(),p.wait(),sys.exit(0))); time.sleep(60)')
+    launch = OwnedLaunch([sys.executable, '-c', parent], dict(os.environ), tmp_path/'ordered.log').start()
+    try:
+        wait_file(ready)
+        outcome = launch.stop(grace=2.)
+        assert not signal_file.exists()
+        assert outcome['returncode'] == 0
+        assert outcome['survivors'] == []
+    finally:
+        launch.stop(grace=.2)

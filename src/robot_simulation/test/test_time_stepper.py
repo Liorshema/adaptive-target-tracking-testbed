@@ -171,3 +171,28 @@ def test_time_stepper_handles_floating_point_boundaries():
         state = stepper.advance(state, target_time)
 
         assert state.time == target_time
+
+
+def test_missing_context_returns_completed_substeps_only_when_requested():
+    """Valid work survives a frontier hole without using unavailable context."""
+    from robot_simulation.state.physical_context import ContextUnavailable
+    def refresh(state):
+        if state.time >= .03 - 1e-12:
+            raise ContextUnavailable('missing frontier')
+        return state
+    original = make_state()
+    partial = make_stepper().advance(original, .08, refresh, allow_partial=True)
+    assert partial.time == pytest.approx(.03)
+    np.testing.assert_allclose(partial.target.position, [.03,.06,.09])
+    assert original.time == 0.
+    resumed = make_stepper().advance(partial, .08, lambda state: state, allow_partial=True)
+    assert resumed.time == pytest.approx(.08)
+    with pytest.raises(ContextUnavailable):
+        make_stepper().advance(original, .08, refresh)
+
+
+def test_partial_mode_does_not_hide_model_errors():
+    def broken(state):
+        raise ValueError('invalid physics')
+    with pytest.raises(ValueError, match='invalid physics'):
+        make_stepper().advance(make_state(), .08, broken, allow_partial=True)

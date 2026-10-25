@@ -92,6 +92,17 @@ class ExtendedKalmanFilter(FilterInterface):
         """
         return self._state.copy()
 
+    def add_process_uncertainty(self, increment):
+        """Add explicit PSD model uncertainty without resetting mean or epoch."""
+        increment = np.asarray(increment, dtype=float)
+        if (increment.shape != self._state.covariance.shape
+                or not np.isfinite(increment).all()
+                or not np.allclose(increment, increment.T, atol=1e-12, rtol=0.)
+                or np.linalg.eigvalsh(increment).min() < -1e-12):
+            raise ValueError('Process uncertainty increment must be finite symmetric PSD')
+        self._state = StateEstimate(self._state.mean.copy(),
+            self._state.covariance+(increment+increment.T)/2, self._state.timestamp)
+
     def predict(
         self,
         dt: float,

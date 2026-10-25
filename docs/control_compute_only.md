@@ -111,7 +111,7 @@ colcon build --symlink-install --packages-up-to robot_simulation robot_control r
 source install/setup.bash
 colcon test --packages-select robot_control robot_estimation robot_prediction
 colcon test-result --verbose
-python3 docs/validation/compute_only_gazebo.py
+python3 tools/validation/compute_only_gazebo.py
 ```
 
 The normal simulation launch builds its initial world and robot from the real description.

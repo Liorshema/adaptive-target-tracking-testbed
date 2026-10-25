@@ -92,8 +92,8 @@ Evidence is `results/reactive_challenge_reset/reset_20261019T160239_195024Z_vp44
 
 ## Kinematic feasibility
 
-[Reproducer](validation/reactive_challenge_feasibility.py) and
-[numerical witnesses](validation/reactive_challenge_feasibility.json) use actual
+[Reproducer](../tools/validation/reactive_challenge_feasibility.py) and
+[numerical witnesses](../results/validation/reactive_challenge_feasibility.json) use actual
 `robot_models` FK/Jacobians and authoritative description. Base world z is `.25 m`,
 shoulder world z `.43 m`; camera mount is wrist translation `[.12,0,0]`, zero RPY,
 selected optical +X. No second approximate kinematic implementation is used.
@@ -126,7 +126,7 @@ the existing local differential controller from the nominal startup posture.
 
 | Variant | System resource in robot_bringup/config | Target | Wrist | WLS |
 |---|---|---|---|---|
-| A | system_manipulation_A.yaml | Existing nominal | Nominal | Nominal |
+| A | system_nominal.yaml | Existing nominal | Nominal | Nominal |
 | B | system_manipulation_B.yaml | Challenge | Nominal | Nominal |
 | C | system_manipulation_C.yaml | Challenge | ±15° | Nominal |
 | D | system_manipulation_D.yaml | Challenge | ±15° | Arm priority |
@@ -152,8 +152,8 @@ motion, and skid-dependent plant response also affect allocation.
 
 Experimental `robot_control/config/whole_body_manipulation_arm_priority.yaml`
 changes only base-yaw motion weight `2 → 12`. Base yaw remains available.
-[Verified single-mount solver evidence](validation/reactive_challenge_allocation_verified.json)
-and [reproducer](validation/reactive_challenge_allocation_verified.py) show centered
+[Verified single-mount solver evidence](../results/validation/reactive_challenge_allocation_verified.json)
+and [reproducer](../tools/validation/reactive_challenge_allocation_verified.py) show centered
 base/arm yaw `.11037/.05719 rad/s` nominal versus `.04954/.11797 rad/s` experimental:
 arm share `34.13% → 70.42%` in this specific task. At the arm upper bound, the
 candidate arm-yaw speed is zero and base yaw is `.16726 rad/s`. These are genuine
@@ -180,7 +180,7 @@ share a physical contract but still have reactive trajectory differences.
 An interrupted initial study completed A/B seed42 but left C orphaned after the
 recorder stopped. Its partial telemetry and 8.4 GB extended actuator trace remain
 preserved and excluded from acceptance. Only its verified private ownership-marker
-processes were stopped; [cleanup](validation/reactive_challenge_interruption_cleanup.json)
+processes were stopped; [cleanup](../results/validation/reactive_challenge_interruption_cleanup.json)
 reports no survivors. Subsequent bounded retry failures are retained separately.
 Their timestamp/readiness failures motivated the causal catch-up correction above;
 no old failed run is relabeled successful. The final study uses the corrected
@@ -215,7 +215,7 @@ ros2 launch robot_bringup closed_loop.launch.py \
   system_config:=config/system_manipulation_B.yaml enable_actuation:=true gui:=false
 
 # Choose one of the other exact installed selections:
-ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_manipulation_A.yaml enable_actuation:=true gui:=false
+ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_nominal.yaml enable_actuation:=true gui:=false
 ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_manipulation_C.yaml enable_actuation:=true gui:=false
 ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_manipulation_D.yaml enable_actuation:=true gui:=false
 ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_manipulation_E.yaml enable_actuation:=true gui:=false
@@ -229,13 +229,13 @@ ros2 run robot_experiments run --config config/reactive_manipulation.yaml \
 ros2 launch robot_bringup visualization.launch.py \
   system_config:=config/system_manipulation_C.yaml enable_actuation:=true gui:=true rviz:=true
 
-python3 docs/validation/reactive_challenge_feasibility.py --output /tmp/challenge_fk_fresh.json
-python3 docs/validation/reactive_challenge_allocation_verified.py --output /tmp/challenge_wls_fresh.json
-python3 docs/validation/reactive_challenge_report.py --study STUDY_DIRECTORY \
+python3 tools/validation/reactive_challenge_feasibility.py --output /tmp/challenge_fk_fresh.json
+python3 tools/validation/reactive_challenge_allocation_verified.py --output /tmp/challenge_wls_fresh.json
+python3 tools/validation/reactive_challenge_report.py --study STUDY_DIRECTORY \
   --output FRESH_REPORT_DIRECTORY
 
 # Permanent launch compute-only check:
-python3 docs/validation/m09_live.py --output results/challenge_compute_reproduction \
+python3 tools/validation/m09_live.py --output results/challenge_compute_reproduction \
   --compute-only --duration 4 --settling-time 2
 ```
 
@@ -295,7 +295,7 @@ Every completed challenge entered the configured low region and physical rear he
 | E_seed42 / vertical_escape | [0.452, 1.261, 0.951, 1.045] | 0.681–0.865 |
 | E_seed42 / orbit | [0.051, 0.357, 0.242, 0.000] | 0.799–0.834 |
 
-Full per-joint, per-phase range, observed travel, time-weighted RMS speed, peak speed, position/speed utilization, near-bound duration, violation count/duration, coverage and gaps for both seeds are in [the joint metrics CSV](validation/reactive_challenge_joint_metrics.csv). Startup and active summaries are separate. Motion is unsmoothed physical feedback resolved by joint name.
+Full per-joint, per-phase range, observed travel, time-weighted RMS speed, peak speed, position/speed utilization, near-bound duration, violation count/duration, coverage and gaps for both seeds are in [the joint metrics CSV](../results/validation/reactive_challenge_joint_metrics.csv). Startup and active summaries are separate. Motion is unsmoothed physical feedback resolved by joint name.
 
 | Run | Shoulder / elbow observed travel [rad] | Arm yaw range [rad] | Physical base yaw excursion [rad] | Base planar travel [m] |
 |---|---:|---:|---:|---:|
@@ -348,10 +348,10 @@ Recovery, inactivity and fault durations describe only observed eligible source-
 
 - Baseline: 1,224 functional tests; ten-package build; nominal isolated Gazebo
   trace accepted. Baseline hashes/status are in
-  [the preservation baseline](validation/reactive_challenge_baseline.json).
+  [the preservation baseline](../results/validation/reactive_challenge_baseline.json).
 - Final functional/architecture/integration regression: **1,272 passed**,
   18 existing copyright/style checks deselected. Log:
-  `docs/validation/reactive_challenge_verified_regression.log`. The whole style
+  `results/validation/reactive_challenge_verified_regression.log`. The whole style
   suite is not claimed clean; scoped lint of the new guidance, schedule, context
   and phase-metrics modules passes (`reactive_challenge_new_lint_pass.log`).
 - Red/green tests cover guidance signs/regularization/determinism, strict YAML,
@@ -362,7 +362,7 @@ Recovery, inactivity and fault durations describe only observed eligible source-
 - All **ten ROS packages** built in normal and independent copied installations.
   The final snapshot-only experiment package was copied again after adding the
   new context comparison-identity field; no numerical algorithm changed.
-  [Copied verification](validation/reactive_challenge_snapshot_installed.json)
+  [Copied verification](../results/validation/reactive_challenge_snapshot_installed.json)
   checks module origins outside the checkout, installed A–E resources, launch
   composition, native motor binary and consistent selected descriptions.
 - Both normal and copied-install real Gazebo compute-only probes passed **29/29**
@@ -375,7 +375,7 @@ Recovery, inactivity and fault durations describe only observed eligible source-
   cleanup. Reproduce with:
 
   ```bash
-  python3 docs/validation/m02_resolution_reset.py \
+  python3 tools/validation/m02_resolution_reset.py \
     --output results/challenge_reset_reproduction \
     --system-config config/system_manipulation_C.yaml
   ```
@@ -384,7 +384,7 @@ Recovery, inactivity and fault durations describe only observed eligible source-
   context starvation, latched-stop reason accounting and a duplicate camera mount
   in an offline WLS probe. Corrected numerical evidence supersedes that probe;
   runtime kinematics never adopted the duplicate mount.
-- [Final process audit](validation/reactive_challenge_final_processes.json)
+- [Final process audit](../results/validation/reactive_challenge_final_processes.json)
   contains no running Gazebo/simulation/actuation launch processes. No staging,
   commits, Git resets, deletion of historical data or pushes occurred.
 
@@ -410,10 +410,10 @@ restricting the wrist solves those issues.
 
 ## Exact change inventory and preservation
 
-[Task-only file inventory](validation/reactive_challenge_modified_files.txt)
+[Task-only file inventory](../results/validation/reactive_challenge_modified_files.txt)
 distinguishes modified existing files, added source/config/tests, engineering
 reports and validation evidence. Generated raw results and plots remain in the
-separate result directories listed there. [Preservation checks](validation/reactive_challenge_preservation.json)
+separate result directories listed there. [Preservation checks](../results/validation/reactive_challenge_preservation.json)
 record no missing baseline files and unchanged protected robot geometry, nominal
 manifest, estimator/predictor/control algorithms, native actuator/guard and holding
 configuration. Existing M02/M09 work and historical experiment evidence remain.

@@ -12,7 +12,7 @@ No M07/M08 work, algorithm tuning, commit or push was performed.
 
 The workspace now has nine ROS packages. `robot_configuration` is the sole new
 package; the other eight retain their responsibilities. Actual complete source
-tree: [`validation/m06_final_tree.txt`](validation/m06_final_tree.txt).
+tree: [`validation/m06_final_tree.txt`](../results/validation/m06_final_tree.txt).
 
 ```text
 robot_configuration/robot_configuration/yaml_loader.py
@@ -64,7 +64,7 @@ is retained as one thin compatibility alias: **10 implementations relocated,
 | `robot_simulation.factory.config_loader` | `robot_configuration.yaml_loader` |
 
 Machine-readable filesystem/module map and active import updates:
-[`m06_migration_map.json`](validation/m06_migration_map.json). New internal imports,
+[`m06_migration_map.json`](../results/validation/m06_migration_map.json). New internal imports,
 tests, console targets and active top-level validation utilities use canonical
 paths. No blanket replacement touched historical nested captures or archived
 before-source implementations.
@@ -105,7 +105,7 @@ alone do not justify editing historical evidence. No removal date was invented.
   `control_node.py.bak` and `control_node.py.before_tf.bak` now live under
   `results/legacy_backups/robot_control/`; the aggressive environment YAML backup
   lives under `results/legacy_backups/robot_simulation/`. Full mapping/hashes:
-  [`m06_backup_archive.json`](validation/m06_backup_archive.json). The archive is
+  [`m06_backup_archive.json`](../results/validation/m06_backup_archive.json). The archive is
   gitignored runtime storage; the pre-task rollback snapshot also retains bytes.
 - Removed only the identified broken old installed backup symlink left by the
   prior symlink installation. No broad install/source cleanup was performed. The
@@ -146,7 +146,7 @@ The copied-install check ran from `/tmp`, with workspace PYTHONPATH and ament pr
 variables removed, sourcing ROS and the copied install's **local_setup.bash**.
 Assertions require project modules and package shares to resolve under the copied
 prefix, preventing a source-tree/symlink import from masking missing packages.
-Results: [`m06_installed_checks.json`](validation/m06_installed_checks.json).
+Results: [`m06_installed_checks.json`](../results/validation/m06_installed_checks.json).
 This is an independent installed-resource check on the current machine, not a
 fresh-OS rosdep provisioning claim.
 
@@ -163,7 +163,7 @@ and no markers. Read-only estimator/actuation trace prefixes use the migrated
 entry points; `observed.launch.py` is the production launch source with those
 prefixes, not a separate controller implementation. No second Gazebo run was made.
 
-Evidence: [`m06_smoke/result.json`](validation/m06_smoke/result.json), raw streams,
+Evidence: [`m06_smoke/result.json`](../results/validation/m06_smoke/result.json), raw streams,
 generated SDF, timing/actuation traces and logs in the same directory.
 
 - Base excursion 0.720 m; all arm joints moved (excursions
@@ -198,7 +198,7 @@ source install/setup.bash
 python3 -m pytest src --import-mode=importlib \
   -p no:launch_testing -p no:launch_ros -q \
   -k 'not flake8 and not pep257 and not copyright'
-python3 docs/validation/m06_verify_instrumentation.py
+python3 tools/validation/m06_verify_instrumentation.py
 
 # Fresh copy build; choose an unused /tmp prefix when repeating.
 colcon --log-base /tmp/m06_repeat/log build --base-paths src \
@@ -208,7 +208,7 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
   bash --noprofile --norc -c 'source /opt/ros/jazzy/setup.bash
 source /tmp/m06_repeat/install/local_setup.bash
 cd /tmp
-python3 /home/user/ros2_ws/docs/validation/m06_verify_installation.py \
+python3 /home/user/ros2_ws/tools/validation/m06_verify_installation.py \
   --prefix /tmp/m06_repeat/install'
 
 # Normal headless launch; executable and resource contracts are unchanged.
@@ -221,12 +221,12 @@ ros2 launch robot_bringup closed_loop.launch.py \
 Exact smoke command used (do not overwrite its output when repeating):
 
 ```bash
-ROS_DOMAIN_ID=149 python3 docs/validation/v2_tracking_gazebo.py \
+ROS_DOMAIN_ID=149 python3 tools/validation/v2_tracking_gazebo.py \
   --case reactive --config config/reactive_tracking_oscillatory.yaml \
   --strategy-config config/whole_body.yaml --physical-ground-truth --without-markers \
   --shoulder-posture --estimator-trace --actuation-trace \
   --duration 16 --settling-time 4 --wall-timeout 120 \
-  --output docs/validation/m06_smoke
+  --output results/validation/m06_smoke
 ```
 
 ## Differences, limitations and closure
@@ -255,9 +255,9 @@ establish real-hardware safety.
 Deliverables:
 
 - This report: `docs/m06_structural_consolidation.md`.
-- Actual source tree: `docs/validation/m06_final_tree.txt`.
+- Actual source tree: `results/validation/m06_final_tree.txt`.
 - Exact task-local modified/moved/added/deleted path inventory:
-  `docs/validation/m06_modified_files.txt`; supporting implementation map and
+  `results/validation/m06_modified_files.txt`; supporting implementation map and
   preservation/review evidence are linked above.
 
 **M06 structural consolidation is complete. Stop here; M07/M08 were not started.**

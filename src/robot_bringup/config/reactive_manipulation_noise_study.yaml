@@ -1,0 +1,2 @@
+extends: reactive_manipulation_localized.yaml
+simulation_config: config/scenarios/reactive_manipulation_noise_study.yaml

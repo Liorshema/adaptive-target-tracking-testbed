@@ -156,3 +156,19 @@ def test_stepper_refreshes_causal_context_each_substep():
     result=TimeStepper(engine,.1,10).advance(state,.3,refresh_context=refresh)
     np.testing.assert_allclose(seen,[0.,.1,.2])
     assert result.time==.3
+
+
+def test_delayed_causal_context_repairs_hole_without_replacing_duplicate():
+    from robot_simulation.state.physical_context import PhysicalPositionHistory
+    h = PhysicalPositionHistory('world', 'test', .02, .1)
+    h.add(np.zeros(3), 1., 'world')
+    h.add(np.ones(3), 1.08, 'world')
+    h.add(np.full(3, 2.), 1.04, 'world')
+    h.add(np.full(3, 99.), 1.04, 'world')
+    np.testing.assert_equal(h.at(1.05).position_world, np.full(3, 2.))
+    assert h.at(.99) is None
+    for t in np.arange(1.1, 2., .01): h.add(np.zeros(3), float(t), 'world')
+    assert h.at(1.) is None
+    assert len(h._samples) <= 11
+    h.clear()
+    assert h.at(1.99) is None

@@ -1,0 +1,5 @@
+# Explicit null clears inherited WLS; the control owner retains Cartesian DLS defaults.
+extends: nominal_tracking.yaml
+control:
+  type: jacobian
+  strategy: null

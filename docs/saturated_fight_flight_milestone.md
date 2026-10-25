@@ -175,9 +175,9 @@ settled watchdog timeouts. Its checks also failed physical wrist speed
 limits passed. The observer returned nonzero as intended. These measurements
 do not certify a hard physical velocity ceiling.
 
-[Target trajectories](validation/saturated_trajectories.png) and
-[speed/tracking-error plots](validation/saturated_tracking.png) accompany
-[machine-readable comparison](validation/saturated_comparison.json).
+[Target trajectories](../results/validation/saturated_trajectories.png) and
+[speed/tracking-error plots](../results/validation/saturated_tracking.png) accompany
+[machine-readable comparison](../results/validation/saturated_comparison.json).
 
 ## Control and estimation diagnostics — read-only
 
@@ -290,16 +290,16 @@ Use separate terminals for the viewers. For baseline/low damping, replace
 `config/reactive_tracking_low_damping.yaml`; stop the previous run first.
 
 ```bash
-python3 docs/validation/saturated_dynamics_probe.py --output /tmp/saturated_math
-python3 docs/validation/v2_tracking_gazebo.py --case v2 \
+python3 tools/validation/saturated_dynamics_probe.py --output /tmp/saturated_math
+python3 tools/validation/v2_tracking_gazebo.py --case v2 \
   --config config/reactive_tracking_saturated.yaml --physical-ground-truth \
   --shoulder-posture --target-trace --duration 120 --wall-timeout 360 \
   --output /tmp/saturated_live
-python3 docs/validation/v2_tracking_gazebo.py --case v2 \
+python3 tools/validation/v2_tracking_gazebo.py --case v2 \
   --config config/reactive_tracking_saturated.yaml --physical-ground-truth \
   --duration 60 --wall-timeout 240 --output /tmp/saturated_production
-python3 docs/validation/saturated_diagnostics.py
-MPLCONFIGDIR=/tmp/saturated_mpl python3 docs/validation/analyze_saturated_milestone.py
+python3 tools/validation/saturated_diagnostics.py
+MPLCONFIGDIR=/tmp/saturated_mpl python3 tools/validation/analyze_saturated_milestone.py
 python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_ros \
   -q -k 'not flake8 and not pep257 and not copyright'
 ```
@@ -307,7 +307,7 @@ python3 -m pytest src --import-mode=importlib -p no:launch_testing -p no:launch_
 Live validators intentionally exit nonzero for the measured speed/performance
 failures and preserve results. Diagnostics/plot commands above reproduce analysis
 of the saved workspace captures; their paths are explicit in the scripts. Raw
-evidence is in `docs/validation/saturated_*`, with numerical cases, production
+evidence is in `results/validation/saturated_*`, with numerical cases, production
 snapshots, native poses, exact target states, TF inputs, all received joint speeds,
 commands/references, estimator order and comparison figures.
 
@@ -323,17 +323,17 @@ commands/references, estimator order and comparison figures.
 | src/robot_bringup/config/reactive_tracking_saturated.yaml | Select that experiment with the existing pipeline |
 | src/robot_simulation/test/test_saturated_fight_flight.py | Mathematical/compatibility/integration verification |
 | src/robot_simulation/test/test_configuration.py | Verify model selection and shared resource inheritance |
-| docs/validation/v2_tracking_gazebo.py | Reuse permanent-launch observer; exact traces, raw feedback and reliable shutdown |
-| docs/validation/shoulder_experiment_metrics.py | Extend independent physical metrics to XYZ, center and raw speed peaks |
-| docs/validation/test_shoulder_experiment_metrics.py | Verify raw velocity peak retention |
-| docs/validation/saturated_dynamics_cases.yaml | External standalone sweep parameters and initial/reference inputs |
-| docs/validation/saturated_dynamics_probe.py | Numerical sweeps using the existing factory/RK4 engine |
-| docs/validation/target_dynamics_trace.py | Read-only exact target state, acceleration and TF input |
-| docs/validation/actuation_dynamics_trace.py | Read-only emitted position-reference source timestamps |
-| docs/validation/saturated_diagnostics.py | Joint/PID, odometry and ordering analysis/replay |
-| docs/validation/analyze_saturated_milestone.py | Reproducible comparison and scientific figures |
+| tools/validation/v2_tracking_gazebo.py | Reuse permanent-launch observer; exact traces, raw feedback and reliable shutdown |
+| tools/validation/shoulder_experiment_metrics.py | Extend independent physical metrics to XYZ, center and raw speed peaks |
+| tools/validation/test_shoulder_experiment_metrics.py | Verify raw velocity peak retention |
+| tools/validation/saturated_dynamics_cases.yaml | External standalone sweep parameters and initial/reference inputs |
+| tools/validation/saturated_dynamics_probe.py | Numerical sweeps using the existing factory/RK4 engine |
+| tools/validation/target_dynamics_trace.py | Read-only exact target state, acceleration and TF input |
+| tools/validation/actuation_dynamics_trace.py | Read-only emitted position-reference source timestamps |
+| tools/validation/saturated_diagnostics.py | Joint/PID, odometry and ordering analysis/replay |
+| tools/validation/analyze_saturated_milestone.py | Reproducible comparison and scientific figures |
 | docs/saturated_fight_flight_milestone.md | Results, scope, limits and reproduction |
-| docs/validation/saturated_modified_files.txt | Exact change manifest |
+| results/validation/saturated_modified_files.txt | Exact change manifest |
 
 The recommended next milestone is **actuator physical-speed enforcement and
 state-timing/localization reliability**: distinguish regular integration from

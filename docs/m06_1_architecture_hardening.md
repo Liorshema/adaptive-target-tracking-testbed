@@ -22,7 +22,7 @@ The baseline snapshot contains 450 source/packaging/resource files plus README a
 the active installation checker (452 hashed files). The current source contains
 445 such files: 47 old paths removed, 42 new paths, and 71 existing files
 modified (largely imports). Moves count as an old path and a new path here.
-Counts exclude generated caches. The exact tree is [m06_1_final_tree.txt](validation/m06_1_final_tree.txt).
+Counts exclude generated caches. The exact tree is [m06_1_final_tree.txt](../results/validation/m06_1_final_tree.txt).
 
 | Concern | Before at 7cceaf3 | After |
 |---|---|---|
@@ -85,7 +85,7 @@ Other audited deletions:
 It now tests Hx/timestamp/input immutability, seeded Gaussian reproducibility and
 empirical covariance, and rejection of nonfinite input. Legitimate package
 initializers, ROS resource markers and actual interfaces were retained. The
-path-level deletion inventory is [m06_1_deleted.json](validation/m06_1_deleted.json).
+path-level deletion inventory is [m06_1_deleted.json](../results/validation/m06_1_deleted.json).
 
 ## Semantic consolidation and exact moves
 
@@ -162,7 +162,7 @@ ordering, unknown domains, absent optional folders, caches, and the current tree
 No manually maintained competing source tree was introduced.
 
 Exact source/destination/class inventory:
-[m06_1_semantic_moves.json](validation/m06_1_semantic_moves.json). Generic `common/`
+[m06_1_semantic_moves.json](../results/validation/m06_1_semantic_moves.json). Generic `common/`
 paths and obsolete semantic namespaces are explicitly forbidden by architecture
 tests. Package-level types.py remains optional for compact aliases; no package
 needs a generic type dumping ground or broader Any annotations.
@@ -240,7 +240,7 @@ grants. Retained metadata debt: estimation declares MIT without a bundled text;
 prediction's LICENSE is empty; description (`user@todo.todo`), interfaces
 (`user@example.com`) and estimation (`lior@example.com`) have placeholder maintainer
 emails. These require owner-supplied provenance. They are documented exceptions,
-not misleading source capabilities. Details: [metadata audit](validation/m06_1_metadata_audit.json).
+not misleading source capabilities. Details: [metadata audit](../results/validation/m06_1_metadata_audit.json).
 
 README lists all nine packages and links the current guide. Local links in README,
 the current guide, this report and the historical M06 banner targets were checked.
@@ -252,9 +252,9 @@ evidence. Historical evidence there may be tracked or untracked; `git ls-files`
 identifies what a clone includes. New raw output is in ignored
 `results/m06_1_smoke/`, `results/m06_1_semantic_smoke/` and their instrumentation
 directories. The before-source snapshot
-is preserved locally at ignored `docs/validation/m06_1_before/`, with `COLCON_IGNORE`. A second ignored `m06_1_semantic_before/` snapshot
+is preserved locally at ignored `results/validation/m06_1_before/`, with `COLCON_IGNORE`. A second ignored `m06_1_semantic_before/` snapshot
 preserves the completed first phase. All **792** pre-existing untracked evidence
-paths still exist ([preservation inventory](validation/m06_1_preserved_local_evidence.json)).
+paths still exist ([preservation inventory](../results/validation/m06_1_preserved_local_evidence.json)).
 Build/log output remains ignored. No large output or prior evidence was deleted.
 
 ## Verification evidence
@@ -268,14 +268,14 @@ Build/log output remains ignored. No large output or prior evidence was deleted.
 | Final architecture/tree/loader tests | **52 passed** (`m06_1_semantic_architecture_final.log`) |
 | Full functional regression | **921 passed**, 18 existing lint/copyright checks separately deselected, 8.17 s (`m06_1_semantic_regression_final.log`); first-phase 896-pass log preserved; no genuine functional failure deselected |
 | Syntax/canonical imports | All source/launch Python parsed; seven canonical nodes loaded from isolated install |
-| Syntax/docs links | **389 Python files parsed; 39 local links resolved**, no broken links in audited current/M06 docs ([JSON](validation/m06_1_syntax_and_links.json)) |
+| Syntax/docs links | **389 Python files parsed; 39 local links resolved**, no broken links in audited current/M06 docs ([JSON](../results/validation/m06_1_syntax_and_links.json)) |
 | Package discovery and normal build | **9 discovered; 9 built**, 12.1 s (`m06_1_packages.txt`, `m06_1_semantic_build.log`) |
 | Non-symlink isolated build | **9 built**, 20.7 s (`m06_1_semantic_copy_build.log`) |
-| Copied install, workspace paths removed, cwd=/tmp | **7 console entries, 10 absent M06 aliases, 28 semantic modules, 22 removed semantic paths, 64 resources and Xacro limits verified** ([JSON](validation/m06_1_semantic_installed_checks.json)) |
-| Configuration/physical preservation | **64 surviving YAML/Xacro/SDF/message assets byte-identical**; only empty disturbances YAML removed ([JSON](validation/m06_1_preservation.json)) |
+| Copied install, workspace paths removed, cwd=/tmp | **7 console entries, 10 absent M06 aliases, 28 semantic modules, 22 removed semantic paths, 64 resources and Xacro limits verified** ([JSON](../results/validation/m06_1_semantic_installed_checks.json)) |
+| Configuration/physical preservation | **64 surviving YAML/Xacro/SDF/message assets byte-identical**; only empty disturbances YAML removed ([JSON](../results/validation/m06_1_preservation.json)) |
 | Extracted filter numerical equivalence | Baseline/new robot and target mean, covariance and time match **exactly**, after prediction and observation updates; zero absolute/relative tolerance |
-| Instrumentation preservation | All four current/archived estimator/actuator probes select expected implementations and globals ([JSON](validation/m06_1_semantic_instrumentation.json)) |
-| Semantic numerical preservation | **155 production modules** match pre-semantic AST ignoring only imports; moved 5 records and 4 contract/data classes have exact class AST equality ([JSON](validation/m06_1_semantic_equivalence.json)) |
+| Instrumentation preservation | All four current/archived estimator/actuator probes select expected implementations and globals ([JSON](../results/validation/m06_1_semantic_instrumentation.json)) |
+| Semantic numerical preservation | **155 production modules** match pre-semantic AST ignoring only imports; moved 5 records and 4 contract/data classes have exact class AST equality ([JSON](../results/validation/m06_1_semantic_equivalence.json)) |
 | Independent bounded code review | No critical/important structural or behavior-preservation finding ([review](validation/m06_1_review.md)) |
 | Bounded nominal Gazebo | Active functional loop; **physical speed check failed**, exit 1; detailed results below |
 
@@ -294,7 +294,7 @@ actuation, headless, physical ground truth, unchanged limits/PID. Requested dura
 evaluation interval was 5.252–17.252 simulated seconds; **239** selected control
 samples. Measurements use physical Gazebo base pose plus measured joints and
 authoritative FK against target truth, not just the estimator's internal error.
-Compact source-linked evidence: [m06_1_semantic_smoke_summary.json](validation/m06_1_semantic_smoke_summary.json).
+Compact source-linked evidence: [m06_1_semantic_smoke_summary.json](../results/validation/m06_1_semantic_smoke_summary.json).
 
 | Metric | Measured |
 |---|---|
@@ -376,7 +376,7 @@ env -u PYTHONPATH -u AMENT_PREFIX_PATH -u COLCON_PREFIX_PATH \
     source /opt/ros/jazzy/setup.bash
     source /tmp/m06_1_semantic_copy/install/local_setup.bash
     cd /tmp
-    python3 /home/user/ros2_ws/docs/validation/m06_verify_installation.py \
+    python3 /home/user/ros2_ws/tools/validation/m06_verify_installation.py \
       --prefix /tmp/m06_1_semantic_copy/install'
 ```
 
@@ -393,7 +393,7 @@ Reproduce the bounded measurement with a **new** output directory; the observer'
 nonzero status for existing physical overspeed is expected and must not be suppressed:
 
 ```bash
-ROS_DOMAIN_ID=151 python3 docs/validation/v2_tracking_gazebo.py \
+ROS_DOMAIN_ID=151 python3 tools/validation/v2_tracking_gazebo.py \
   --case reactive --config config/reactive_tracking_oscillatory.yaml \
   --strategy-config config/whole_body.yaml --physical-ground-truth \
   --without-markers --shoulder-posture --estimator-trace --actuation-trace \
@@ -402,7 +402,7 @@ ROS_DOMAIN_ID=151 python3 docs/validation/v2_tracking_gazebo.py \
 ```
 
 Local baseline-preservation check (requires preserved before-source snapshot):
-`python3 docs/validation/m06_1_verify_preservation.py`. Snapshot is intentionally
+`python3 tools/validation/m06_1_verify_preservation.py`. Snapshot is intentionally
 not a required installed runtime resource. Fresh clones can compare source assets
 to commit `7cceaf3`; the compact preservation result records this workspace's run.
 The active instrumentation checker accepts `--case estimation` or `--case actuation`,
@@ -412,17 +412,17 @@ its historical aggregate default over existing M06 evidence.
 ## Changed files and remaining debt
 
 Exact edited/added/deleted task paths, excluding pre-existing untracked experiments:
-[m06_1_modified_files.txt](validation/m06_1_modified_files.txt). Changes comprise
+[m06_1_modified_files.txt](../results/validation/m06_1_modified_files.txt). Changes comprise
 the ten alias removals and unused directories/stubs, two cohesive extractions,
 behavioral/architecture tests, current docs, ignored rollback snapshot declaration,
 the semantic moves and tested tree-rendering utility, and validation evidence/checker updates. No package manifest, active YAML, Xacro,
 message or launch file changed.
 
-Requested review outputs: [git status --short](validation/m06_1_git_status_short.txt)
-and [git diff --stat](validation/m06_1_git_diff_stat.txt). Git's unstaged diff stat
+Requested review outputs: [git status --short](../results/validation/m06_1_git_status_short.txt)
+and [git diff --stat](../results/validation/m06_1_git_diff_stat.txt). Git's unstaged diff stat
 does not include new untracked files; the task inventory above includes them and
 excludes the preserved pre-existing experiment outputs. Cleanup evidence confirms
-[no robot/Gazebo workloads remain](validation/m06_1_process_cleanup.json).
+[no robot/Gazebo workloads remain](../results/validation/m06_1_process_cleanup.json).
 
 Completed: canonical paths, ownership enforcement, placeholder cleanup, packaging,
 documentation and all structural verification. No architectural investigation is
