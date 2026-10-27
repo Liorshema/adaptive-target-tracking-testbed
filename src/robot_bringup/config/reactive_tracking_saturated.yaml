@@ -1,2 +1,0 @@
-extends: reactive_tracking.yaml
-simulation_config: config/scenarios/reactive_target_saturated.yaml

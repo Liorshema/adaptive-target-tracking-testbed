@@ -7,9 +7,13 @@ import pytest
 
 from robot_bringup.factory.system_configuration import load_system_configuration
 
-from robot_configuration.yaml_loader import load_yaml
 
 import yaml
+from robot_experiments.configuration import resolve_system_resource
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -23,18 +27,21 @@ def share(package):
 
 def load(path, **kwargs):
     """Construct the components through the production M07 factory."""
-    return load_system_configuration(path, share, **kwargs)
+    return load_system_configuration(resolve_system_resource(
+        path, Path.cwd(), share), share, **kwargs)
 
 
 def system(name):
     """Select the additive explicit compositions."""
-    return share('robot_bringup') / f'config/systems/{name}.yaml'
+    return resolve_system_resource(share('robot_experiments') / f'config/systems/{name}.yaml', Path.cwd(
+    ), lambda package: Path(__file__).resolve().parents[2] / package)
 
 
 @pytest.mark.parametrize('old,new', PAIRS)
 def test_nominal_family_has_equal_owners_and_actual_implementations(old, new):
     """An actual factory preflight must preserve the historical mathematical selections."""
-    a = load(share('robot_bringup') / f'config/system_{old}.yaml')
+    from robot_bringup.factory.system_configuration import assemble_system_configuration
+    a = assemble_system_configuration(load_yaml(system(new)), system(new), share)
     b = load(system(new))
     for key in ['selection', 'identities', 'runtime', 'estimation_parameters',
                 'control_parameters', 'prediction_topics', 'description_path',
@@ -54,13 +61,17 @@ def test_nominal_family_has_equal_owners_and_actual_implementations(old, new):
 
 
 def test_variant_documents_express_only_the_genuine_component_differences():
-    """One inheritance edge suffices; explicit null is essential to clear WLS."""
-    assert 'extends' not in yaml.safe_load(system('nominal_tracking').read_text())
-    assert yaml.safe_load(system('cv_prediction').read_text()) == {
-        'extends': 'nominal_tracking.yaml', 'prediction': {
-            'type': 'constant_velocity', 'adaptation': 'none', 'fusion': 'none'}}
-    assert yaml.safe_load(system('dls_control').read_text()) == {
-        'extends': 'nominal_tracking.yaml', 'control': {'type': 'jacobian', 'strategy': None}}
+    """Explicit documents retain only the intended effective family differences."""
+    from copy import deepcopy
+    nominal = load_yaml(system('nominal_tracking'))
+    cv = load_yaml(system('cv_prediction'))
+    dls = load_yaml(system('dls_control'))
+    expected_cv = deepcopy(nominal)
+    expected_cv['prediction'].update(type='constant_velocity', adaptation='none', fusion='none')
+    assert cv == expected_cv
+    expected_dls = deepcopy(nominal)
+    expected_dls['control'].update(type='jacobian', strategy=None)
+    assert dls == expected_dls
 
 
 @pytest.mark.parametrize('mutation', [
@@ -82,9 +93,13 @@ def test_nominal_family_rejects_invalid_selections_before_launch(tmp_path, mutat
     elif mutation == 'strategy_conflict':
         data['control']['type'] = 'jacobian'
     elif mutation == 'path':
-        data['simulation']['config']['path'] = '../../outside.yaml'
+        data['simulation']['config'] = {
+            'package': 'robot_simulation',
+            'path': '../../outside.yaml'}
     elif mutation == 'package':
-        data['simulation']['config']['package'] = 'missing_package'
+        data['simulation']['config'] = {
+            'package': 'missing_package',
+            'path': 'config/deployment.yaml'}
     elif mutation == 'robot':
         data['simulation']['robot']['path'] = 'config/gazebo/robot_wrist15.yaml'
     elif mutation == 'description':
@@ -99,7 +114,7 @@ def test_nominal_family_rejects_invalid_selections_before_launch(tmp_path, mutat
         load(path)
 
 
-def actions(tmp_path, monkeypatch, path, overrides):
+def actions(tmp_path, monkeypatch, path, overrides, *, mapping=False):
     """Evaluate the real launch adapter without acquiring a runtime."""
     from launch import LaunchContext
     from launch.actions import IncludeLaunchDescription
@@ -109,13 +124,17 @@ def actions(tmp_path, monkeypatch, path, overrides):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setenv('ROS_LOG_DIR', str(tmp_path / 'ros'))
+    import robot_bringup.deployment.launching as module
     monkeypatch.setattr(module, 'get_package_share_directory', lambda p: str(share(p)))
     context = LaunchContext()
     context.launch_configurations.update(dict.fromkeys([
         'config', 'gui', 'enable_actuation', 'visualize_tracking', 'publish_ground_truth',
         'publish_commands', 'strategy_config', 'lookahead', 'feedforward'], ''))
     context.launch_configurations.update(system_config=str(path), **overrides)
-    result = module.configure(context)
+    from robot_bringup.factory.system_configuration import assemble_system_configuration
+    plan = (assemble_system_configuration(load_yaml(path), path, share, overrides)
+            if mapping else None)
+    result = module.configure(context, plan=plan)
     nodes = {str(a.node_executable): evaluate_parameters(context, a._Node__parameters)
              for a in result if hasattr(a, 'node_executable')}
     include = next(a for a in result if isinstance(a, IncludeLaunchDescription))
@@ -132,6 +151,6 @@ def test_actual_launch_inputs_and_override_precedence_are_equal(
         tmp_path, monkeypatch, old, new, overrides):
     """Default and explicit compute-only runtime routes deliver identical ROS parameters."""
     before = actions(tmp_path, monkeypatch,
-                     share('robot_bringup') / f'config/system_{old}.yaml', overrides)
-    after = actions(tmp_path, monkeypatch, system(new), overrides)
+                     system(new), overrides)
+    after = actions(tmp_path, monkeypatch, system(new), overrides, mapping=True)
     assert before == after

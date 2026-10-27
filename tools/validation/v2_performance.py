@@ -22,7 +22,9 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
 from rosgraph_msgs.msg import Clock
 from std_msgs.msg import Float64
-from robot_configuration.yaml_loader import load_yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / 'src' / package)
 from robot_interfaces.msg import (ControlTelemetry, SafeVelocityCommand,
                                   StateEstimate, PredictedTrajectory)
 import yaml
@@ -64,19 +66,23 @@ def main():
     if args.hold:
         launch.append('publish_commands:=false')
     # Explicit override survives scenario inheritance and template changes.
-    simulation_source = ROOT / 'src/robot_simulation/config/scenarios/moving_target.yaml'
-    simulation = load_yaml(simulation_source)
+    simulation = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                            'group': 'resources.deployment_moving_target'})
     simulation['world'].setdefault('physics', {})['max_step_size'] = args.step
     simulation['paths']['base'] = 'package'
     simfile = args.output / 'simulation.yaml'
     simfile.write_text(yaml.safe_dump(simulation))
-    bringup = load_yaml(ROOT / 'src/robot_bringup/config/closed_loop.yaml')
-    bringup['simulation_config'] = str(simfile)
+    from robot_experiments.launching import launch_profile
+    from robot_experiments.reporting import plain
+    bringup = plain(launch_profile('closed_loop', lambda p: ROOT / 'src' / p)['manifest'])
+    bringup['simulation']['config'] = str(simfile)
     config = args.output / 'bringup.yaml'
     config.write_text(yaml.safe_dump(bringup))
-    launch.append(f'config:={config}')
+    launch.append(f'system_config:={config.resolve()}')
     if args.instrument or args.profile_estimation or args.relay or args.joint_relay or args.estimator_cadence:
-        code = (ROOT / 'src/robot_bringup/launch/closed_loop.launch.py').read_text()
+        code = ((ROOT / 'src/robot_bringup/robot_bringup/deployment/launching.py').read_text() + '\n' +
+                (ROOT / 'src/robot_bringup/launch/closed_loop.launch.py').read_text().replace(
+                    'from robot_bringup.deployment.launching import configure', ''))
         if args.relay or args.joint_relay:
             simulation_launch = (ROOT / 'src/robot_simulation/launch/simulation.launch.py').read_text()
             remaps = [("/joint_states", "/v2/raw_joints")]

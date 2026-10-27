@@ -90,7 +90,7 @@ def configure(context):
 def generate_launch_description():
     """Offer GUI clients separately from explicit physical actuation."""
     return LaunchDescription([
-        DeclareLaunchArgument('system_config',default_value='config/system_nominal.yaml'),
+        DeclareLaunchArgument('system_config',default_value='',description='Required explicit system manifest'),
         DeclareLaunchArgument('visualization_config',default_value='config/tracking_visualization.yaml'),
         DeclareLaunchArgument('gui',default_value='false',description='Optional Gazebo GUI-only client'),
         DeclareLaunchArgument('rviz',default_value='false',description='Optional RViz client'),

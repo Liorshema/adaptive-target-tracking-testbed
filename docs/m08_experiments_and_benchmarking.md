@@ -1,5 +1,12 @@
 # M08 — Experiments and benchmarking
 
+Current ownership, canonical configuration paths and direct-launch migration are
+documented in the [experiment-management guide](experiment_management.md).
+The milestone/design details below retain their original historical context.
+
+
+> Current study definitions are consolidated into the revisioned experiment catalog. Former M08 filenames are explicit imports, not installed YAML files. See [experiment management](experiment_management.md) for current editing, execution and history commands; numerical and scientific contracts below remain in force.
+
 2026-10-18. M08 starts from committed M07 `b16b649` on
 `feature/m08-experiments`. It introduces the tenth package, robot_experiments.
 The existing nine packages retain their production behavior; only their

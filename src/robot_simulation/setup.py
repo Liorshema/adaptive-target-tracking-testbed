@@ -128,7 +128,6 @@ setup(
             "config/terrain/*.yaml",
         ),
         *install_directory_tree("config/gazebo"),
-        *install_directory_tree("config/scenarios"),
         *install_directory_tree("config/sensors"),
     ],
 

@@ -1,6 +1,0 @@
-# Rejected candidate: physical elbow/wrist overspeed and pointing failed validation.
-# Preserve this distinct allocation for reproduction; the shared strategy owns defaults.
-extends: whole_body.yaml
-controller:
-  parameters:
-    motion_weights: [3.0, 4.0, 3.0, 3.0, 3.0, 2.0]

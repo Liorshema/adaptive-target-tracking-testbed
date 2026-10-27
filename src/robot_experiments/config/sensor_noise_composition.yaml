@@ -1,6 +1,0 @@
-# Same S2 study, assignments, identity and execution policy; explicit M07 composition.
-extends: sensor_noise_study.yaml
-experiment:
-  system_config:
-    package: robot_bringup
-    path: config/systems/mobile_manipulator_pose_tracking.yaml

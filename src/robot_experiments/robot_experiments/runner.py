@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 
 import psutil
 import yaml
@@ -94,14 +95,18 @@ def required_streams(plan, enabled):
     return required
 
 
-def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False):
+def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False,cancel_requested=None):
     from .recording import Recorder
     directory.mkdir()
     started=datetime.now(timezone.utc).isoformat()
-    write_json(directory/'status.json',{'schema_version':1,'execution_status':'preparing','acceptance':None,'started_utc':started})
+    run_id = str(uuid.uuid4())
+    write_json(directory/'status.json',{'schema_version':1,'execution_status':'preparing','acceptance':None,
+        'started_utc':started,'run_id':run_id,'experiment_identity':spec.get('experiment_identity')})
     observer=None
     process=recorder=None;window=None;cleanup=None;error=None;metrics=None;actual={};availability={};events=[]
     metadata={'schema_version':1,'variant':variant['name'],'seed':seed,'started_utc':started,
+              'run_id': run_id, 'experiment_identity': spec.get('experiment_identity'),
+              'experiment_definition': spec.get('experiment_definition'),
               'git':_git(),'package_versions':_versions(share),
               'time_contract':{'duration':'simulation seconds after settling','source_time':'ROS header epoch',
               'timeouts':'host monotonic seconds','wall_timestamps':'UTC ISO8601'},
@@ -113,6 +118,7 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False):
     configuration_identity=None
     prepared={}
     try:
+        if cancel_requested is not None and cancel_requested(): raise RunFailure('cancelled')
         prepared=materialize_run(variant,seed,directory,share,spec['runtime'],
             record_actuator_trace=spec['execution']['record_actuator_trace'])
         complete_preparation(spec, prepared, metadata['git'].get('worktree_source_sha256'))
@@ -148,6 +154,8 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False):
                 required=required_streams(plan,spec['runtime']['enable_actuation'])
                 performance=[];previous=[0.];cpu={}
                 def tick():
+                    if cancel_requested is not None and cancel_requested():
+                        raise RunFailure('cancelled')
                     now=time.monotonic()
                     if now-previous[0]<.5:return
                     previous[0]=now
@@ -221,6 +229,7 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False):
     write_json(directory/'metadata.json',metadata)
     write_json(directory/'events.json',{'schema_version':1,'events':events,'failure':error})
     status={'schema_version':1,'execution_status':'failed' if error else 'completed','acceptance':accepted,
+      'run_id': metadata['run_id'], 'experiment_identity': spec.get('experiment_identity'),
       'acceptance_gates':gates,'safety_status':metrics['safety'] if metrics else {'accepted':None,'reason':'evaluation unavailable'},
       'started_utc':started,'ended_utc':datetime.now(timezone.utc).isoformat(),'window':window,'error':error,'cleanup':cleanup}
     write_json(directory/'status.json',status)
@@ -231,15 +240,22 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False):
        'metrics':metrics or {},'artifacts':str(Path('runs')/directory.name),'status':status}
 
 
-def run_experiment(spec,share,*,observer_diagnostics=False):
+def run_experiment(spec,share,*,observer_diagnostics=False,cancel_requested=None):
     directory=create_study_directory(spec['output']['directory'],spec['name'])
-    shutil.copyfile(spec['source'],directory/'experiment.yaml')
+    if 'source_document' in spec:
+        (directory/'experiment.yaml').write_text(yaml.safe_dump(spec['source_document'], sort_keys=False))
+        write_json(directory/'experiment_identity.json', spec['experiment_identity'])
+    else:
+        shutil.copyfile(spec['source'],directory/'experiment.yaml')
     write_json(directory/'resolved_experiment.json',spec)
     (directory/'runs').mkdir()
     runs=[]
     for seed in spec['seeds']:
         for variant in spec['variants']:
-            if observer_diagnostics:
+            if cancel_requested is not None:
+                run=run_one(spec,variant,seed,directory/'runs'/f'{variant["name"]}_seed{seed}',share,
+                            observer_diagnostics=observer_diagnostics,cancel_requested=cancel_requested)
+            elif observer_diagnostics:
                 run=run_one(spec,variant,seed,directory/'runs'/f'{variant["name"]}_seed{seed}',share,
                             observer_diagnostics=True)
             else:
@@ -248,7 +264,8 @@ def run_experiment(spec,share,*,observer_diagnostics=False):
             summary=summarize(runs,[v['name'] for v in spec['variants']],spec['seeds'],
                               comparison_policy=spec.get('comparison'), experiment_name=spec['name'])
             summary['runs']=runs;write_json(directory/'summary.json',summary)
-            interrupted=(run.get('status',{}).get('error') or {}).get('type')=='KeyboardInterrupt'
+            error=run.get('status',{}).get('error') or {}
+            interrupted=error.get('type')=='KeyboardInterrupt' or error.get('code')=='cancelled'
             if interrupted or (run['execution_status']=='failed' and spec['execution']['failure_policy']=='abort'):break
         else:continue
         break

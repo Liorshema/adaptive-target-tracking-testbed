@@ -8,7 +8,9 @@ from pathlib import Path
 
 import numpy as np
 from robot_models.target.target_state import TargetState
-from robot_configuration.yaml_loader import load_yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / 'src' / package)
 from robot_simulation.factory.simulation_factory import SimulationFactory
 from robot_simulation.state.simulation_state import SimulationState
 from robot_simulation.adapters.target_state import state_to_vector
@@ -48,7 +50,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     cases = load_yaml(args.cases)
     package = ROOT / 'src/robot_simulation'
-    scenario = load_yaml(package / 'config/scenarios/reactive_target_saturated.yaml')
+    scenario = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                          'group': 'resources.deployment_reactive_target_saturated'})
     target = load_yaml(package / scenario['target']['config'])
     environment = load_yaml(package / scenario['simulation']['environment_config'])
     simulation = load_yaml(package / scenario['simulation']['config'])

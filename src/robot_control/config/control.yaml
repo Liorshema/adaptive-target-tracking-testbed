@@ -1,115 +1,98 @@
-
-control_node:
-  ros__parameters:
-
-    # ============================================================
-    # 1. Robot configuration
-    # ============================================================
-
-    joint_count: 4
-
-    # Model implementation identifiers
-    base_model_type: "differential_drive"
-    manipulator_model_type: "serial_arm"
-    kinematics_adapter_type: "planar"
-
-    # ============================================================
-    # 2. ROS input topics
-    # ============================================================
-
-    robot_state_topic: "/estimation/robot_state_full"
-    prediction_topic: "/prediction/trajectory"
-
-    # ============================================================
-    # 3. Input freshness and validation
-    # ============================================================
-
-    # Maximum input age [seconds]
-    max_robot_state_age: 0.2
-    max_prediction_age: 0.5
-
-    # Clock tolerance [seconds]
-    future_tolerance: 0.01
-
-    # Input validation frequency [Hz]
-    validation_rate: 20.0
-
-    # ============================================================
-    # 4. Control execution
-    # ============================================================
-
-    # Compute safe commands without actuating the robot.
-    compute_enabled: true
-
-    # Do not publish actuator commands.
-    publish_commands: false
-
-    # ============================================================
-    # 5. Controller selection
-    # ============================================================
-
-    controller_type: "jacobian"
-
-    # Damped least-squares regularization
-    controller_damping: 1.0
-
-    # Selected task-space components:
-    # [vx, vy, vz, wx, wy, wz]
-    #
-    # Current task: Cartesian position tracking.
-    controller_task_axes: [0, 1, 2]
-
-    # Diagonal task-space gains
-    controller_task_gains: [1.0, 1.0, 1.0]
-
-    # ============================================================
-    # 6. Tracking reference
-    # ============================================================
-
-    reference_geometry_type: "sphere"
-    reference_policy_type: "radial"
-
-    # Desired distance from the target [m]
-    tracking_radius: 1.0
-
-    # Prediction lookahead [seconds]
-    tracking_lookahead_time: 0.0
-
-    # ============================================================
-    # 7. Tracking-frame conventions
-    # ============================================================
-
-    # The tracking frame is wrist-aligned. This camera looks along wrist +X.
-    # A different camera mount may select another local forward axis.
-    tracking_forward_axis: [1.0, 0.0, 0.0]
-
-    # Local axis defining the tracking frame's upward direction.
-    tracking_up_axis: [0.0, -1.0, 0.0]
-
-    # Preferred upward direction in the world frame.
-    world_up_axis: [0.0, 0.0, 1.0]
-
-    # ============================================================
-    # 8. Safety
-    # ============================================================
-
-    # Explicit example operating limits in [v (m/s), omega (rad/s)] order.
-    # Joint limits are loaded from robot_description/config/robot/robot.yaml.
-    base_velocity_lower: [-0.5, -1.0]
-    base_velocity_upper: [0.5, 1.0]
-
-    # Safety is mandatory for control computation.
-    safety_enabled: true
-
-    # Simulator-independent opt-in transport (Bringup derives joint names).
-    command_topic: /control/safe_velocity
-    command_frame_id: base_link
-    command_joint_names: []
-    publish_telemetry: false
-    telemetry_topic: /control/telemetry
-    # Empty preserves the existing Jacobian controller. Bringup can select v2.
-    strategy_config_file: ''
-    robot_description_file: ''  # Empty uses the installed authoritative default.
-    feedforward_override: ''
-
-    lookahead_override: ''
+controllers:
+  jacobian:
+    parameters:
+      gains:
+      - 1.0
+      - 1.0
+      - 1.0
+      damping: 1.0
+  weighted_least_squares:
+    parameters:
+      gains:
+      - 1.0
+      - 3.0
+      - 3.0
+      task_weights:
+      - 4.0
+      - 12.0
+      - 12.0
+      task_scales:
+      - 1.0
+      - 1.0
+      - 1.0
+      motion_weights:
+      - 1.0
+      - 2.0
+      - 3.0
+      - 3.0
+      - 3.0
+      - 2.0
+      damping: 0.08
+      posture_weight: 0.01
+      posture_gain: 0.3
+      smoothness_weight: 0.005
+      limit_avoidance_weight: 0.002
+tasks:
+  cartesian:
+    parameters:
+      axes:
+      - 0
+      - 1
+      - 2
+  distance_pointing:
+    parameters:
+      minimum_distance: 0.001
+      antipodal_tolerance: 1.0e-05
+tracking:
+  parameters:
+    radius: 1.0
+    forward_axis_local:
+    - 1.0
+    - 0.0
+    - 0.0
+    up_axis_local:
+    - 0.0
+    - -1.0
+    - 0.0
+    world_up:
+    - 0.0
+    - 0.0
+    - 1.0
+    lookahead_time: 0.0
+  distance_pointing:
+    lookahead_time: 0.25
+    prediction_sampling: linear
+    target_velocity_feedforward: true
+references:
+  radial:
+    parameters:
+      epsilon: 1.0e-09
+operating_bounds:
+  base_velocity_lower:
+  - -0.5
+  - -1.0
+  base_velocity_upper:
+  - 0.5
+  - 1.0
+transport:
+  joint_count: 4
+  robot_state_topic: /estimation/robot_state_full
+  prediction_topic: /prediction/trajectory
+  command_topic: /control/safe_velocity
+  command_frame_id: base_link
+  command_joint_names: []
+  telemetry_topic: /control/telemetry
+  strategy_config_file: ''
+  strategy_configuration: ''
+  robot_description_file: ''
+  feedforward_override: ''
+  lookahead_override: ''
+runtime:
+  max_robot_state_age: 0.2
+  max_prediction_age: 0.5
+  future_tolerance: 0.01
+  validation_rate: 20.0
+  compute_enabled: true
+  publish_commands: false
+  safety_enabled: true
+  publish_telemetry: false

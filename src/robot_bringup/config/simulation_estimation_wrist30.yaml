@@ -1,2 +1,0 @@
-extends: simulation_estimation.yaml
-robot_description_config: config/robot/robot_wrist30.yaml

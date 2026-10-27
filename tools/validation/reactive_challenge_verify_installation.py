@@ -1,4 +1,6 @@
 """Verify installed challenge resources outside the checkout, including M02/M09 gates."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 from importlib import import_module
 import json
@@ -9,7 +11,7 @@ import tempfile
 
 from ament_index_python.packages import get_package_share_directory
 from robot_configuration.yaml_loader import load_yaml
-from robot_experiments.configuration import load_experiment, materialize_run
+from robot_experiments.configuration import materialize_run
 
 
 def main():
@@ -29,7 +31,7 @@ def main():
                      'robot_experiments.metrics.manipulation']:
             assert Path(import_module(name).__file__).resolve().is_relative_to(prefix)
         share=lambda name:Path(get_package_share_directory(name))
-        spec=load_experiment(share('robot_experiments')/'config/reactive_manipulation.yaml',share)
+        spec=ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
         variants={}
         for variant in spec['variants']:
             directory=Path(tmp)/variant['name'];directory.mkdir()

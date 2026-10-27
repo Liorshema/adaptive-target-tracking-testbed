@@ -1,3 +1,0 @@
-extends: reactive_manipulation.yaml
-simulation_config: config/scenarios/reactive_manipulation_wrist15.yaml
-estimation_overrides: config/simulation_estimation_wrist15.yaml

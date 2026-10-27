@@ -19,8 +19,18 @@ import yaml
 from robot_control.adapters.prediction_message_adapter import PredictionMessageAdapter
 from robot_control.adapters.robot_state_message_adapter import RobotStateMessageAdapter
 from robot_control.nodes.control_node import ControlNode
+from robot_control.configuration import load_control_parameters
 from robot_control.safety.input_status import InputStatusTracker
 from robot_control.safety.input_validator import InputValidationConfig, InputValidator
+
+
+def selected_parameters():
+    """Select the DLS test composition explicitly, separate from owner defaults."""
+    data = {'parameters': load_control_parameters(Path(__file__).parents[1] / 'config/control.yaml', 'parameters')}
+    return {**data['parameters']['control_node']['ros__parameters'],
+            'base_model_type': 'differential_drive', 'manipulator_model_type': 'serial_arm',
+            'kinematics_adapter_type': 'planar', 'controller_type': 'jacobian',
+            'reference_geometry_type': 'sphere', 'reference_policy_type': 'radial'}
 
 
 def robot_message(timestamp=10.0, shoulder=0.0):
@@ -51,8 +61,7 @@ def prediction_message(timestamp=10.0):
 def node():
     """Supply local ROS boundaries without creating DDS resources."""
     control = object.__new__(ControlNode)
-    config = Path(__file__).parents[1] / 'config' / 'control.yaml'
-    parameters = yaml.safe_load(config.read_text())['control_node']['ros__parameters']
+    parameters = selected_parameters()
     # Exercise the existing implementation before shipped config is repaired.
     parameters.setdefault('base_velocity_lower', [-0.5, -1.0])
     parameters.setdefault('base_velocity_upper', [0.5, 1.0])
@@ -220,9 +229,7 @@ def test_invalid_input_or_safety_failure_does_not_compute(node, failure):
 
 def test_shipped_configuration_computes_with_real_model(node):
     """The installed example supplies a complete safe computation setup."""
-    parameters = yaml.safe_load(
-        (Path(__file__).parents[1] / 'config' / 'control.yaml').read_text()
-    )['control_node']['ros__parameters']
+    parameters = selected_parameters()
     node.get_parameter = lambda name: SimpleNamespace(value=parameters[name])
     assert parameters['compute_enabled']
     assert not parameters['publish_commands']
@@ -244,10 +251,13 @@ def test_shipped_configuration_computes_with_real_model(node):
 
 
 def test_inherited_strategy_uses_same_loader_at_preflight_and_runtime(node, tmp_path):
-    parameters = yaml.safe_load(
-        (Path(__file__).parents[1] / 'config/control.yaml').read_text()
-    )['control_node']['ros__parameters']
-    parent = Path(__file__).resolve().parents[1] / 'config/whole_body.yaml'
+    parameters = selected_parameters()
+    from robot_control.configuration import load_control_parameters
+    parent = tmp_path / 'base_strategy.yaml'
+    strategy = load_control_parameters(
+        Path(__file__).resolve().parents[1] / 'config/control.yaml', 'distance_pointing')
+    strategy['controller']['type'] = 'weighted_least_squares'
+    parent.write_text(yaml.safe_dump(strategy))
     child = tmp_path / 'strategy.yaml'; child.write_text(f'extends: {parent}\n')
     parameters['strategy_config_file'] = str(child)
     node.get_parameter = lambda name: SimpleNamespace(value=parameters[name])

@@ -1,4 +1,6 @@
 """Bounded real-world-reset probe; record both native actuator epochs intact."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 import os
 from pathlib import Path
@@ -9,7 +11,7 @@ import xml.etree.ElementTree as ET
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from robot_configuration.yaml_loader import load_yaml
-from robot_experiments.configuration import load_experiment, materialize_run
+from robot_experiments.configuration import materialize_run
 from robot_experiments.execution import DomainLease, OwnedLaunch
 from robot_experiments.metrics.actuator_trace import analyze_trace
 from robot_experiments.recording import Recorder
@@ -24,12 +26,14 @@ def main():
     args = parser.parse_args()
     directory = create_study_directory(args.output,'reset')
     share = lambda p: Path(get_package_share_directory(p))
-    spec = load_experiment(share('robot_experiments')/'config/nominal.yaml',share)
+    spec = ExperimentCatalog(share=share).prepare('EXP-NOMINAL')
     if args.system_config is not None:
         from robot_bringup.factory.system_configuration import load_system_configuration
         system = args.system_config
         if not system.is_absolute():
             system = share('robot_bringup')/system
+        from robot_experiments.configuration import resolve_system_resource
+        system = resolve_system_resource(system, share('robot_bringup'), share)
         spec['variants'][0]['plan'] = load_system_configuration(system,share,overrides={
             'enable_actuation':'true','publish_ground_truth':'true','gui':'false',
             'visualize_tracking':'false'})

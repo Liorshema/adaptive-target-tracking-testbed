@@ -14,6 +14,10 @@ def _display(value, directory: Path):
     if isinstance(value, Path):
         value = str(value)
     if isinstance(value, str):
+        from .composition import resource_label
+        label = resource_label(value)
+        if label is not None:
+            return label
         prefix = str(directory)
         if value == prefix or value.startswith(prefix + '/'):
             return '<materialized>' + value[len(prefix):]
@@ -108,6 +112,7 @@ def _describe(spec: dict, variant: dict, seed: int, prepared: dict, directory: P
                       'not full per-key declaring ancestry. <materialized> labels deleted '
                       'temporary input paths, not persistent files.'),
             'overrides': {'launch_runtime': plan['runtime'],
+                          'owner_parameters': variant.get('owner_overrides', {}),
                           'seed_consumers': snapshot['seed_consumers'],
                           'parameter_assignments': snapshot.get(
                               'assignments', 'not supported in schema 1')}},

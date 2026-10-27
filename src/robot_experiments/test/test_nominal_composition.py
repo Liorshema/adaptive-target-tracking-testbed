@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.catalog import ExperimentCatalog
+
 
 from robot_experiments import cli
 from robot_experiments.comparison import comparison_reasons
@@ -14,6 +15,11 @@ from robot_experiments.preparation import complete_preparation
 from robot_experiments.reporting import plain
 
 import yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+from robot_experiments.configuration import resolve_system_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -40,11 +46,11 @@ def test_seeded_owner_inputs_contracts_and_runtime_are_equivalent(tmp_path, seed
     else:
         paths = []
         for label, name in [('old', f'config/system_{family}.yaml'), ('new',
-                            'config/systems/' + ('nominal_tracking.yaml' if family == 'nominal'
-                                                 else 'dls_control.yaml'))]:
-            data = load_yaml(CONFIG / 'nominal.yaml')
-            data['experiment']['variants'] = [{'name': family, 'system_config': {
-                'package': 'robot_bringup', 'path': name}}]
+                            resolve_system_resource(CONFIG / 'systems' / ('nominal_tracking.yaml' if family == 'nominal'
+                                                                          else 'dls_control.yaml'), CONFIG, lambda package: Path(__file__).resolve().parents[2] / package))]:
+            data = ExperimentCatalog(share=share).document('EXP-NOMINAL')
+            data['experiment']['variants'] = [{'name': family, 'system_config': ({'package': 'robot_bringup', 'path': name}
+                                                                                 if label == 'old' else str(name))}]
             path = tmp_path / f'{label}.yaml'
             path.write_text(yaml.safe_dump(data))
             paths.append(path)
@@ -113,13 +119,12 @@ def test_explain_reports_real_cv_and_nominal_classes_and_does_not_run(
         assert run['control']['implementations']['controller'].endswith(
             '.WeightedLeastSquaresController')
         assert run['system']['composition']['schema_version'] == 2
-        assert run['system']['composition']['simulation'].endswith(
-            'scenarios/oscillatory_reactive_tracking.yaml')
+        assert 'resources.deployment_oscillatory_reactive_tracking' in run['system']['composition']['simulation']
 
 
 def test_dls_fixture_explain_retains_actual_cartesian_controller(tmp_path, capsys):
     """A test-only study exercises DLS without adding a duplicate production study."""
-    data = load_yaml(CONFIG / 'nominal.yaml')
+    data = ExperimentCatalog(share=share).document('EXP-NOMINAL')
     data['experiment']['variants'] = [{'name': 'dls', 'system_config': {
         'package': 'robot_bringup', 'path': 'config/systems/dls_control.yaml'}}]
     path = tmp_path / 'dls.yaml'
@@ -132,16 +137,21 @@ def test_dls_fixture_explain_retains_actual_cartesian_controller(tmp_path, capsy
 
 def test_physical_initial_condition_difference_is_still_rejected(tmp_path):
     """The strict historical contract must retain real scenario fields after migration."""
-    system = load_yaml(share('robot_bringup') / 'config/systems/nominal_tracking.yaml')
-    deployment = load_yaml(share('robot_simulation') /
-                           system['simulation']['config']['path'])
+    system = load_yaml(
+        resolve_system_resource(
+            share('robot_experiments') /
+            'config/systems/nominal_tracking.yaml',
+            Path.cwd(),
+            lambda package: Path(__file__).resolve().parents[2] /
+            package))
+    deployment = load_yaml(system['simulation']['config'])
     deployment['target']['initial_position'][0] += .1
     path = tmp_path / 'deployment.yaml'
     path.write_text(yaml.safe_dump(deployment))
     system['simulation']['config'] = str(path)
     path = tmp_path / 'system.yaml'
     path.write_text(yaml.safe_dump(system))
-    data = load_yaml(NEW)
+    data = ExperimentCatalog(share=share).document('EXP-PREDICTION-COMPOSITION')
     data['experiment']['variants'][1]['system_config'] = str(path)
     path = tmp_path / 'study.yaml'
     path.write_text(yaml.safe_dump(data))

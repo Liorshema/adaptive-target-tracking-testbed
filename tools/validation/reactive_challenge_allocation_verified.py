@@ -43,12 +43,14 @@ def main():
     """Solve the actual configured objective at four measured arm yaw positions."""
     description_path = ROOT / 'src/robot_description/config/robot/robot.yaml'
     control_path = ROOT / 'src/robot_control/config/control.yaml'
-    nominal_path = ROOT / 'src/robot_control/config/whole_body.yaml'
-    priority_path = ROOT / 'src/robot_control/config/whole_body_manipulation_arm_priority.yaml'
-    existing_path = ROOT / 'src/robot_control/config/whole_body_arm_preferred.yaml'
+    from robot_experiments.launching import launch_profile
+    share = lambda package: ROOT / 'src' / package
+    selections = {key:launch_profile('closed_loop', share, controller=key) for key in
+                  ['whole_body', 'whole_body_manipulation_arm_priority', 'whole_body_arm_preferred']}
+    nominal_path = priority_path = existing_path = ROOT / 'src/robot_experiments/config/launch_profiles.yaml'
     description = load_yaml(description_path)
-    control = load_yaml(control_path)['control_node']['ros__parameters']
-    nominal = load_yaml(nominal_path)
+    control = selections['whole_body']['control_parameters']
+    nominal = selections['whole_body']['strategy']
     model = create_robot_model(robot_model_parameters_from_description(description))
     _, bounds, _ = project_control_configuration(
         description, control['base_velocity_lower'], control['base_velocity_upper'])
@@ -71,9 +73,9 @@ def main():
             RobotState(np.r_[base[:2, 3], 0., q], np.zeros(6), 0., 'world'),
             TrackingReference(target), target_state=np.r_[target, np.zeros(3)],
             dt=.02, previous_velocity=np.zeros(6))
-        for policy, path in [('nominal', nominal_path), ('existing_arm_preferred', existing_path),
-                             ('yaw_priority_candidate', priority_path)]:
-            strategy = load_yaml(path)
+        for policy, selected in [('nominal', 'whole_body'), ('existing_arm_preferred', 'whole_body_arm_preferred'),
+                                 ('yaw_priority_candidate', 'whole_body_manipulation_arm_priority')]:
+            strategy = selections[selected]['strategy']
             geometry = strategy['controller']['task']['parameters']
             task = DistancePointingTask(
                 radius=control['tracking_radius'],

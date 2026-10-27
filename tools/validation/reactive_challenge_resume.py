@@ -1,4 +1,6 @@
 """Run only missing M08 variant/seed pairs after an interrupted study; retain originals."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 import hashlib
 import json
@@ -6,7 +8,6 @@ from pathlib import Path
 import shutil
 
 from ament_index_python.packages import get_package_share_directory
-from robot_experiments.configuration import load_experiment
 from robot_experiments.reporting import create_study_directory, write_json
 from robot_experiments.runner import run_one
 
@@ -17,7 +18,7 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args()
     share=lambda package:Path(get_package_share_directory(package))
-    spec=load_experiment(share('robot_experiments')/'config/reactive_manipulation.yaml',share)
+    spec=ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
     previous=json.loads((args.previous/'resolved_experiment.json').read_text())
     for key in ['duration','settling_time','seeds','metrics','runtime','execution']:
         if previous[key]!=spec[key]:

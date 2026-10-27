@@ -10,11 +10,11 @@ from robot_bringup.factory.system_configuration import load_system_configuration
 from robot_configuration.yaml_loader import load_yaml
 
 import yaml
+from robot_experiments.configuration import resolve_system_resource
 
 
 SRC = Path(__file__).resolve().parents[2]
 SYSTEM = 'config/systems/mobile_manipulator_pose_tracking.yaml'
-LEGACY = 'config/system_manipulation_D_localized.yaml'
 
 
 def share(package):
@@ -23,20 +23,9 @@ def share(package):
 
 
 def document():
-    """Express the existing system with explicit owners, before adding production resources."""
-    data = load_yaml(share('robot_bringup') / LEGACY)
-    profile = load_yaml(share('robot_bringup') / 'config/reactive_manipulation_localized.yaml')
-    data['schema_version'] = 2
-    data['estimation']['calibration'] = {
-        'package': 'robot_bringup', 'path': profile['estimation_overrides']}
-    data['simulation'] = {
-        'config': {'package': 'robot_simulation', 'path': profile['simulation_config']},
-        'robot': {'package': 'robot_simulation', 'path': 'config/gazebo/robot_wrist15.yaml'},
-        'actuation': {'package': 'robot_simulation', 'path': profile['actuation_config']},
-        'localization_sensor': {
-            'package': 'robot_simulation', 'path': 'config/sensors/planar_localization.yaml'},
-        'tracking_tf': profile['tracking_tf']}
-    return data
+    """Use the experiment-owned explicit fixture and real package defaults."""
+    return load_yaml(resolve_system_resource(
+        share('robot_experiments') / SYSTEM, Path.cwd(), share))
 
 
 def write(tmp_path, data, name='system.yaml'):
@@ -48,12 +37,13 @@ def write(tmp_path, data, name='system.yaml'):
 
 def load(path, **kwargs):
     """Use the real M07 assembler and component factories."""
-    return load_system_configuration(path, share, **kwargs)
+    return load_system_configuration(resolve_system_resource(
+        path, Path.cwd(), share), share, **kwargs)
 
 
 def test_explicit_assembly_reuses_all_existing_component_preflight(tmp_path):
     """The adapter must retain component identities, calibration, routing and safe defaults."""
-    old = load(share('robot_bringup') / LEGACY)
+    old = load(share('robot_experiments') / SYSTEM)
     new = load(write(tmp_path, document()))
     for key in ['selection', 'identities', 'runtime', 'estimation_parameters',
                 'control_parameters', 'prediction_topics', 'description_path', 'strategy_path']:
@@ -99,18 +89,23 @@ def test_explicit_conflicts_and_invalid_owners_fail_closed(tmp_path, mutation, m
     data = document()
     sim = data['simulation']
     if mutation == 'robot_description':
-        data['robot']['description']['path'] = 'config/robot/robot.yaml'
+        data['robot']['description'] = {
+            'package': 'robot_description',
+            'path': 'config/robot/robot.yaml'}
     elif mutation == 'robot_deployment':
-        sim['robot']['path'] = 'config/gazebo/robot.yaml'
+        sim['robot'] = {'package': 'robot_simulation', 'path': 'config/gazebo/robot.yaml'}
     elif mutation == 'sensor':
-        sim['localization_sensor']['path'] = 'config/sensors/planar_localization_noise_study.yaml'
+        sim['localization_sensor'] = {'package': 'robot_simulation',
+                                      'path': 'config/sensors/planar_localization_noise_study.yaml'}
     elif mutation in ['calibration', 'calibration_unknown']:
-        cal = load_yaml(share('robot_bringup') / 'config/calibration/manipulation_pose.yaml')
+        cal = load_yaml(share('robot_experiments') / 'config/calibration/manipulation_pose.yaml')
         cal['robot_description_config' if mutation == 'calibration' else 'unknown_key'] = (
             'config/robot/robot.yaml' if mutation == 'calibration' else 1.)
         data['estimation']['calibration'] = str(write(tmp_path, cal, 'calibration.yaml'))
     elif mutation == 'overlap':
-        target = load_yaml(share('robot_estimation') / 'config/target_estimator.yaml')
+        from robot_estimation.configuration import load_estimation_parameters
+        target = load_estimation_parameters(
+            share('robot_estimation') / 'config/estimation.yaml', 'kalman')
         target['estimation_node']['ros__parameters']['wheel_linear_velocity_variance'] = .1
         data['estimation']['target']['config'] = str(write(tmp_path, target, 'target.yaml'))
     elif mutation == 'predictor':
@@ -156,7 +151,7 @@ def test_new_reference_resolves_at_declaring_parent_and_runtime_overrides_win(tm
     parent = tmp_path / 'parent'
     parent.mkdir()
     data = document()
-    cal = load_yaml(share('robot_bringup') / 'config/calibration/manipulation_pose.yaml')
+    cal = load_yaml(share('robot_experiments') / 'config/calibration/manipulation_pose.yaml')
     write(parent, cal, 'calibration.yaml')
     data['estimation']['calibration'] = 'calibration.yaml'
     write(parent, data, 'base.yaml')
@@ -179,6 +174,7 @@ def launch(tmp_path, monkeypatch, system):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setenv('ROS_LOG_DIR', str(tmp_path / 'ros'))
+    import robot_bringup.deployment.launching as module
     monkeypatch.setattr(module, 'get_package_share_directory', lambda p: str(share(p)))
     context = LaunchContext()
     context.launch_configurations.update({key: '' for key in [
@@ -194,9 +190,14 @@ def test_production_composition_is_shallow_and_delivers_equal_launch_parameters(
     from launch.actions import IncludeLaunchDescription
     from launch_ros.utilities import evaluate_parameters
     plans = []
-    for system in [LEGACY, SYSTEM]:
-        module, context = launch(tmp_path, monkeypatch, share('robot_bringup') / system)
-        actions = module.configure(context)
+    from robot_bringup.factory.system_configuration import assemble_system_configuration
+    source = resolve_system_resource(share('robot_experiments') / SYSTEM, Path.cwd(), share)
+    for route in ['file', 'mapping']:
+        module, context = launch(tmp_path, monkeypatch, source)
+        plan = (
+            assemble_system_configuration(document(), source, share)
+            if route == 'mapping' else None)
+        actions = module.configure(context, plan=plan)
         nodes = {str(a.node_executable): evaluate_parameters(context, a._Node__parameters)
                  for a in actions if hasattr(a, 'node_executable')}
         include = next(a for a in actions if isinstance(a, IncludeLaunchDescription))
@@ -204,16 +205,18 @@ def test_production_composition_is_shallow_and_delivers_equal_launch_parameters(
         plans.append((nodes, load_yaml(arguments['config']),
                       {k: v for k, v in arguments.items() if k != 'config'}))
     assert plans[0] == plans[1]
-    raw = yaml.safe_load((share('robot_bringup') / SYSTEM).read_text())
+    raw = document()
     assert 'extends' not in raw
-    assert raw['simulation']['config']['package'] == 'robot_simulation'
+    assert Path(raw['simulation']['config']).is_file()
 
 
 def test_bad_direct_composition_is_rejected_before_constructing_process_actions(
         tmp_path, monkeypatch):
     """Preflight must run before any Node is constructed."""
     data = document()
-    data['simulation']['robot']['path'] = 'config/gazebo/robot.yaml'
+    data['simulation']['robot'] = {
+        'package': 'robot_simulation',
+        'path': 'config/gazebo/robot.yaml'}
     module, context = launch(tmp_path, monkeypatch, write(tmp_path, data))
     calls = []
     monkeypatch.setattr(module, 'Node', lambda **kwargs: calls.append(kwargs))
@@ -229,7 +232,7 @@ def test_bad_direct_composition_is_rejected_before_constructing_process_actions(
 def test_direct_deployment_cannot_use_manifest_resource_syntax(tmp_path, section, key):
     """Preflight must reject resource forms that the unchanged simulation launcher cannot read."""
     data = document()
-    deployment = load_yaml(share('robot_simulation') / data['simulation']['config']['path'])
+    deployment = load_yaml(data['simulation']['config'])
     deployment[section][key] = {'package': 'robot_simulation', 'path': deployment[section][key]}
     data['simulation']['config'] = str(write(tmp_path, deployment, 'deployment.yaml'))
     with pytest.raises(ValueError, match='deployment resource'):
@@ -251,7 +254,7 @@ def test_manifest_estimator_types_remain_authoritative_over_calibration(tmp_path
     """Preserve M07's existing typed selector authority through actual launch parameters."""
     from launch_ros.utilities import evaluate_parameters
     data = document()
-    cal = load_yaml(share('robot_bringup') / 'config/calibration/manipulation_pose.yaml')
+    cal = load_yaml(share('robot_experiments') / 'config/calibration/manipulation_pose.yaml')
     cal.update(robot_estimator_type='not_real', target_estimator_type='not_real')
     data['estimation']['calibration'] = str(write(tmp_path, cal, 'calibration.yaml'))
     path = write(tmp_path, data)
@@ -272,14 +275,16 @@ def test_manifest_estimator_types_remain_authoritative_over_calibration(tmp_path
 def test_optional_localization_can_be_absent_when_deployment_has_no_producer(tmp_path, selection):
     """Do not invent a requirement for a built-in producer when fusion is not selected."""
     data = document()
-    deployment = load_yaml(share('robot_simulation') / data['simulation']['config']['path'])
+    deployment = load_yaml(data['simulation']['config'])
     deployment.pop('localization_sensor_config')
     data['simulation']['config'] = str(write(tmp_path, deployment, 'deployment.yaml'))
     if selection == 'omitted':
         data['simulation'].pop('localization_sensor')
     else:
         data['simulation']['localization_sensor'] = None
-    data['estimation']['robot']['config']['path'] = 'config/robot_estimator.yaml'
+    data['estimation']['robot']['config'] = {
+        'package': 'robot_estimation', 'path': 'config/estimation.yaml', 'group': 'robot_ekf'}
+    data['estimation']['robot']['parameters'] = {'localization_enabled': False}
     plan = load(write(tmp_path, data))
     sensor = plan['sensor_inventory']['sources']['external_planar_localization']
     assert not sensor['producer']['configured']

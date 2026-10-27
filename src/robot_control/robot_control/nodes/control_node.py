@@ -1,5 +1,6 @@
 """Validated tracking with optional simulator-independent safe publication."""
 
+import json
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -201,6 +202,7 @@ class ControlNode(Node):
         self.declare_parameter('publish_telemetry', False)
         self.declare_parameter('telemetry_topic', Parameter.Type.STRING)
         self.declare_parameter('strategy_config_file', '')
+        self.declare_parameter('strategy_configuration', '')
         self.declare_parameter('robot_description_file', '')
         self.declare_parameter('feedforward_override', '')
         self.declare_parameter('lookahead_override', '')
@@ -233,12 +235,17 @@ class ControlNode(Node):
                             Path(get_package_share_directory('robot_description')) / 'config/robot/robot.yaml')
         description = yaml.safe_load(description_path.read_text())
         strategy_path = self.get_parameter('strategy_config_file').value
+        strategy_document = self.get_parameter('strategy_configuration').value
         strategy = None
         if strategy_path:
             strategy_path = Path(strategy_path)
             if not strategy_path.is_absolute():
                 strategy_path = Path(get_package_share_directory('robot_control')) / strategy_path
             strategy = load_yaml(strategy_path)
+        if strategy_document:
+            if strategy_path:
+                raise ValueError('Select strategy_configuration or strategy_config_file, not both')
+            strategy = json.loads(strategy_document)
         factory_config = configured_control(
             parameters, description, strategy,
             feedforward=self.get_parameter('feedforward_override').value,

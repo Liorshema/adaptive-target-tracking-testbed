@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.catalog import ExperimentCatalog
+
 
 from robot_experiments import cli
 from robot_experiments.configuration import load_experiment, materialize_run
@@ -14,6 +15,10 @@ from robot_experiments.preparation import complete_preparation
 from robot_experiments.reporting import plain
 
 import yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -60,9 +65,7 @@ def test_old_new_materialized_owners_plans_launch_inputs_and_contracts_equal(tmp
         assert b['snapshot']['assignments'] == a['snapshot']['assignments']
         captured = [Path(p) for p in b['snapshot']['resources']]
         bringup = [p for p in captured if p.is_relative_to(share('robot_bringup'))]
-        assert set(bringup) == {
-            share('robot_bringup') / 'config/systems/mobile_manipulator_pose_tracking.yaml',
-            share('robot_bringup') / 'config/calibration/manipulation_pose.yaml'}
+        assert not bringup
     assert all(hashlib.sha256(p.read_bytes()).hexdigest() == digest
                for p, digest in before.items())
 
@@ -84,7 +87,7 @@ def test_explain_exposes_direct_composition_and_effective_calibration_without_ru
     for run, noise in zip(doc['runs'], [.04, .08]):
         composition = run['system']['composition']
         assert composition['schema_version'] == 2
-        assert composition['simulation'].endswith('scenarios/base_relative_manipulation.yaml')
+        assert 'resources.deployment_base_relative_manipulation' in composition['simulation']
         assert composition['calibration'].endswith('calibration/manipulation_pose.yaml')
         assert run['estimation']['parameters']['wheel_linear_velocity_variance'] == .02
         assert run['experimental_variables']['pose_white_noise_std']['value'][0] == noise
@@ -99,7 +102,7 @@ def test_explain_exposes_direct_composition_and_effective_calibration_without_ru
 def test_invalid_later_variant_fails_before_any_runtime_for_new_composition(
         tmp_path, monkeypatch, capsys):
     """Preserve S2 all-variant prevalidation through the new system route."""
-    data = load_yaml(NEW)
+    data = ExperimentCatalog(share=share).document('EXP-SENSOR-NOISE-COMPOSITION')
     # Keep the inherited global package resource independent of this fixture location.
     bad = [-.1, .08, .06981317007977318]
     data['experiment']['comparison']['variables'][0]['values'].append(bad)

@@ -1,0 +1,134 @@
+# Canonical numerical defaults are independent of manifest model selection.
+# Optional numerical defaults preserve legacy disabled pose-aiding semantics;
+# the ROS compatibility reader exports them only when explicitly selected.
+robot_estimators:
+  robot_ekf:
+    parameters:
+      joint_bounds_enabled: true
+      joint_bounds_numerical_tolerance: 1.0e-09
+      joint_count: 4
+      robot_initial_state:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      robot_initial_covariance_diagonal:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      linear_acceleration_noise_std: 0.1
+      angular_acceleration_noise_std: 0.05
+      joint_acceleration_noise_std: 0.1
+      wheel_linear_velocity_variance: 0.05
+      wheel_angular_velocity_variance: 0.02
+      imu_yaw_rate_variance: 0.01
+      joint_position_variance: 0.02
+      joint_velocity_variance: 0.02
+    optional_parameters:
+      planar_slip_noise_std: 0.0
+      yaw_slip_noise_std: 0.0
+      localization_enabled: false
+      localization_consensus_window: 0
+      localization_consensus_inliers: 0
+      localization_consensus_span: 0.0
+      localization_consensus_max_age: 0.0
+      localization_trust_timeout: 0.0
+      localization_recovery_nis_target: 0.0
+target_estimators:
+  kalman:
+    parameters:
+      target_spatial_dimension: 3
+      target_initial_state:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      target_initial_covariance_diagonal:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      target_acceleration_noise_std: 0.1
+      target_position_variance:
+      - 0.01
+      - 0.01
+      - 0.01
+transport:
+  robot:
+    diagnostic_topic: /estimation/diagnostics
+    robot_description_file: ''
+    robot_description_package: robot_description
+    robot_description_config: config/robot/robot.yaml
+    wheel_odom_frame: odom
+    base_frame: base_link
+    imu_frame: base_link
+    joint_names:
+    - base_yaw_joint
+    - shoulder_joint
+    - elbow_joint
+    - wrist_joint
+    imu_topic: /imu
+    wheel_odometry_topic: /wheel/odometry
+    joint_states_topic: /joint_states
+    robot_state_topic: /estimation/robot_state
+    robot_state_full_topic: /estimation/robot_state_full
+    robot_state_frame_id: odom
+  target:
+    target_measurement_topic: /perception/target_position
+    target_state_topic: /estimation/target_state
+    target_state_full_topic: /estimation/target_state_full
+runtime:
+  robot:
+    reorder_holdback: 0.03
+    reorder_max_age: 0.2
+    reorder_rate_hz: 100.0
+    reorder_capacity: 256
+    diagnostic_rate_hz: 5.0
+    future_tolerance: 0.01
+    max_wheel_odometry_age: 0.2
+    max_joint_state_age: 0.2
+  target: {}
+profiles:
+  pose_aiding:
+    robot_parameters:
+      linear_acceleration_noise_std: 0.3
+      angular_acceleration_noise_std: 0.3
+      planar_slip_noise_std: 0.15
+      yaw_slip_noise_std: 0.2
+      localization_nis_limit: 11.345
+      localization_consensus_window: 5
+      localization_consensus_inliers: 4
+      localization_consensus_span: 0.3
+      localization_consensus_max_age: 0.8
+      localization_trust_timeout: 0.35
+      localization_recovery_nis_target: 3.0
+    transport:
+      localization_topic: /localization/odometry
+      localization_frame: world
+      localization_max_age: 0.15
+      localization_transform_tolerance: 1.0e-06
+    runtime:
+      reorder_holdback: 0.08

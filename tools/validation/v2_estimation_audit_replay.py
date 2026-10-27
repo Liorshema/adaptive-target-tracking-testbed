@@ -1,4 +1,5 @@
 """Replay captured simulator feedback through the actual estimator offline."""
+from robot_estimation.configuration import load_estimation_parameters
 import json
 from pathlib import Path
 import numpy as np
@@ -8,7 +9,7 @@ from robot_estimation.measurement import Measurement
 from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
 from robot_estimation.robot.models.process_model import RobotProcessModel
 from robot_estimation.robot.models.measurement_model import WheelOdometryMeasurementModel,ImuYawRateMeasurementModel,JointEncoderMeasurementModel
-ROOT=Path('/home/user/ros2_ws');OUT=ROOT/'results/validation/v2_estimation_audit';data=json.loads((OUT/'streams.json').read_text());cfg=yaml.safe_load((ROOT/'src/robot_estimation/config/robot_estimator.yaml').read_text())['estimation_node']['ros__parameters']
+ROOT=Path('/home/user/ros2_ws');OUT=ROOT/'results/validation/v2_estimation_audit';data=json.loads((OUT/'streams.json').read_text());cfg=load_estimation_parameters(ROOT/'src/robot_estimation/config/estimation.yaml', 'robot_ekf')['estimation_node']['ros__parameters']
 odom=data['odom'];ot=np.array([r['t'] for r in odom]);op=np.array([r['base'] for r in odom]);op[:,2]=np.unwrap(op[:,2]);ov=np.array([r['velocity'] for r in odom]);jt=np.array([r['t'] for r in data['joint']]);q=np.array([r['q'] for r in data['joint']])
 events=[(row['t'],row['received'],kind,row) for kind in ['joint','odom'] for row in data[kind]]
 def run(order,scale):

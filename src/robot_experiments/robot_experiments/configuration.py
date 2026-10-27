@@ -1,45 +1,151 @@
 """Validate experiment composition and materialize seed-owned replay inputs."""
+
 from copy import deepcopy
 import hashlib
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
 
+from robot_bringup.factory.system_configuration import load_system_configuration
+from robot_configuration.parameter_validation import override_parameters
+from robot_configuration.resources import resolve_resource
+from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.assignments import apply_assignments
+from robot_experiments.assignments import bind_assignments
+from robot_experiments.assignments import check_parameter_keys
+from robot_experiments.comparison import validate_policy
 import yaml
 
-from robot_configuration.yaml_loader import load_yaml
-from robot_configuration.resources import resolve_resource
-from robot_bringup.factory.system_configuration import load_system_configuration
+METRICS = {
+    'tracking_distance',
+    'pointing_error',
+    'prediction_rmse',
+    'estimation_error',
+    'joint_speed_violation',
+    'joint_position_violation',
+    'realtime_factor',
+    'control_compute',
+}
+DEFAULT_EXECUTION = {
+    'readiness_timeout': 45.0,
+    'stall_timeout': 12.0,
+    'wall_timeout': 150.0,
+    'shutdown_timeout': 5.0,
+    'max_skew': 0.08,
+    'failure_policy': 'continue',
+    'record_actuator_trace': False,
+}
 
-from robot_experiments.assignments import apply_assignments, bind_assignments, check_parameter_keys
-from robot_experiments.comparison import validate_policy
 
-METRICS = {'tracking_distance', 'pointing_error', 'prediction_rmse', 'estimation_error',
-           'joint_speed_violation', 'joint_position_violation', 'realtime_factor', 'control_compute'}
-DEFAULT_EXECUTION = dict(readiness_timeout=45., stall_timeout=12., wall_timeout=150.,
-                         shutdown_timeout=5., max_skew=.08, failure_policy='continue', record_actuator_trace=False)
+def resolve_system_resource(reference, base, share):
+    """Materialize catalog composition and explicit historical resource migrations."""
+    from robot_experiments.composition import materialize_resource, load_resource_group
+
+    catalog = Path(share('robot_experiments')) / 'config/experiments.yaml'
+    aliases = load_resource_group(catalog).get('legacy_resources', {})
+    key = None
+    if isinstance(reference, dict) and set(reference) == {'package', 'path'}:
+        key = reference['package'] + ':' + reference['path']
+    elif isinstance(reference, (str, Path)):
+        candidate = Path(reference)
+        if not candidate.is_absolute():
+            candidate = Path(base) / candidate
+        candidate = candidate.resolve()
+        for package in ['robot_experiments', 'robot_bringup',
+                        'robot_simulation', 'robot_description']:
+            root = Path(share(package)).resolve()
+            if candidate.is_relative_to(root):
+                key = package + ':' + str(candidate.relative_to(root))
+                break
+    if key in aliases:
+        reference = aliases[key]
+    path = materialize_resource(reference, base, share)
+    # Saved external manifests keep their declaration origins while migrating only
+    # the bounded historical resource names. Reuse the existing M07 resolver.
+    if path.suffix in {'.yaml', '.yml'}:
+        document = load_resource_group(path)
+        if document.get('schema_version') == 2:
+            from robot_bringup.factory.system_configuration import _resolve_references
+            from robot_experiments.composition import _store_document, resource_sources
+            from robot_experiments.reporting import plain
+            changed = [False]
+
+            def migrate(value):
+                if isinstance(value, dict):
+                    if set(value) == {'package', 'path'}:
+                        alias = aliases.get(value['package'] + ':' + value['path'])
+                        if alias is not None:
+                            changed[0] = True
+                            return str(materialize_resource(alias, base, share))
+                    return {k: migrate(v) for k, v in value.items()}
+                if isinstance(value, list):
+                    return [migrate(v) for v in value]
+                return value
+
+            def transform(value, origin):
+                return _resolve_references(migrate(value), origin, share)
+
+            if any((isinstance(v, dict) and set(v) == {'package', 'path'}
+                    and v['package'] + ':' + v['path'] in aliases)
+                   for v in _mapping_values(document)):
+                document = load_yaml(path, transform=transform)
+                return _store_document(plain(document), resource_sources(path))
+    return path
+
+
+def _mapping_values(value):
+    yield value
+    if isinstance(value, dict):
+        for child in value.values():
+            yield from _mapping_values(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _mapping_values(child)
 
 
 def mapping(value, allowed, required, label):
     if not isinstance(value, dict):
         raise ValueError(f'{label}: expected mapping')
-    if set(value)-set(allowed) or set(required)-set(value):
-        raise ValueError(f'{label}: unknown keys {sorted(set(value)-set(allowed))}; missing {sorted(set(required)-set(value))}')
+    if set(value) - set(allowed) or set(required) - set(value):
+        raise ValueError(
+            f'{label}: unknown keys {sorted(set(value)-set(allowed))}; '
+            f'missing {sorted(set(required)-set(value))}'
+        )
     return value
 
 
 def positive(value, label, zero=False):
     import math
-    if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (not zero and value == 0):
-        raise ValueError(f'{label}: expected finite {"nonnegative" if zero else "positive"} number')
+
+    if (
+        type(value) not in (int, float)
+        or not math.isfinite(value)
+        or value < 0
+        or (not zero and value == 0)
+    ):
+        raise ValueError(
+            f"{label}: expected finite {'nonnegative' if zero else 'positive'} number"
+        )
     return float(value)
 
 
 def load_experiment(path, share, output_override=None):
     """Resolve variant resources at their declaring document before inheritance."""
     source = Path(path).resolve()
+    installed = Path(share('robot_experiments')) / 'config'
+    if not source.is_file() and (
+        Path(path).absolute().parent == installed.absolute()
+        or source.parent == installed.resolve()
+    ):
+        # One explicit importer for historical CLI/resource names, backed by the
+        # catalog's sole definitions. Never guess based on an arbitrary filename.
+        from .catalog import ExperimentCatalog
+
+        catalog = ExperimentCatalog(share=share)
+        return catalog.prepare(catalog.entry_id(source.name), output=output_override)
     source_ancestry = []
     baseline_sources, parameter_sources = [], {}
+
     def normalize(data, origin):
         source_ancestry.append(str(origin))
         experiment = data.get('experiment')
@@ -50,23 +156,43 @@ def load_experiment(path, share, output_override=None):
                 if isinstance(variant, dict) and 'parameters' in variant:
                     parameter_sources.setdefault(variant.get('name'), str(origin))
                 if isinstance(variant, dict) and 'system_config' in variant:
-                    variant['system_config'] = resolve_resource(variant['system_config'], origin.parent, share)
+                    variant['system_config'] = resolve_system_resource(
+                        variant['system_config'], origin.parent, share
+                    )
         return data
+
     try:
         data = load_yaml(source, transform=normalize)
-        mapping(data, {'schema_version', 'experiment'}, {'schema_version', 'experiment'}, str(source))
+        mapping(
+            data, {'schema_version', 'experiment'}, {'schema_version', 'experiment'}, str(source)
+        )
         version = data['schema_version']
         if type(version) is not int or version not in (1, 2):
             raise ValueError('schema_version: supported integer 1 or 2')
-        allowed = {'name', 'description', 'duration', 'settling_time', 'seeds', 'variants',
-                   'metrics', 'output', 'execution', 'runtime', 'comparison'}
+        allowed = {
+            'name',
+            'description',
+            'duration',
+            'settling_time',
+            'seeds',
+            'variants',
+            'metrics',
+            'output',
+            'execution',
+            'runtime',
+            'comparison',
+        }
         required = {'name', 'duration', 'settling_time', 'seeds', 'variants', 'metrics', 'output'}
         if version == 2:
             allowed |= {'system_config'}
             required |= {'system_config', 'comparison'}
         ex = mapping(data['experiment'], allowed, required, 'experiment')
-        if not isinstance(ex['name'], str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}', ex['name']):
-            raise ValueError('experiment.name: use 1-80 alphanumeric, underscore or hyphen characters')
+        if not isinstance(ex['name'], str) or not re.fullmatch(
+            r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}', ex['name']
+        ):
+            raise ValueError(
+                'experiment.name: use 1-80 alphanumeric, underscore or hyphen characters'
+            )
         if 'description' in ex and not isinstance(ex['description'], str):
             raise ValueError('experiment.description: expected string')
         if 'comparison' in ex:
@@ -74,40 +200,56 @@ def load_experiment(path, share, output_override=None):
         ex['duration'] = positive(ex['duration'], 'duration')
         ex['settling_time'] = positive(ex['settling_time'], 'settling_time', zero=True)
         seeds = ex['seeds']
-        if not isinstance(seeds,list) or not seeds or any(type(v) is not int or not 0 <= v < 2**32 for v in seeds) or len(seeds)!=len(set(seeds)):
+        if (
+            not isinstance(seeds, list)
+            or not seeds
+            or any(type(v) is not int or not 0 <= v < 2**32 for v in seeds)
+            or len(seeds) != len(set(seeds))
+        ):
             raise ValueError('seeds: expected nonempty unique uint32 list')
-        if not isinstance(ex['metrics'],list) or not ex['metrics'] or any(not isinstance(v,str) or v not in METRICS for v in ex['metrics']) or len(ex['metrics'])!=len(set(ex['metrics'])):
+        if (
+            not isinstance(ex['metrics'], list)
+            or not ex['metrics']
+            or any(not isinstance(v, str) or v not in METRICS for v in ex['metrics'])
+            or len(ex['metrics']) != len(set(ex['metrics']))
+        ):
             raise ValueError(f'metrics: supported {sorted(METRICS)} without duplicates')
         mapping(ex['output'], {'directory'}, {'directory'}, 'output')
-        if not isinstance(ex['output']['directory'],str) or not ex['output']['directory'].strip():
+        if not isinstance(ex['output']['directory'], str) or not ex['output']['directory'].strip():
             raise ValueError('output.directory: expected nonempty path')
-        ex['output']['directory'] = Path(output_override or ex['output']['directory']).expanduser().resolve()
-        runtime = mapping(ex.get('runtime',{}), {'enable_actuation'}, set(), 'runtime')
+        ex['output']['directory'] = (
+            Path(output_override or ex['output']['directory']).expanduser().resolve()
+        )
+        runtime = mapping(ex.get('runtime', {}), {'enable_actuation'}, set(), 'runtime')
         if 'enable_actuation' in runtime and type(runtime['enable_actuation']) is not bool:
             raise ValueError('runtime.enable_actuation: expected boolean')
-        ex['runtime'] = {'enable_actuation':runtime.get('enable_actuation',False)}
-        execution = mapping(ex.get('execution',{}), DEFAULT_EXECUTION, set(), 'execution')
-        ex['execution'] = {**DEFAULT_EXECUTION,**execution}
-        for key in DEFAULT_EXECUTION.keys()-{'failure_policy', 'record_actuator_trace'}:
-            ex['execution'][key] = positive(ex['execution'][key], 'execution.'+key)
+        ex['runtime'] = {'enable_actuation': runtime.get('enable_actuation', False)}
+        execution = mapping(ex.get('execution', {}), DEFAULT_EXECUTION, set(), 'execution')
+        ex['execution'] = {**DEFAULT_EXECUTION, **execution}
+        for key in DEFAULT_EXECUTION.keys() - {'failure_policy', 'record_actuator_trace'}:
+            ex['execution'][key] = positive(ex['execution'][key], 'execution.' + key)
         if type(ex['execution']['record_actuator_trace']) is not bool:
             raise ValueError('execution.record_actuator_trace: expected boolean')
-        if ex['execution']['failure_policy'] not in {'continue','abort'}:
+        if ex['execution']['failure_policy'] not in {'continue', 'abort'}:
             raise ValueError('execution.failure_policy: supported continue, abort')
         variants = ex['variants']
-        if not isinstance(variants,list) or not variants:
+        if not isinstance(variants, list) or not variants:
             raise ValueError('variants: expected nonempty list')
         if version == 2:
             for origin in source_ancestry:
                 check_parameter_keys(origin)
             baseline, origin = baseline_sources[0]
-            ex['system_config'] = resolve_resource(baseline, origin.parent, share)
+            ex['system_config'] = resolve_system_resource(baseline, origin.parent, share)
             ex['schema_version'] = 2
         names = set()
         for v in variants:
             fields = {'name', 'system_config'} if version == 1 else {'name', 'parameters'}
             mapping(v, fields, fields, 'variant')
-            if not isinstance(v['name'],str) or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}',v['name']) or v['name'] in names:
+            if (
+                not isinstance(v['name'], str)
+                or not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}', v['name'])
+                or v['name'] in names
+            ):
                 raise ValueError('variant.name: expected unique safe identifier')
             names.add(v['name'])
             if version == 2:
@@ -115,11 +257,23 @@ def load_experiment(path, share, output_override=None):
                 v['system_config'] = ex['system_config']
                 v['assignment_policy'] = deepcopy(ex['comparison'])
                 v['parameter_sources'] = {
-                    key: {'document': parameter_sources[v['name']],
-                          'variant': v['name'], 'parameter': key} for key in v['parameters']}
-            v['plan'] = load_system_configuration(v['system_config'],share,overrides={
-                'enable_actuation':str(ex['runtime']['enable_actuation']).lower(),
-                'publish_ground_truth':'true','gui':'false','visualize_tracking':'false'})
+                    key: {
+                        'document': parameter_sources[v['name']],
+                        'variant': v['name'],
+                        'parameter': key,
+                    }
+                    for key in v['parameters']
+                }
+            v['plan'] = load_system_configuration(
+                v['system_config'],
+                share,
+                overrides={
+                    'enable_actuation': str(ex['runtime']['enable_actuation']).lower(),
+                    'publish_ground_truth': 'true',
+                    'gui': 'false',
+                    'visualize_tracking': 'false',
+                },
+            )
         ex['source'] = source
         ex['source_ancestry'] = source_ancestry
         if version == 2:
@@ -129,162 +283,407 @@ def load_experiment(path, share, output_override=None):
                 for variant in variants:
                     directory = Path(temporary) / variant['name']
                     directory.mkdir()
-                    materialize_run(variant, seeds[0], directory, share, ex['runtime'],
-                                    ex['execution']['record_actuator_trace'])
+                    materialize_run(
+                        variant,
+                        seeds[0],
+                        directory,
+                        share,
+                        ex['runtime'],
+                        ex['execution']['record_actuator_trace'],
+                    )
         return ex
     except (ValueError, TypeError, KeyError, OSError) as error:
         raise ValueError(f'{source}: {error}') from error
 
 
 def _write(path, data):
-    path.write_text(yaml.safe_dump(data,sort_keys=False))
+    path.write_text(yaml.safe_dump(data, sort_keys=False))
     return str(path)
 
 
 def materialize_run(variant, seed, directory, share, runtime, record_actuator_trace=False):
-    """Snapshot selected owner values and wire the supported sensor RNG to this seed.
+    """
+    Snapshot selected owner values and wire the supported sensor RNG to this seed.
 
     References outside the run are immutable installed owner resources, whose
     contents/hashes are captured. No owner source file is modified.
     """
     directory = Path(directory).resolve()
-    inputs = directory/'inputs';inputs.mkdir()
-    plan = variant['plan']; profile = deepcopy(plan['profile'])
+    inputs = directory / 'inputs'
+    inputs.mkdir()
+    plan = variant['plan']
+    profile = deepcopy(plan['profile'])
+    overrides = variant.get('owner_overrides', {})
+    allowed = {
+        'prediction',
+        'estimation',
+        'control',
+        'strategy',
+        'target',
+        'environment',
+        'integration',
+        'measurements',
+        'localization_sensor',
+    }
+    if not isinstance(overrides, dict) or set(overrides) - allowed:
+        raise ValueError(f'owner overrides: supported owners {sorted(allowed)}')
+
+    def adjusted(name, value):
+        selection_keys = {
+            'controller_type',
+            'base_model_type',
+            'manipulator_model_type',
+            'kinematics_adapter_type',
+            'reference_geometry_type',
+            'reference_policy_type',
+            'strategy_config_file',
+            'strategy_configuration',
+        }
+        if (
+            name == 'control'
+            and isinstance(overrides.get(name), dict)
+            and selection_keys & overrides[name].keys()
+        ):
+            raise ValueError('overrides.control: component selection belongs to composition')
+        if value is None and name in overrides:
+            raise ValueError(f'overrides.{name}: owner is not selected')
+        return (
+            override_parameters(value, overrides[name], path=f'overrides.{name}')
+            if name in overrides
+            else value
+        )
+
     snapshots = {}
+
     def read(path):
         path = Path(path).resolve()
         value = load_yaml(path)
-        snapshots[str(path)] = {'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'resolved':deepcopy(value)}
-        declared=yaml.safe_load(path.read_text())
-        parents=declared.get('extends',[]) if isinstance(declared,dict) else []
-        if isinstance(parents,str):parents=[parents]
-        snapshots[str(path)]['parents'] = [str((path.parent/parent).resolve()) for parent in parents]
+        snapshots[str(path)] = {
+            'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+            'resolved': deepcopy(value),
+        }
+        from robot_experiments.composition import resource_sources
+        records = resource_sources(path)
+        snapshots[str(path)]['composition_sources'] = records
+        for record in records:
+            original = Path(record['path']).resolve()
+            if original != path and str(original) not in snapshots:
+                if original.suffix in {'.yaml', '.yml'}:
+                    read(original)
+                else:
+                    snapshots[str(original)] = {
+                        'sha256': hashlib.sha256(original.read_bytes()).hexdigest(),
+                        'text': original.read_text(),
+                    }
+        declared = yaml.safe_load(path.read_text())
+        parents = declared.get('extends', []) if isinstance(declared, dict) else []
+        if isinstance(parents, str):
+            parents = [parents]
+        snapshots[str(path)]['parents'] = [
+            str((path.parent / parent).resolve()) for parent in parents
+        ]
         for parent in parents:
-            parent_path=(path.parent/parent).resolve()
-            if str(parent_path) not in snapshots:read(parent_path)
+            parent_path = (path.parent / parent).resolve()
+            if str(parent_path) not in snapshots:
+                read(parent_path)
         return value
-    original_manifest=read(plan['source'])
-    read(plan['profile_path'])
-    for owner,entry in [('estimation',original_manifest['estimation']['robot']),
-                        ('estimation',original_manifest['estimation']['target']),
-                        ('control',original_manifest['control'])]:
-        reference=entry['config']
+
+    original_manifest = deepcopy(plan['manifest'])
+    if Path(plan['source']).is_file():
+        read(plan['source'])
+    if Path(plan['profile_path']).is_file():
+        read(plan['profile_path'])
+    for owner, entry in [
+        ('estimation', original_manifest['estimation']['robot']),
+        ('estimation', original_manifest['estimation']['target']),
+        ('control', original_manifest['control']),
+    ]:
+        reference = entry['config']
         # Package references are source independent; merged values themselves are
         # captured below even when declaring-file-relative inheritance is used.
-        if isinstance(reference,dict):read(resolve_resource(reference,Path(plan['source']).parent,share))
+        if isinstance(reference, dict):
+            read(resolve_resource(reference, Path(plan['source']).parent, share))
+        else:
+            read(reference)
     sim = read(profile['simulation_config'])
-    base = share('robot_simulation') if sim['paths']['base']=='package' else Path(profile['simulation_config']).parent
-    sim['world']['source'] = str(resolve_resource(sim['world']['source'],base,share))
-    world_path=Path(sim['world']['source'])
-    snapshots[str(world_path)]={'sha256':hashlib.sha256(world_path.read_bytes()).hexdigest(),'text':world_path.read_text()}
-    for section,key in [('world','terrain_config'),('robot','config'),('robot','joint_position_hold'),
-                        ('target','config'),('simulation','config'),('simulation','environment_config'),('simulation','measurement_config')]:
-        resource=resolve_resource(sim[section][key],base,share)
-        value=read(resource)
-        sim[section][key]=str(resource)
+    base = (
+        share('robot_simulation')
+        if sim['paths']['base'] == 'package'
+        else Path(profile['simulation_config']).parent
+    )
+    sim['world']['source'] = str(resolve_resource(sim['world']['source'], base, share))
+    world_path = Path(sim['world']['source'])
+    snapshots[str(world_path)] = {
+        'sha256': hashlib.sha256(world_path.read_bytes()).hexdigest(),
+        'text': world_path.read_text(),
+    }
+    for section, key in [
+        ('world', 'terrain_config'),
+        ('robot', 'config'),
+        ('robot', 'joint_position_hold'),
+        ('target', 'config'),
+        ('simulation', 'config'),
+        ('simulation', 'environment_config'),
+        ('simulation', 'measurement_config'),
+    ]:
+        resource = resolve_resource(sim[section][key], base, share)
+        value = read(resource)
+        sim[section][key] = str(resource)
     localization_sensor, measurements, assignment_records = None, None, {}
     localization_source = None
     if sim.get('localization_sensor_config'):
         localization_source = resolve_resource(sim['localization_sensor_config'], base, share)
         localization_sensor = read(localization_source)
+    localization_sensor = adjusted('localization_sensor', localization_sensor)
     if 'assignment_policy' in variant:
-        measurements = read(sim['simulation']['measurement_config'])
+        measurements = adjusted('measurements', read(sim['simulation']['measurement_config']))
         bound = bind_assignments(variant['assignment_policy'], variant['parameters'])
         assignment_records = apply_assignments(
-            bound, localization_sensor, measurements,
-            {'localization_sensor': str(localization_source),
-             'measurements': sim['simulation']['measurement_config']},
-            variant['parameter_sources'])
+            bound,
+            localization_sensor,
+            measurements,
+            {
+                'localization_sensor': str(localization_source),
+                'measurements': sim['simulation']['measurement_config'],
+            },
+            variant['parameter_sources'],
+        )
     if localization_sensor is not None:
         localization_sensor['localization_sensor']['random_seed'] = int.from_bytes(
-            hashlib.sha256(f'{seed}:localization'.encode()).digest()[:4], 'little')
-        sim['localization_sensor_config'] = _write(inputs/'localization_sensor.yaml',localization_sensor)
+            hashlib.sha256(f'{seed}:localization'.encode()).digest()[:4], 'little'
+        )
+        sim['localization_sensor_config'] = _write(
+            inputs / 'localization_sensor.yaml', localization_sensor
+        )
     original_holding = read(sim['robot']['joint_position_hold'])
     if record_actuator_trace:
         holding = deepcopy(original_holding)
-        holding['joint_position_hold']['trace_directory'] = str(directory/'physics')
-        sim['robot']['joint_position_hold'] = _write(inputs/'holding.yaml', holding)
-    robot=read(sim['robot']['config'])['robot']
-    description=read(plan['description_path'])
-    description_file=_write(inputs/'robot_description.yaml',description)
-    physical_deployment=deepcopy(robot)
+        holding['joint_position_hold']['trace_directory'] = str(directory / 'physics')
+        sim['robot']['joint_position_hold'] = _write(inputs / 'holding.yaml', holding)
+    robot = read(sim['robot']['config'])['robot']
+    description = read(plan['description_path'])
+    description_file = _write(inputs / 'robot_description.yaml', description)
+    physical_deployment = deepcopy(robot)
     physical_deployment.pop('description')
-    robot['description']['config']=description_file
-    sim['robot']['config']=_write(inputs/'robot.yaml',{'robot':robot})
+    robot['description']['config'] = description_file
+    sim['robot']['config'] = _write(inputs / 'robot.yaml', {'robot': robot})
     if measurements is None:
-        measurements=read(sim['simulation']['measurement_config'])
+        measurements = adjusted('measurements', read(sim['simulation']['measurement_config']))
     # Target and localization retain their existing independent seed policies.
-    measurements['measurements']['target_position']['random_seed']=seed
-    sim['simulation']['measurement_config']=_write(inputs/'measurements.yaml',measurements)
-    sim['paths']['base']='config'
-    simulation_file=inputs/'simulation.yaml';_write(simulation_file,sim)
-    profile['simulation_config']=str(simulation_file)
-    for key,package in [('actuation_config','robot_simulation'),('estimation_overrides','robot_bringup')]:
+    measurements['measurements']['target_position']['random_seed'] = seed
+    sim['simulation']['measurement_config'] = _write(inputs / 'measurements.yaml', measurements)
+    for section, key, name in [
+        ('target', 'config', 'target'),
+        ('simulation', 'environment_config', 'environment'),
+        ('simulation', 'config', 'integration'),
+    ]:
+        value = read(sim[section][key])
+        if name == 'target':
+            from robot_simulation.factory.simulation_factory import SimulationFactory
+            factory = SimulationFactory.with_defaults()
+            read(factory.dynamics_defaults_path)
+            specification = value['target']['dynamics']
+            specification['parameters'] = factory.dynamics_registry.validate(
+                specification['type'], specification.get('parameters', {}))
+        value = adjusted(name, value)
+        sim[section][key] = _write(inputs / (name + '.yaml'), value)
+    # Freeze the remaining scalar configuration owners, including gravity holding.
+    if not record_actuator_trace:
+        sim['robot']['joint_position_hold'] = _write(inputs / 'holding.yaml', original_holding)
+    sim['world']['terrain_config'] = _write(
+        inputs / 'terrain.yaml', read(sim['world']['terrain_config'])
+    )
+    sim['paths']['base'] = 'config'
+    simulation_file = inputs / 'simulation.yaml'
+    _write(simulation_file, sim)
+    profile['simulation_config'] = str(simulation_file)
+    for key, package in [
+        ('actuation_config', 'robot_simulation'),
+        ('estimation_overrides', 'robot_bringup'),
+    ]:
         if key in profile:
-            path=resolve_resource(str(profile[key]),share(package),share)
-            read(path);profile[key]=str(path)
+            path = resolve_resource(str(profile[key]), share(package), share)
+            read(path)
+            profile[key] = str(path)
+            if key == 'actuation_config':
+                profile[key] = _write(inputs / 'actuation.yaml', read(path))
     # Calibration overrides were already applied by the M07 owner preflight.
-    profile.pop('estimation_overrides',None)
-    estimation_parameters=deepcopy(plan['estimation_parameters'])
-    estimation_parameters['robot_description_file']=description_file
-    control_parameters=deepcopy(plan['control_parameters'])
-    control_parameters['robot_description_file']=description_file
-    est=_write(inputs/'estimation.yaml',{'estimation_node':{'ros__parameters':estimation_parameters}})
-    target_est=_write(inputs/'target_estimation.yaml',{'estimation_node':{'ros__parameters':{}}})
-    control=_write(inputs/'control.yaml',{'control_node':{'ros__parameters':control_parameters}})
-    profile.update(control_config=control,robot_estimator_config=est,target_estimator_config=target_est)
-    profile_path=_write(inputs/'profile.yaml',profile)
-    source=read(plan['source'])
-    manifest={'schema_version':1,'robot':{'type':source['robot']['type'],'description':description_file,'model':source['robot']['model']},
-        'estimation':{'robot':{'type':plan['selection']['robot_estimator_type'],'config':est},
-                      'target':{'type':plan['selection']['target_estimator_type'],'config':target_est}},
-        'prediction':{'type':plan['selection']['predictor_type'],'config':str(plan['prediction_path']),
-                      'adaptation':plan['selection']['adaptation_type'],'fusion':plan['selection']['fusion_type']},
-        'control':{'type':source['control']['type'],'config':control,'strategy':str(plan['strategy_path']) if plan['strategy_path'] else None},
-        'simulation':{'config':profile_path},'runtime':{**plan['runtime'],'enable_actuation':runtime['enable_actuation'],
-         'publish_ground_truth':True,'gui':False,'visualize_tracking':False}}
-    prediction_configuration=read(plan['prediction_path'])
-    if plan['strategy_path']:read(plan['strategy_path'])
-    system_path=inputs/'system.yaml';_write(system_path,manifest)
-    resolved=load_system_configuration(system_path,share)
-    sensor=measurements['measurements']['target_position'];estparams=plan['estimation_parameters'];ctrl=plan['control_parameters']
-    integration=read(sim['simulation']['config'])
-    topics={'clock':'/clock','target_truth':integration['simulation']['ground_truth']['topic'],
-      'target_measurement':sensor['topic'],'joints':robot['joint_states']['topic'],'base_truth':robot['ground_truth_odometry']['topic'],
-      'odometry':robot['differential_drive']['odom_topic'],'robot_estimate':estparams['robot_state_full_topic'],
-      'target_estimate':estparams['target_state_full_topic'],'prediction':ctrl['prediction_topic'],
-      'control':ctrl['telemetry_topic'],'command':ctrl['command_topic'],'actuation':read(profile['actuation_config'])['actuation']['diagnostic_topic'],
-      'diagnostics':estparams['diagnostic_topic']}
+    profile.pop('estimation_overrides', None)
+    estimation_parameters = deepcopy(plan['estimation_parameters'])
+    estimation_parameters = adjusted('estimation', estimation_parameters)
+    estimation_parameters['robot_description_file'] = description_file
+    control_parameters = deepcopy(plan['control_parameters'])
+    control_parameters = adjusted('control', control_parameters)
+    control_parameters['robot_description_file'] = description_file
+    est = _write(
+        inputs / 'estimation.yaml', {'estimation_node': {'ros__parameters': estimation_parameters}}
+    )
+    target_est = _write(
+        inputs / 'target_estimation.yaml', {'estimation_node': {'ros__parameters': {}}}
+    )
+    control = _write(
+        inputs / 'control.yaml', {'control_node': {'ros__parameters': control_parameters}}
+    )
+    from robot_prediction.configuration.prediction_config import (
+        PredictionConfig, normalize_prediction_overrides)
+    read(plan['prediction_path'])
+    if 'prediction' in overrides:
+        overrides = {**overrides, 'prediction': normalize_prediction_overrides(
+            overrides['prediction'])}
+    prediction_configuration = adjusted(
+        'prediction', PredictionConfig(plan['prediction_path']).data)
+    prediction_file = _write(inputs / 'prediction.yaml', prediction_configuration)
+    if plan['strategy_path']:
+        # Record original source/ancestry while executing the frozen effective plan.
+        read(plan['strategy_path'])
+    strategy_file = (
+        _write(inputs / 'strategy.yaml', adjusted('strategy', plan['strategy']))
+        if plan['strategy_path']
+        else None
+    )
+    if not strategy_file and 'strategy' in overrides:
+        raise ValueError('overrides.strategy: no controller strategy selected')
+    profile.update(
+        control_config=control, robot_estimator_config=est, target_estimator_config=target_est
+    )
+    source = deepcopy(plan['manifest'])
+    manifest = {
+        'schema_version': 2,
+        'robot': {
+            'type': source['robot']['type'],
+            'description': description_file,
+            'model': source['robot']['model'],
+        },
+        'estimation': {
+            'robot': {'type': plan['selection']['robot_estimator_type'], 'config': est},
+            'target': {'type': plan['selection']['target_estimator_type'], 'config': target_est},
+        },
+        'prediction': {
+            'type': plan['selection']['predictor_type'],
+            'config': prediction_file,
+            'adaptation': plan['selection']['adaptation_type'],
+            'fusion': plan['selection']['fusion_type'],
+        },
+        'control': {
+            'type': source['control']['type'],
+            'config': control,
+            'strategy': strategy_file,
+        },
+        'simulation': {
+            'config': str(simulation_file),
+            'robot': sim['robot']['config'],
+            'actuation': profile['actuation_config'],
+            'tracking_tf': deepcopy(profile['tracking_tf']),
+            **(
+                {'localization_sensor': sim['localization_sensor_config']}
+                if localization_sensor
+                else {}
+            ),
+        },
+        'runtime': {
+            **plan['runtime'],
+            'enable_actuation': runtime['enable_actuation'],
+            'publish_ground_truth': True,
+            'gui': False,
+            'visualize_tracking': False,
+        },
+    }
+    system_path = inputs / 'system.yaml'
+    _write(system_path, manifest)
+    resolved = load_system_configuration(system_path, share)
+    sensor = measurements['measurements']['target_position']
+    estparams = resolved['estimation_parameters']
+    ctrl = resolved['control_parameters']
+    integration = read(sim['simulation']['config'])
+    topics = {
+        'clock': '/clock',
+        'target_truth': integration['simulation']['ground_truth']['topic'],
+        'target_measurement': sensor['topic'],
+        'joints': robot['joint_states']['topic'],
+        'base_truth': robot['ground_truth_odometry']['topic'],
+        'odometry': robot['differential_drive']['odom_topic'],
+        'robot_estimate': estparams['robot_state_full_topic'],
+        'target_estimate': estparams['target_state_full_topic'],
+        'prediction': ctrl['prediction_topic'],
+        'control': ctrl['telemetry_topic'],
+        'command': ctrl['command_topic'],
+        'actuation': read(profile['actuation_config'])['actuation']['diagnostic_topic'],
+        'diagnostics': estparams['diagnostic_topic'],
+    }
     if localization_sensor:
-        topics['localization_measurement']=localization_sensor['localization_sensor']['topic']
-    context={'description':description,'robot':robot,'control':ctrl,'joint_names':ctrl['command_joint_names'],
-       'world_frame':sim['tracking']['reference_frame'],'estimator_frame':estparams['robot_state_frame_id'],
-       'target_frame':sim['tracking']['reference_frame'],'topics':topics,
-       'physical_numerical_tolerance':.001}
-    comparison_contract={'description':description,'robot':physical_deployment,
-      'target_initial_position':sim['target']['initial_position'],'target_initial_velocity':sim['target']['initial_velocity'],
-      'target_dynamics':read(sim['target']['config']),'environment':read(sim['simulation']['environment_config']),
-      'integration':integration,'measurements':measurements,'tracking':sim['tracking'],
-      'physical_context':deepcopy(sim.get('physical_context')),
-      'prediction_sampling':{key:prediction_configuration['prediction'][key] for key in ['dt','horizon']},
-      'holding':original_holding,'terrain':read(sim['world']['terrain_config']),
-      'world_sha256':snapshots[str(world_path)]['sha256'],'actuation':read(profile['actuation_config']),
-      'tracking_reference':{key:ctrl[key] for key in ['tracking_radius','tracking_forward_axis','base_velocity_lower','base_velocity_upper']}}
+        topics['localization_measurement'] = localization_sensor['localization_sensor']['topic']
+    context = {
+        'description': description,
+        'robot': robot,
+        'control': ctrl,
+        'joint_names': ctrl['command_joint_names'],
+        'world_frame': sim['tracking']['reference_frame'],
+        'estimator_frame': estparams['robot_state_frame_id'],
+        'target_frame': sim['tracking']['reference_frame'],
+        'topics': topics,
+        'physical_numerical_tolerance': 0.001,
+    }
+    comparison_contract = {
+        'description': description,
+        'robot': physical_deployment,
+        'target_initial_position': sim['target']['initial_position'],
+        'target_initial_velocity': sim['target']['initial_velocity'],
+        'target_dynamics': read(sim['target']['config']),
+        'environment': read(sim['simulation']['environment_config']),
+        'integration': integration,
+        'measurements': measurements,
+        'tracking': sim['tracking'],
+        'physical_context': deepcopy(sim.get('physical_context')),
+        'prediction_sampling': {
+            key: prediction_configuration['prediction']['parameters'][key]
+            for key in ['dt', 'horizon']
+        },
+        'holding': original_holding,
+        'terrain': read(sim['world']['terrain_config']),
+        'world_sha256': snapshots[str(world_path)]['sha256'],
+        'actuation': read(profile['actuation_config']),
+        'tracking_reference': {
+            key: ctrl[key]
+            for key in [
+                'tracking_radius',
+                'tracking_forward_axis',
+                'base_velocity_lower',
+                'base_velocity_upper',
+            ]
+        },
+    }
     if localization_sensor:
-        comparison_contract['localization_sensor']=localization_sensor
-    snapshot={'schema_version':1,'resources':snapshots,'seed_consumers':{'measurements.target_position.random_seed':seed},
-      'initial_conditions':{'robot_pose':robot['pose'],'target_position':sim['target']['initial_position'],'target_velocity':sim['target']['initial_velocity']},
-      'reproducibility':'Owner config replay and sensor RNG control; asynchronous ROS/Gazebo, contact/skid dynamics and reactive target trajectories are not bitwise deterministic.'}
+        comparison_contract['localization_sensor'] = localization_sensor
+    snapshot = {
+        'schema_version': 1,
+        'resources': snapshots,
+        'seed_consumers': {'measurements.target_position.random_seed': seed},
+        'initial_conditions': {
+            'robot_pose': robot['pose'],
+            'target_position': sim['target']['initial_position'],
+            'target_velocity': sim['target']['initial_velocity'],
+        },
+        'reproducibility': (
+            'Owner config replay and sensor RNG control; asynchronous ROS/Gazebo, '
+            'contact/skid dynamics and reactive target trajectories are not bitwise deterministic.'
+        ),
+    }
     if 'assignment_policy' in variant:
         snapshot['assignments'] = assignment_records
     if localization_sensor:
-        snapshot['seed_consumers']['localization_sensor.random_seed']=localization_sensor['localization_sensor']['random_seed']
+        snapshot['seed_consumers']['localization_sensor.random_seed'] = localization_sensor[
+            'localization_sensor'
+        ]['random_seed']
     # Resource filenames are provenance; their resolved contents are protected.
     estimator_settings = deepcopy(resolved['estimation_parameters'])
     controller_settings = deepcopy(resolved['control_parameters'])
     for settings in [estimator_settings, controller_settings]:
-        for key in ['robot_description_file', 'robot_description_config',
-                    'robot_description_package', 'strategy_config_file']:
+        for key in [
+            'robot_description_file',
+            'robot_description_config',
+            'robot_description_package',
+            'strategy_config_file',
+        ]:
             settings.pop(key, None)
     scientific_conditions = {
         'physics': deepcopy(sim['world'].get('physics', {})),
@@ -293,11 +692,18 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
         'component_selection': deepcopy(resolved['selection']),
         'estimator_parameters': estimator_settings,
         'controller_parameters': controller_settings,
-        'controller_strategy': read(plan['strategy_path']) if plan['strategy_path'] else None,
+        'controller_strategy': read(strategy_file) if strategy_file else None,
         'prediction_configuration': prediction_configuration,
         'tracking_feedback': deepcopy(profile['tracking_tf']),
         'runtime': deepcopy(resolved['runtime']),
         'seed_consumers': deepcopy(snapshot['seed_consumers']),
     }
-    return {'plan':resolved,'context':context,'snapshot':snapshot,'system_path':system_path,'simulation_path':simulation_file,
-            'comparison_contract':comparison_contract, 'scientific_conditions':scientific_conditions}
+    return {
+        'plan': resolved,
+        'context': context,
+        'snapshot': snapshot,
+        'system_path': system_path,
+        'simulation_path': simulation_file,
+        'comparison_contract': comparison_contract,
+        'scientific_conditions': scientific_conditions,
+    }

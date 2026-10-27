@@ -96,3 +96,30 @@ def _reject_recursive_aliases(value: Any, ancestors: set[int]) -> None:
     for child in children:
         _reject_recursive_aliases(child, ancestors)
     ancestors.remove(identity)
+
+
+def load_yaml_group(path: str | Path, group: str | list[str] | None = None) -> dict[str, Any]:
+    """Load an explicitly named mapping group without selecting a default group."""
+    data = load_yaml(path)
+    if group is None:
+        return data
+    if isinstance(group, list):
+        if (
+            not group
+            or any(not isinstance(name, str) for name in group)
+            or len(set(group)) != len(group)
+        ):
+            raise ValueError(f'{path}: group list must contain unique nonempty names')
+        merged = {}
+        for name in group:
+            merged = _merge_mappings(merged, load_yaml_group(path, name))
+        return merged
+    if not isinstance(group, str) or not group or any(not key for key in group.split('.')):
+        raise ValueError(f'{path}: group must be a nonempty dotted name')
+    for key in group.split('.'):
+        if not isinstance(data, dict) or key not in data:
+            raise ValueError(f'{path}: unknown parameter group {group!r}')
+        data = data[key]
+    if not isinstance(data, dict):
+        raise ValueError(f'{path}: parameter group {group!r} must be a mapping')
+    return deepcopy(data)

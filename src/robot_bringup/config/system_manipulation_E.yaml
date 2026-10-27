@@ -1,6 +1,0 @@
-# Challenge with wrist +/-30 degrees and nominal WLS.
-extends: system_manipulation_B.yaml
-robot:
-  description: {package: robot_description, path: config/robot/robot_wrist30.yaml}
-simulation:
-  config: {package: robot_bringup, path: config/reactive_manipulation_wrist30.yaml}

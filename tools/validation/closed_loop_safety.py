@@ -1,4 +1,5 @@
 """Physical actuator smoke and failure/recovery checks on production launches."""
+from robot_control.configuration import load_control_parameters
 
 import argparse
 import json
@@ -39,10 +40,10 @@ def main():
     os.environ['ROS_LOG_DIR'] = str(args.output / 'ros-log')
     limits = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']['manipulator']['joints']
     robot = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
-    control = yaml.safe_load((ROOT / 'src/robot_control/config/control.yaml').read_text())['control_node']['ros__parameters']
+    control = load_control_parameters(ROOT / 'src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     thresholds = yaml.safe_load(Path(__file__).with_name('closed_loop_thresholds.yaml').read_text())
     names = [robot['joint_name_template'].format(key=key) for key in limits]
-    launch = ['ros2', 'launch', 'robot_bringup', 'closed_loop.launch.py', 'enable_actuation:=true']
+    launch = ['ros2', 'launch', 'robot_experiments', 'tracking.launch.py', 'enable_actuation:=true']
     if args.config:
         launch.append(f'config:={args.config}')
     if args.strategy_config:

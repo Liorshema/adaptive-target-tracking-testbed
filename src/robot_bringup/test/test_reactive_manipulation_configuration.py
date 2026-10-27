@@ -9,10 +9,14 @@ import numpy as np
 import pytest
 import yaml
 
-from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.launching import launch_profile
 from robot_bringup.factory.system_configuration import load_system_configuration
 from robot_description.model_parameters import load_robot_model_parameters
 from robot_experiments.configuration import load_experiment, materialize_run
+from functools import partial
+from robot_experiments.composition import load_resource
+from robot_experiments.configuration import resolve_system_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / package)
 
 
 SOURCE = Path(__file__).resolve().parents[2]
@@ -28,7 +32,7 @@ def test_wrist_variant_is_complete_description_with_only_position_bounds_changed
     """Xacro and every plain YAML consumer must see identical owner parameters."""
     root = share('robot_description') / 'config/robot'
     nominal = load_yaml(root / 'robot.yaml')
-    path = root / f'robot_wrist{degrees}.yaml'
+    path = resolve_system_resource(root / f'robot_wrist{degrees}.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package)
     actual = yaml.safe_load(path.read_text())
     expected = deepcopy(nominal)
     expected['robot']['manipulator']['joints']['wrist'].update(
@@ -44,7 +48,7 @@ def test_wrist_description_renders_matching_physical_urdf_limits(degrees):
     """The simulator's unchanged xacro reader must honor the selected owner bounds."""
     xacro = pytest.importorskip('xacro')
     root = share('robot_description')
-    config = root / f'config/robot/robot_wrist{degrees}.yaml'
+    config = resolve_system_resource(root / f'config/robot/robot_wrist{degrees}.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package)
     document = xacro.process_file(
         str(root / 'urdf/robot.urdf.xacro'), mappings={'config_file': str(config)})
     physical = ET.fromstring(document.toxml())
@@ -58,60 +62,60 @@ def test_wrist_description_renders_matching_physical_urdf_limits(degrees):
 
 def test_arm_priority_changes_only_normalized_base_yaw_cost():
     """The experiment cannot alter task gains, physical bounds or wrist penalties."""
-    root = share('robot_control') / 'config'
-    expected = load_yaml(root / 'whole_body.yaml')
+    expected = launch_profile(
+        'closed_loop', lambda p: SOURCE / p, controller='whole_body')['strategy']
     expected['controller']['parameters']['motion_weights'][1] = 12.
-    assert load_yaml(root / 'whole_body_manipulation_arm_priority.yaml') == expected
+    assert launch_profile(
+        'closed_loop', lambda p: SOURCE / p,
+        controller='whole_body_manipulation_arm_priority')['strategy'] == expected
 
 
 def test_nominal_remains_identical_and_challenge_direct_launch_has_physical_feedback():
     """Wrist selection must preserve challenge deployment, including enabled truth."""
-    root = share('robot_bringup') / 'config'
     experiment = load_experiment(
         share('robot_experiments') / 'config/reactive_manipulation.yaml', share)
     nominal = next(v for v in experiment['variants'] if v['name'] == 'A')
-    assert nominal['system_config'] == root / 'system_nominal.yaml'
+    assert nominal['system_config'] == (
+        resolve_system_resource(share('robot_experiments') / 'config/systems/nominal_tracking.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package))
     base_deployment = load_yaml(share('robot_simulation') / 'config/gazebo/robot_manipulation.yaml')
     for name in ['B', 'C', 'D', 'E']:
-        plan = load_system_configuration(root / f'system_manipulation_{name}.yaml', share)
+        plan = load_system_configuration(
+            resolve_system_resource(share('robot_experiments') / f'config/systems/manipulation_{name}.yaml', Path.cwd(), share), share)
         assert plan['runtime']['enable_actuation'] is False
         scenario = load_yaml(plan['profile']['simulation_config'])
         assert scenario['tracking']['pose_source'] == 'physical'
         deployment = load_yaml(share('robot_simulation') / scenario['robot']['config'])
         expected = deepcopy(base_deployment)
-        expected['robot']['description']['config'] = str(
-            plan['description_path'].relative_to(share('robot_description')))
+        actual_description = deployment['robot']['description']['config']
+        assert (share('robot_description') / actual_description).resolve() == plan['description_path']
+        expected['robot']['description']['config'] = actual_description
         assert deployment == expected
         assert deployment['robot']['ground_truth_odometry']['enabled'] is True
-        expected_strategy = ('whole_body_manipulation_arm_priority.yaml'
-                             if name == 'D' else 'whole_body.yaml')
-        assert plan['strategy_path'].name == expected_strategy
+        assert plan['strategy_path'] == share('robot_control') / 'config/control.yaml'
+        expected_yaw_cost = 12. if name == 'D' else 2.
+        assert plan['strategy']['controller']['parameters']['motion_weights'][1] == (
+            expected_yaw_cost)
 
 
 @pytest.mark.parametrize('variant,degrees', [('C', 15), ('E', 30)])
 def test_restricted_wrist_rejects_out_of_bounds_initial_hold_before_launch(
         tmp_path, variant, degrees):
     """A selected physical bound must reject a previously nominal-valid posture."""
-    root = share('robot_bringup') / 'config'
     holding = tmp_path / 'holding.yaml'
     holding.write_text(yaml.safe_dump({
         'extends': str(share('robot_simulation') / 'config/gazebo/joint_position_hold.yaml'),
         'joint_position_hold': {'positions': {'wrist': math.radians(degrees) + .01}}}))
     scenario = tmp_path / 'scenario.yaml'
     scenario.write_text(yaml.safe_dump({
-        'extends': str(share('robot_simulation') /
-                       f'config/scenarios/reactive_manipulation_wrist{degrees}.yaml'),
+        'extends': str(resolve_system_resource(share('robot_simulation') /
+                       f'config/scenarios/reactive_manipulation_wrist{degrees}.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package)),
         'robot': {'joint_position_hold': str(holding)}}))
-    profile = tmp_path / 'profile.yaml'
-    profile.write_text(yaml.safe_dump({
-        'extends': str(root / f'reactive_manipulation_wrist{degrees}.yaml'),
-        'simulation_config': str(scenario)}))
     manifest = tmp_path / 'system.yaml'
-    manifest.write_text(yaml.safe_dump({
-        'extends': str(root / f'system_manipulation_{variant}.yaml'),
-        'simulation': {'config': str(profile)}}))
+    data = load_yaml(resolve_system_resource(share('robot_experiments') / f'config/systems/manipulation_{variant}.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package))
+    data['simulation']['config'] = str(scenario)
+    manifest.write_text(yaml.safe_dump(data))
     with pytest.raises(ValueError, match=r'positions\.wrist=.*outside authoritative limits'):
-        load_system_configuration(manifest, share)
+        load_system_configuration(resolve_system_resource(manifest, Path.cwd(), share), share)
 
 
 def test_study_variants_preflight_and_materialize_consistent_physical_consumers(tmp_path):
@@ -145,7 +149,6 @@ def test_study_variants_preflight_and_materialize_consistent_physical_consumers(
 
 def test_physical_context_is_part_of_m08_comparison_identity(tmp_path):
     from robot_experiments.configuration import load_experiment, materialize_run
-    from robot_configuration.yaml_loader import load_yaml
     root = Path(__file__).resolve().parents[2]
     share = lambda name: root / name
     spec = load_experiment(root/'robot_experiments/config/reactive_manipulation.yaml', share)

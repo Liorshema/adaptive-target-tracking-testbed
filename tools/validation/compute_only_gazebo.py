@@ -8,6 +8,7 @@ simulation launch. This script only observes and tests that launch.
 import json
 import argparse
 import os
+import tempfile
 from pathlib import Path
 import signal
 import subprocess
@@ -33,7 +34,6 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = Path('/tmp/control-runtime')
 os.environ['ROS_DOMAIN_ID'] = '79'
 os.environ['GZ_PARTITION'] = 'control-compute-verification'
-os.environ['ROS_LOG_DIR'] = str(OUT / 'ros-log')
 os.environ['GZ_IP'] = '127.0.0.1'
 processes = []
 files = []
@@ -41,7 +41,10 @@ nodes = []
 executor = None
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--gui', action='store_true', help='Verify the default GUI launch as well')
+parser.add_argument('--output', type=Path, default=OUT, help='Evidence directory')
 options = parser.parse_args()
+OUT = options.output.resolve()
+os.environ['ROS_LOG_DIR'] = str(OUT / 'ros-log')
 
 
 def start(name, args):
@@ -78,13 +81,19 @@ def wait_until(predicate, label, timeout=25):
 
 try:
     OUT.mkdir(parents=True, exist_ok=True)
-    robot = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
-    deployment = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
-    hold = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/joint_position_hold.yaml').read_text())['joint_position_hold']
-    joint_names = [deployment['joint_name_template'].format(key=key) for key in robot['manipulator']['joints']]
+    robot = yaml.safe_load(
+        (ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
+    deployment = yaml.safe_load(
+        (ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
+    hold = yaml.safe_load(
+        (ROOT /
+         'src/robot_simulation/config/gazebo/joint_position_hold.yaml').read_text())['joint_position_hold']
+    joint_names = [deployment['joint_name_template'].format(
+        key=key) for key in robot['manipulator']['joints']]
     targets = np.array([hold['positions'][key] for key in robot['manipulator']['joints']])
     model = create_robot_model()
     arm_samples = []
+
     def sample_arm(message):
         index = [list(message.name).index(name) for name in joint_names]
         positions = np.array(message.position)[index]
@@ -94,17 +103,28 @@ try:
                                            joint_positions=positions)
         arm_samples.append({'time': stamp, 'positions': positions.tolist(),
                             'velocities': velocities.tolist(), 'tracking_height_above_base': pose[2, 3]})
-    launch_command = ['ros2', 'launch', 'robot_simulation', 'simulation.launch.py']
+    from robot_experiments.launching import launch_profile
+    standalone = launch_profile('standalone', lambda package: ROOT / 'src' / package)
+    launch_command = ['ros2', 'launch', 'robot_simulation', 'simulation.launch.py',
+                      'config:=' + str(standalone['profile']['simulation_config'])]
     if not options.gui:
         launch_command.append('gui:=false')
     start('simulation', launch_command)
     start('static-tf', ['ros2', 'run', 'tf2_ros', 'static_transform_publisher',
-                      '--z', str(deployment['pose'][2]), '--frame-id', 'world', '--child-frame-id', 'odom',
-                      '--ros-args', '-p', 'use_sim_time:=true'])
+                        '--z', str(deployment['pose'][2]
+                                   ), '--frame-id', 'world', '--child-frame-id', 'odom',
+                        '--ros-args', '-p', 'use_sim_time:=true'])
+    from robot_experiments.launching import launch_profile
+    plan = launch_profile('closed_loop', lambda package: ROOT / 'src' / package)
+    parameter_file = Path(tempfile.mkdtemp(prefix='compute_only_parameters_')) / 'parameters.yaml'
+    parameter_file.write_text(yaml.safe_dump({
+        'estimation_node': {'ros__parameters': {**plan['estimation_parameters'],
+                                                **{k: plan['selection'][k] for k in ['robot_estimator_type', 'target_estimator_type']}}},
+        'control_node': {'ros__parameters': plan['control_parameters']},
+        'prediction_node': {'ros__parameters': {k: plan['selection'][k] for k in
+                                                ['predictor_type', 'adaptation_type', 'fusion_type']}}}))
     rclpy.init(args=['--ros-args', '-p', 'use_sim_time:=true',
-                    '--params-file', str(ROOT / 'src/robot_estimation/config/robot_estimator.yaml'),
-                    '--params-file', str(ROOT / 'src/robot_estimation/config/target_estimator.yaml'),
-                    '--params-file', str(ROOT / 'src/robot_control/config/control.yaml')])
+                     '--params-file', str(parameter_file)])
     estimation = EstimationNode()
     prediction = PredictionNode()
     control = ControlNode()
@@ -115,6 +135,7 @@ try:
         executor.add_node(node)
     seen = {key: 0 for key in ['wheel', 'joints', 'target', 'robot', 'prediction']}
     latest = {}
+
     def received(key, message):
         seen[key] += 1
         latest[key] = message
@@ -126,13 +147,21 @@ try:
         (StateEstimate, '/estimation/robot_state_full', 'robot'),
         (PredictedTrajectory, '/prediction/trajectory', 'prediction'),
     ]:
-        observer.create_subscription(msg_type, topic, lambda message, key=key: received(key, message), 10)
+        observer.create_subscription(
+            msg_type,
+            topic,
+            lambda message,
+            key=key: received(
+                key,
+                message),
+            10)
     results = []
     original_compute = control._pipeline.compute
     lower = np.array([-0.5, -1., -1., -1., -1., -1.5])
     upper = -lower
     joint_lower = np.array([v['lower'] for v in robot['manipulator']['joints'].values()])
     joint_upper = np.array([v['upper'] for v in robot['manipulator']['joints'].values()])
+
     def checked_compute(**kwargs):
         result = original_compute(**kwargs)
         assert result.raw_output.command.shape == (6,)
@@ -144,7 +173,9 @@ try:
         next_joints = kwargs['robot_state'].configuration[3:] + kwargs['dt'] * safe[2:]
         assert np.all(next_joints >= joint_lower - 1e-12)
         assert np.all(next_joints <= joint_upper + 1e-12)
-        results.append({'time': kwargs['now'], 'raw': result.raw_output.command.tolist(), 'safe': safe.tolist()})
+        results.append({'time': kwargs['now'],
+                        'raw': result.raw_output.command.tolist(),
+                        'safe': safe.tolist()})
         return result
     control._pipeline.compute = checked_compute
     wait_until(lambda: observer.get_clock().now().nanoseconds > 0,
@@ -178,8 +209,13 @@ try:
     spin_for(1.0)
     assert len(results) == count, 'Stale joint data still computed commands'
     print('Stale joint input blocked computation while wheel feedback continued', flush=True)
-    estimation.create_subscription(JointState, '/joint_states', estimation._joint_state_callback, 10)
-    wait_until(lambda: len(results) >= count + 40, 'Control recovered after robot feedback resumed')
+    estimation.create_subscription(
+        JointState,
+        '/joint_states',
+        estimation._joint_state_callback,
+        10)
+    wait_until(lambda: len(results) >= count + 40,
+               'Control recovered after robot feedback resumed')
     count = len(results)
     old_time = results[-1]['time']
     run(['gz', 'service', '-s', '/world/tracking_testbed/control',
@@ -189,7 +225,8 @@ try:
     scene = run(['gz', 'service', '-s', '/world/tracking_testbed/scene/info',
                  '--reqtype', 'gz.msgs.Empty', '--reptype', 'gz.msgs.Scene',
                  '--timeout', '5000', '--req', ''])
-    assert 'name: "' + deployment['entity_name'] + '"' in scene.stdout, 'Permanent robot lost on reset'
+    assert 'name: "' + deployment['entity_name'] + \
+        '"' in scene.stdout, 'Permanent robot lost on reset'
     wait_until(lambda: len(results) >= count + 60 and any(r['time'] < old_time for r in results[count:]),
                'Control recovered after actual Gazebo reset')
     wait_until(lambda: arm_samples and 5.0 <= arm_samples[-1]['time'] < old_time,

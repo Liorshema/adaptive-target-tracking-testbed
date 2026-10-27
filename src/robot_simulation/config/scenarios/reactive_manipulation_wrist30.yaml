@@ -1,3 +1,0 @@
-extends: reactive_manipulation.yaml
-robot:
-  config: config/gazebo/robot_wrist30.yaml

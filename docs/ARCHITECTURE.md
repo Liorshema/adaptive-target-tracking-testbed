@@ -1,6 +1,6 @@
 # Current architecture
 
-Authoritative navigation guide, updated 2026-10-25. The earlier M06 audit,
+Authoritative navigation guide, updated 2026-10-27. The earlier M06 audit,
 target tree and compatibility-migration report describe historical states. Current
 source has ten ROS packages, ROS adapters and an experiment CLI, and no M06 Python
 compatibility aliases. See [hardening verification](m06_1_architecture_hardening.md).
@@ -8,6 +8,20 @@ M07 selection and runtime validation are documented in
 [the unified configuration guide](m07_unified_system_configuration.md).
 Experiment ownership and stable data contracts are documented in
 [the M08 guide](m08_experiments_and_benchmarking.md).
+Study definitions and immutable revisions now live in the
+[experiment catalog](experiment_management.md). Its API delegates interpretation
+and validation to the shared mapping-plus-origin M07 boundary. Experiment-owned
+composition selects models, reference policy, scenario, sensing and runtime. Each
+algorithm package owns one grouped parameter YAML. Generic bringup has no selected
+experiment; simulation retains reusable physics/sensing resources. See the catalog
+guide for the ownership migration. [Experiment composition](experiment_composition.md)
+describes the consolidated catalog, recipes, explicit standalone migration and
+[current verification](validation/experiment_composition.md). Scenario and wrist
+variations are catalog data; reusable physics remains in robot_simulation/config/deployment.yaml.
+Canonical model-family YAML, owner registries, strict schemas, capability metadata
+and the headless discovery API are documented in
+[the component configuration guide](component_configuration.md). Numerical defaults
+and physical constraints retain their owners; model selection stays in experiments.
 Read-only live Gazebo/RViz display and its frame/time contracts are documented in
 [the M09 guide](m09_robot_realism_and_visualization.md).
 
@@ -15,7 +29,7 @@ Read-only live Gazebo/RViz display and its frame/time contracts are documented i
 
 | Package | Owns | Does not own |
 |---|---|---|
-| robot_configuration | Pure YAML mapping loading, relative-parent inheritance and validation | ROS policy, physical parameters, experiment orchestration |
+| robot_configuration | Pure YAML loading/inheritance, trusted registration, schemas and resource lookup | ROS policy, physical parameters, experiment orchestration |
 | robot_description | Authoritative geometry, axes, masses, collisions, joint limits, mount; visual-only camera icon, Xacro and parameter normalization | Control/estimator algorithms or scenario selection |
 | robot_interfaces | ROS state, trajectory, safe command and telemetry messages | Numerical implementation or component selection |
 | robot_models | Pure kinematics, dynamics, transforms, geometry, constraints, references and robot composition | ROS/Gazebo adapters, file-based robot deployment |
@@ -24,7 +38,7 @@ Read-only live Gazebo/RViz display and its frame/time contracts are documented i
 | robot_control | DLS/WLS algorithms, velocity tasks, references, optimization and command safety | Gazebo physics/PID or physical-speed certification |
 | robot_simulation | Numerical target simulation, fields, RK4, synthetic observations, Gazebo, physical actuation transport/guard | Tracking controller algorithms or authoritative duplicate geometry |
 | robot_bringup | Cross-package deployment composition, launch, tracking TF, pure visualization scene/configuration and read-only ROS display adapter | Control/estimation/prediction algorithms, M08 metrics or physics |
-| robot_experiments | Experiment schema, isolated execution, recording, pure metrics, benchmarks and result artifacts | Physics, estimation/prediction/control algorithms, authoritative limits or launch assembly |
+| robot_experiments | Explicit component/scenario selection, revisioned experiment catalog, detached overrides, run identity/history, bounded workers, recording/metrics/comparisons | Physics, estimation/prediction/control algorithms, authoritative limits or launch assembly |
 
 Arrows below mean consumer → dependency. Dashed lines are deployment/resource
 dependencies; the others are direct project Python dependencies. The automated
@@ -37,6 +51,10 @@ flowchart TD
  X --> D
  X --> M
  X --> I
+ X --> E
+ X --> P
+ X --> C
+ X --> S
  B[robot_bringup] --> Q[robot_configuration]
  B --> D[robot_description]
  B --> M[robot_models]
@@ -54,6 +72,7 @@ flowchart TD
  C --> I
  C --> Q
  E --> I
+ E --> Q
  E -. physical bounds .-> D
  P --> I
  P --> Q
@@ -241,8 +260,9 @@ configuration schema or source of physical truth was introduced by M06.1.
 
 `robot_configuration.yaml_loader.load_yaml` resolves `extends` relative to each child and
 merges mappings; lists/scalars/null replace. Resource values still resolve by the
-owning package or explicit simulation resource base. ROS parameter YAML, prediction
-sections and controller strategies keep their existing schemas and override order.
+owning package or explicit simulation resource base. Named parameter groups select detached owner defaults before calibration and explicit
+experiment overrides. Runtime ROS parameter mappings and strategy documents preserve
+their existing dimensional/numerical contracts and override order.
 M07 composition references these owner files through relative paths or explicit
 `{package, path}` resources. Generic per-document transforms preserve declaring-file
 relative references through inheritance. Unknown selections and incompatible
@@ -269,13 +289,17 @@ overrides win over manifest runtime settings; actuation remains an explicit opt-
 
 ## Selecting or adding control
 
-`robot_control/config/control.yaml` defaults to `controller_type: jacobian` (DLS).
-Bringup's `strategy_config:=config/whole_body.yaml` selects the existing WLS
-Distance + Pointing strategy. `factory/project_components.py` registers types;
+`robot_control/config/control.yaml` contains common/DLS ROS parameters under
+`parameters` and WLS Distance + Pointing task defaults under `distance_pointing`.
+It selects no controller, adapter, robot model or reference policy. Experiment
+schema-2 composition explicitly chooses these and references the required groups.
+`robot_experiments tracking.launch.py case:=closed_loop controller:=whole_body`
+selects the existing WLS allocation. `factory/project_components.py` registers types;
 `factory/control_factory.py` builds the task/model/safety composition. Strategy
-configuration may configure controller/tracking choices, not overwrite physical
-robot bounds. WLS consumes shared feasible bounds and final safety still projects
-the output independently.
+configuration cannot overwrite physical robot bounds. WLS consumes shared feasible
+bounds and final safety independently projects the output. The ROS adapter receives
+the validated strategy as a serialized mapping, or an explicitly supplied standalone
+strategy file; there is one strategy interpretation path.
 
 A new algorithm implements `interfaces/controller.py`, returns a model-sized
 `ControlOutput`, and gets a named factory registration plus tests/strategy YAML.

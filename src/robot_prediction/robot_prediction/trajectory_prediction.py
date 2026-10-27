@@ -23,6 +23,9 @@ from robot_prediction.online_adaptation.classical.residual_adapter import (
 )
 
 
+_DEFAULT_FUSION = object()
+
+
 class TrajectoryPredictionSystem:
     """Coordinate prediction, adaptation, and performance monitoring."""
 
@@ -31,11 +34,14 @@ class TrajectoryPredictionSystem:
         predictor: Predictor,
         performance_monitor: PerformanceMonitor,
         residual_adapter: ResidualAdapter | None = None,
+        fusion=_DEFAULT_FUSION,
     ) -> None:
         self._predictor = predictor
         self._performance_monitor = performance_monitor
         self._residual_adapter = residual_adapter
-        self._weighted_correction = WeightedCorrection() if residual_adapter is not None else None
+        self._weighted_correction = (
+            WeightedCorrection() if residual_adapter is not None else None
+        ) if fusion is _DEFAULT_FUSION else fusion
 
         self._last_prediction: TrajectoryPrediction | None = None
         self._last_baseline_prediction: TrajectoryPrediction | None = None

@@ -1,4 +1,5 @@
 """Protect state-time comparison and frame alignment from analysis bias."""
+from robot_estimation.configuration import load_estimation_parameters
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -36,7 +37,7 @@ def test_replay_uses_effective_deployment_measurement_covariance():
     from pathlib import Path
     import yaml
     root = Path(__file__).resolve().parents[2]
-    cfg = yaml.safe_load((root / 'src/robot_estimation/config/robot_estimator.yaml').read_text())
+    cfg = load_estimation_parameters(root / 'src/robot_estimation/config/estimation.yaml', 'robot_ekf')
     cfg = cfg['estimation_node']['ros__parameters']
     snapshot = dict(estimator=cfg, joint_order=['a', 'b', 'c', 'd'],
                     estimation_overrides=dict(wheel_linear_velocity_variance=1e-6))

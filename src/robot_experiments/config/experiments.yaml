@@ -1,0 +1,2997 @@
+schema_version: 1
+generation: 2
+retired_ids: []
+experiments:
+  EXP-NOMINAL:
+    name: Nominal IMM tracking
+    legacy_entry: nominal.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.898977+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: nominal
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config:
+              package: robot_bringup
+              path: config/system_nominal.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 04b266a35ad7dd7ff93d093cccb746deb94dad1623b2b956664707bef22635c5
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.402981+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: nominal
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config:
+              package: robot_experiments
+              path: config/systems/nominal_tracking.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: c97922e4719e8c6a80e5d130c16297883cb24235d12e1f09738351ea85388349
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277020+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: nominal
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config: &id001
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.nominal_tracking
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 40d1845815048bbcf37a1b882a657291ed8237b96d8d6a61a3ac2912e29301b2
+  EXP-PREDICTION:
+    name: IMM versus CV tracking
+    legacy_entry: paired_prediction.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.901532+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: paired_prediction
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config:
+              package: robot_bringup
+              path: config/system_nominal.yaml
+          - name: cv
+            system_config:
+              package: robot_bringup
+              path: config/system_cv.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 1402b4da83ee7bae12de825456894e42e1ab331fb23c376c54e40b4526f5cb3a
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.403214+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: paired_prediction
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config:
+              package: robot_experiments
+              path: config/systems/nominal_tracking.yaml
+          - name: cv
+            system_config:
+              package: robot_experiments
+              path: config/systems/cv_prediction.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 3c4350789d2b6327420925b1973bed9433b994c3e9a578cadbf85f3f9dee0670
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277146+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: paired_prediction
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config: *id001
+          - name: cv
+            system_config: &id002
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.cv_prediction
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 8edc6c7b870a7e8637c0d637b2a1b041be08524be500309275d18f90e9a4f186
+  EXP-PREDICTION-COMPOSITION:
+    name: Explicit IMM versus CV tracking
+    legacy_entry: paired_prediction_composition.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.901697+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: paired_prediction
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config:
+              package: robot_bringup
+              path: config/systems/nominal_tracking.yaml
+          - name: cv
+            system_config:
+              package: robot_bringup
+              path: config/systems/cv_prediction.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 2a40afda884ad246b704106306e3ebc837699580fff045e049cf08484e502159
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.403332+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: paired_prediction
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config:
+              package: robot_experiments
+              path: config/systems/nominal_tracking.yaml
+          - name: cv
+            system_config:
+              package: robot_experiments
+              path: config/systems/cv_prediction.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 3c4350789d2b6327420925b1973bed9433b994c3e9a578cadbf85f3f9dee0670
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277219+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: paired_prediction
+          description: Matched sensor seed and physical scenario; IMM versus CV, no
+            claim of identical reactive trajectories.
+          duration: 6.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: imm
+            system_config: *id001
+          - name: cv
+            system_config: *id002
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+      overrides: {}
+      sha256: 8edc6c7b870a7e8637c0d637b2a1b041be08524be500309275d18f90e9a4f186
+  EXP-MANIPULATION:
+    name: Reactive manipulation A-E
+    legacy_entry: reactive_manipulation.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.903547+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: reactive_manipulation
+          description: Original nominal; challenge nominal; wrist15; wrist15 yaw-priority;
+            wrist30.
+          duration: 40.0
+          settling_time: 0.0
+          seeds:
+          - 42
+          - 917
+          variants:
+          - name: A
+            system_config:
+              package: robot_bringup
+              path: config/system_nominal.yaml
+          - name: B
+            system_config:
+              package: robot_bringup
+              path: config/system_manipulation_B.yaml
+          - name: C
+            system_config:
+              package: robot_bringup
+              path: config/system_manipulation_C.yaml
+          - name: D
+            system_config:
+              package: robot_bringup
+              path: config/system_manipulation_D.yaml
+          - name: E
+            system_config:
+              package: robot_bringup
+              path: config/system_manipulation_E.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 300.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 5514caa5f5b889d113685d288dfc0930ff2d38cc9a321cc0cb7baa6c5c14cfc3
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.403529+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: reactive_manipulation
+          description: Original nominal; challenge nominal; wrist15; wrist15 yaw-priority;
+            wrist30.
+          duration: 40.0
+          settling_time: 0.0
+          seeds:
+          - 42
+          - 917
+          variants:
+          - name: A
+            system_config:
+              package: robot_experiments
+              path: config/systems/nominal_tracking.yaml
+          - name: B
+            system_config:
+              package: robot_experiments
+              path: config/systems/manipulation_B.yaml
+          - name: C
+            system_config:
+              package: robot_experiments
+              path: config/systems/manipulation_C.yaml
+          - name: D
+            system_config:
+              package: robot_experiments
+              path: config/systems/manipulation_D.yaml
+          - name: E
+            system_config:
+              package: robot_experiments
+              path: config/systems/manipulation_E.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 300.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 6c22f3f8037b48454c5bba65e241b35082b7b5ce007df864e345a29e734c4f89
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277316+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: reactive_manipulation
+          description: Original nominal; challenge nominal; wrist15; wrist15 yaw-priority;
+            wrist30.
+          duration: 40.0
+          settling_time: 0.0
+          seeds:
+          - 42
+          - 917
+          variants:
+          - name: A
+            system_config: *id001
+          - name: B
+            system_config: &id005
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.manipulation_B
+          - name: C
+            system_config: &id006
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.manipulation_C
+          - name: D
+            system_config: &id007
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.manipulation_D
+          - name: E
+            system_config: &id008
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.manipulation_E
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 300.0
+            shutdown_timeout: 5.0
+            max_skew: 0.08
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: a7d30f1d492ad4538913b3c00dde8b93b2709cab116724fb5c8c14b4c6204c9b
+  EXP-SENSOR-NOISE-LEGACY:
+    name: Original sensor-noise comparison
+    legacy_entry: sensor_noise_comparison.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.903762+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            system_config:
+              package: robot_bringup
+              path: config/system_manipulation_D_localized.yaml
+          - name: higher_noise
+            system_config:
+              package: robot_bringup
+              path: config/system_localization_noise_study.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+      overrides: {}
+      sha256: f669e8c85161598bf0f1dc5ceafa64be279ae5a93c92432469568dd0c2ed91da
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.403658+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            system_config:
+              package: robot_experiments
+              path: config/systems/mobile_manipulator_pose_tracking.yaml
+          - name: higher_noise
+            system_config:
+              package: robot_experiments
+              path: config/systems/localization_noise_study.yaml
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+      overrides: {}
+      sha256: 8143c961c38974fa365202fd02f9eaf5e550eb576d491ac7d62f5f0ec3c160a3
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277406+00:00'
+      definition:
+        schema_version: 1
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            system_config: &id003
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.mobile_manipulator_pose_tracking
+          - name: higher_noise
+            system_config: &id004
+              package: robot_experiments
+              path: config/experiments.yaml
+              group:
+              - compositions.common
+              - compositions.selections.localization_noise_study
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+      overrides: {}
+      sha256: e2c116231b7cbc4bd0d20684ead59919d67cecc6507e1593fc4750997e9a8a7c
+  EXP-SENSOR-NOISE:
+    name: Assigned sensor-noise comparison
+    legacy_entry: sensor_noise_study.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.904410+00:00'
+      definition:
+        schema_version: 2
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          system_config:
+            package: robot_bringup
+            path: config/system_manipulation_D_localized.yaml
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            parameters:
+              pose_white_noise_std:
+              - 0.04
+              - 0.04
+              - 0.03490658503988659
+          - name: higher_noise
+            parameters:
+              pose_white_noise_std:
+              - 0.08
+              - 0.08
+              - 0.06981317007977318
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: db59d6aa2e23cca0c1d227c38f4129079a13a7789c551f16e647e5e794ddbe67
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.403777+00:00'
+      definition:
+        schema_version: 2
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          system_config:
+            package: robot_experiments
+            path: config/systems/mobile_manipulator_pose_tracking.yaml
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            parameters:
+              pose_white_noise_std:
+              - 0.04
+              - 0.04
+              - 0.03490658503988659
+          - name: higher_noise
+            parameters:
+              pose_white_noise_std:
+              - 0.08
+              - 0.08
+              - 0.06981317007977318
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 8584ebd4cbc1c7878d88ea09448d84f7bf9778692dfe5d96c46dbb240cd79e34
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277500+00:00'
+      definition:
+        schema_version: 2
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          system_config: *id003
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            parameters:
+              pose_white_noise_std:
+              - 0.04
+              - 0.04
+              - 0.03490658503988659
+          - name: higher_noise
+            parameters:
+              pose_white_noise_std:
+              - 0.08
+              - 0.08
+              - 0.06981317007977318
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 263b8ddc990147cf06d3f7657d984aae672accdb26a0ee5cecdf28a20603ed15
+  EXP-SENSOR-NOISE-COMPOSITION:
+    name: Explicit assigned sensor-noise comparison
+    legacy_entry: sensor_noise_composition.yaml
+    deleted: false
+    revisions:
+    - revision: 1
+      created_utc: '2026-10-25T20:57:28.904553+00:00'
+      definition:
+        schema_version: 2
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          system_config:
+            package: robot_bringup
+            path: config/systems/mobile_manipulator_pose_tracking.yaml
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            parameters:
+              pose_white_noise_std:
+              - 0.04
+              - 0.04
+              - 0.03490658503988659
+          - name: higher_noise
+            parameters:
+              pose_white_noise_std:
+              - 0.08
+              - 0.08
+              - 0.06981317007977318
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 973271795ee5fcb2df27856908577808694cdbbaf4443d40757b229182be7600
+    - revision: 2
+      created_utc: '2026-10-26T08:00:47.403892+00:00'
+      definition:
+        schema_version: 2
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          system_config:
+            package: robot_experiments
+            path: config/systems/mobile_manipulator_pose_tracking.yaml
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            parameters:
+              pose_white_noise_std:
+              - 0.04
+              - 0.04
+              - 0.03490658503988659
+          - name: higher_noise
+            parameters:
+              pose_white_noise_std:
+              - 0.08
+              - 0.08
+              - 0.06981317007977318
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 8584ebd4cbc1c7878d88ea09448d84f7bf9778692dfe5d96c46dbb240cd79e34
+    - revision: 3
+      created_utc: '2026-10-27T08:39:18.277587+00:00'
+      definition:
+        schema_version: 2
+        experiment:
+          name: sensor_noise_comparison
+          description: Bounded sensing comparison, not a ranking or identical-trajectory
+            experiment.
+          system_config: *id003
+          duration: 8.0
+          settling_time: 3.0
+          seeds:
+          - 42
+          variants:
+          - name: baseline
+            parameters:
+              pose_white_noise_std:
+              - 0.04
+              - 0.04
+              - 0.03490658503988659
+          - name: higher_noise
+            parameters:
+              pose_white_noise_std:
+              - 0.08
+              - 0.08
+              - 0.06981317007977318
+          comparison:
+            schema_version: 1
+            domain: sensor_parameters
+            variables:
+            - name: pose_white_noise_std
+              path: localization_sensor.localization_sensor.white_noise_std
+              values:
+              - - 0.04
+                - 0.04
+                - 0.03490658503988659
+              - - 0.08
+                - 0.08
+                - 0.06981317007977318
+          metrics:
+          - tracking_distance
+          - pointing_error
+          - prediction_rmse
+          - estimation_error
+          - joint_speed_violation
+          - joint_position_violation
+          - realtime_factor
+          - control_compute
+          output:
+            directory: results/experiments
+          runtime:
+            enable_actuation: true
+          execution:
+            readiness_timeout: 45.0
+            stall_timeout: 12.0
+            wall_timeout: 150.0
+            shutdown_timeout: 5.0
+            max_skew: 0.15
+            failure_policy: continue
+            record_actuator_trace: true
+      overrides: {}
+      sha256: 263b8ddc990147cf06d3f7657d984aae672accdb26a0ee5cecdf28a20603ed15
+compositions:
+  common:
+    schema_version: 2
+    robot:
+      type: mobile_manipulator
+      description:
+        package: robot_description
+        path: config/robot/robot.yaml
+      model:
+        base: differential_drive
+        manipulator: serial_arm
+    estimation:
+      robot:
+        type: robot_ekf
+        config:
+          package: robot_estimation
+          path: config/estimation.yaml
+          group: robot_ekf
+      target:
+        type: kalman
+        config:
+          package: robot_estimation
+          path: config/estimation.yaml
+          group: kalman
+    prediction:
+      type: imm
+      config:
+        package: robot_prediction
+        path: config/prediction.yaml
+      adaptation: residual
+      fusion: weighted_correction
+    control:
+      type: jacobian
+      config:
+        package: robot_control
+        path: config/control.yaml
+        group: parameters
+      strategy: null
+      adapter: planar
+      reference:
+        geometry: sphere
+        policy: radial
+    simulation:
+      config:
+        package: robot_experiments
+        path: config/experiments.yaml
+        group: resources.deployment_moving_target
+      robot:
+        package: robot_simulation
+        path: config/gazebo/robot.yaml
+      actuation:
+        package: robot_simulation
+        path: config/actuation.yaml
+      tracking_tf:
+        rate_hz: 20.0
+        max_age: 0.2
+        max_skew: 0.05
+        future_tolerance: 0.01
+    runtime:
+      enable_actuation: false
+      gui: false
+  selections:
+    cv_prediction:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      prediction:
+        type: constant_velocity
+        adaptation: none
+        fusion: none
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+      simulation:
+        config:
+          group: resources.deployment_oscillatory_reactive_tracking
+    dls_control:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_oscillatory_reactive_tracking
+    localization_noise_study:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        robot:
+          config:
+            group:
+            - robot_ekf
+            - pose_aiding
+          parameters:
+            localization_enabled: true
+        calibration:
+          package: robot_experiments
+          path: config/calibration/manipulation_pose.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+        strategy_overrides:
+          controller:
+            parameters:
+              motion_weights:
+              - 1.0
+              - 12.0
+              - 3.0
+              - 3.0
+              - 3.0
+              - 2.0
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_noise_study
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        localization_sensor:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.localization_noise
+      runtime:
+        publish_ground_truth: true
+    manipulation_B:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_manipulation
+    manipulation_C:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_wrist15
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+    manipulation_D:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+        strategy_overrides:
+          controller:
+            parameters:
+              motion_weights:
+              - 1.0
+              - 12.0
+              - 3.0
+              - 3.0
+              - 3.0
+              - 2.0
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_wrist15
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+    manipulation_E:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist30
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_wrist30
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist30
+    mobile_manipulator_pose_tracking:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        robot:
+          config:
+            group:
+            - robot_ekf
+            - pose_aiding
+          parameters:
+            localization_enabled: true
+        calibration:
+          package: robot_experiments
+          path: config/calibration/manipulation_pose.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+        strategy_overrides:
+          controller:
+            parameters:
+              motion_weights:
+              - 1.0
+              - 12.0
+              - 3.0
+              - 3.0
+              - 3.0
+              - 2.0
+      simulation:
+        config:
+          group: resources.deployment_base_relative_manipulation
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        localization_sensor:
+          package: robot_simulation
+          path: config/sensors/planar_localization.yaml
+      runtime:
+        publish_ground_truth: true
+    nominal_tracking:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      control:
+        type: weighted_least_squares
+        strategy:
+          package: robot_control
+          path: config/control.yaml
+          group: distance_pointing
+      simulation:
+        config:
+          group: resources.deployment_oscillatory_reactive_tracking
+    case_reactive_manipulation_noise_study:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/manipulation_pose.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_noise_study
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        localization_sensor:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.localization_noise
+    case_optimal_tracking:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+    case_reactive_manipulation_wrist15:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_wrist15
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+    case_reactive_manipulation_wrist30:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist30
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation_wrist30
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist30
+    case_reactive_tracking_low_damping:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target_low_damping
+    case_reactive_tracking_oscillatory:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_oscillatory_reactive_tracking
+    case_reactive_tracking_3d:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target_3d
+    case_reactive_tracking_saturated:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target_saturated
+    case_reactive_tracking:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target
+    case_reactive_tracking_oscillatory_aggressive_reference:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target_oscillatory_aggressive_reference
+    case_reactive_tracking_3d_aggressive:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target_3d_aggressive
+    case_reactive_manipulation:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_manipulation
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_manipulation
+    case_reactive_tracking_oscillatory_aggressive:
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/simulation.yaml
+      simulation:
+        config:
+          group: resources.deployment_reactive_target_oscillatory_aggressive
+    case_closed_loop: {}
+    case_reactive_manipulation_localized:
+      robot:
+        description:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.robot_wrist15
+      estimation:
+        calibration:
+          package: robot_experiments
+          path: config/calibration/manipulation_pose.yaml
+      simulation:
+        config:
+          group: resources.deployment_base_relative_manipulation
+        robot:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        localization_sensor:
+          package: robot_simulation
+          path: config/sensors/planar_localization.yaml
+    standalone:
+      simulation:
+        config:
+          group: resources.deployment_standalone
+resources:
+  robot_wrist15:
+    base:
+      package: robot_description
+      path: config/robot/robot.yaml
+    overrides:
+      robot:
+        manipulator:
+          joints:
+            wrist:
+              lower: -0.2617993877991494
+              upper: 0.2617993877991494
+  robot_wrist30:
+    base:
+      package: robot_description
+      path: config/robot/robot.yaml
+    overrides:
+      robot:
+        manipulator:
+          joints:
+            wrist:
+              lower: -0.5235987755982988
+              upper: 0.5235987755982988
+  gazebo_robot_manipulation:
+    base:
+      package: robot_simulation
+      path: config/gazebo/robot.yaml
+    overrides:
+      robot:
+        ground_truth_odometry:
+          enabled: true
+  gazebo_robot_wrist15:
+    base:
+      package: robot_simulation
+      path: config/gazebo/robot.yaml
+    overrides:
+      robot:
+        description:
+          config:
+            package: robot_experiments
+            path: config/experiments.yaml
+            group: resources.robot_wrist15
+        ground_truth_odometry:
+          enabled: true
+  gazebo_robot_wrist30:
+    base:
+      package: robot_simulation
+      path: config/gazebo/robot.yaml
+    overrides:
+      robot:
+        description:
+          config:
+            package: robot_experiments
+            path: config/experiments.yaml
+            group: resources.robot_wrist30
+        ground_truth_odometry:
+          enabled: true
+  localization_noise:
+    base:
+      package: robot_simulation
+      path: config/sensors/planar_localization.yaml
+    overrides:
+      localization_sensor:
+        white_noise_std:
+        - 0.08
+        - 0.08
+        - 0.06981317007977318
+  target_fight_flight:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    selection:
+      target.dynamics:
+        type: fight_flight
+        parameters: {}
+    overrides: {}
+  environment_reactive:
+    base:
+      package: robot_simulation
+      path: config/environment.yaml
+    overrides:
+      environment:
+        acceleration_fields:
+        - type: linear_restoring
+          enabled: true
+          parameters:
+            center:
+            - 2.2
+            - 0.0
+            - 0.85
+            gain_matrix:
+            - - 0.5
+              - 0.0
+              - 0.0
+            - - 0.0
+              - 0.5
+              - 0.0
+            - - 0.0
+              - 0.0
+              - 0.5
+  environment_manipulation:
+    base:
+      package: robot_simulation
+      path: config/environment.yaml
+    overrides:
+      environment:
+        acceleration_fields:
+        - type: base_relative_guidance
+          enabled: true
+          parameters:
+            radial_gain: 1.5
+            height_gain: 1.5
+            radial_epsilon: 0.02
+            reference_frame: world
+            schedule:
+            - name: low_overhead
+              duration: 10.0
+              transition: 0.0
+              values:
+              - 0.55
+              - 1.6
+              - 0.0
+            - name: vertical_escape
+              duration: 10.0
+              transition: 3.0
+              values:
+              - 0.6
+              - 1.85
+              - 0.0
+            - name: orbit
+              duration: 20.0
+              transition: 3.0
+              values:
+              - 1.3
+              - 1.35
+              - 0.3
+  environment_oscillatory:
+    base:
+      package: robot_simulation
+      path: config/environment.yaml
+    overrides:
+      environment:
+        acceleration_fields:
+        - type: linear_restoring
+          enabled: true
+          parameters:
+            center:
+            - 2.2
+            - 0.0
+            - 0.85
+            gain_matrix:
+            - - 0.5
+              - 0.0
+              - 0.0
+            - - 0.0
+              - 0.5
+              - 0.0
+            - - 0.0
+              - 0.0
+              - 0.5
+        - type: sinusoidal
+          enabled: true
+          parameters:
+            amplitude:
+            - 0.0
+            - 0.35
+            - 0.3
+            frequency:
+            - 0.0
+            - 0.2
+            - 0.3
+            phase:
+            - 0.0
+            - 0.0
+            - 1.57079632679
+  environment_oscillatory_aggressive:
+    base:
+      package: robot_simulation
+      path: config/environment.yaml
+    overrides:
+      environment:
+        acceleration_fields:
+        - type: linear_restoring
+          enabled: true
+          parameters:
+            center:
+            - 2.2
+            - 0.0
+            - 0.85
+            gain_matrix:
+            - - 0.25
+              - 0.0
+              - 0.0
+            - - 0.0
+              - 0.15
+              - 0.0
+            - - 0.0
+              - 0.0
+              - 0.2
+        - type: sinusoidal
+          enabled: true
+          parameters:
+            amplitude:
+            - 0.0
+            - 1.0
+            - 0.85
+            frequency:
+            - 0.0
+            - 0.2
+            - 0.25
+            phase:
+            - 0.0
+            - 0.0
+            - 1.57079632679
+  environment_oscillatory_aggressive_reference:
+    base:
+      package: robot_simulation
+      path: config/environment.yaml
+    overrides:
+      environment:
+        acceleration_fields:
+        - type: linear_restoring
+          enabled: true
+          parameters:
+            center:
+            - 2.2
+            - 0.0
+            - 0.85
+            gain_matrix:
+            - - 0.5
+              - 0.0
+              - 0.0
+            - - 0.0
+              - 0.5
+              - 0.0
+            - - 0.0
+              - 0.0
+              - 0.5
+        - type: sinusoidal
+          enabled: true
+          parameters:
+            amplitude:
+            - 0.0
+            - 0.55
+            - 0.45
+            frequency:
+            - 0.0
+            - 0.25
+            - 0.35
+            phase:
+            - 0.0
+            - 0.0
+            - 1.57079632679
+  target_independent:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    selection:
+      target.dynamics:
+        type: fight_flight
+        parameters:
+          alpha: 0.0
+          damping: 0.05
+    overrides: {}
+  target_3d:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    selection:
+      target.dynamics:
+        type: saturated_fight_flight
+        parameters:
+          tangential:
+            acceleration: 0.06
+            axis_world:
+            - 0.3
+            - -0.8
+            - 0.5
+    overrides: {}
+  target_3d_aggressive:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    selection:
+      target.dynamics:
+        type: saturated_fight_flight
+        parameters:
+          damping: 0.35
+          tangential:
+            acceleration: 0.12
+            axis_world:
+            - 0.3
+            - -0.8
+            - 0.5
+    overrides: {}
+  target_fight_flight_low_damping:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    selection:
+      target.dynamics:
+        type: fight_flight
+        parameters:
+          damping: 0.15
+    overrides: {}
+  target_geometry:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    overrides: {}
+  target_saturated:
+    base:
+      package: robot_simulation
+      path: config/target.yaml
+    selection:
+      target.dynamics:
+        type: saturated_fight_flight
+        parameters: {}
+    overrides: {}
+  deployment_standalone:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_fight_flight
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking: {}
+      simulation:
+        environment_config:
+          package: robot_simulation
+          path: config/environment.yaml
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_base_relative_manipulation:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_saturated
+        initial_position:
+        - 0.5390366178
+        - 0.109268132
+        - 1.85
+      robot:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+        max_age: 0.3
+        future_tolerance: 0.0
+        pose_source: physical
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_manipulation
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      localization_sensor_config:
+        package: robot_simulation
+        path: config/sensors/planar_localization.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+  deployment_moving_target:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_independent
+        initial_position:
+        - 2.7
+        - 0.0
+        - 0.85
+        initial_velocity:
+        - 0.0
+        - 0.35
+        - 0.0
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking: {}
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_reactive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_oscillatory_reactive_tracking:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_3d
+        initial_position:
+        - 2.0
+        - 0.25
+        - 1.0
+        initial_velocity:
+        - 0.0
+        - 0.1
+        - -0.12
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_oscillatory
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_manipulation:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_saturated
+        initial_position:
+        - 0.5390366178
+        - 0.109268132
+        - 1.85
+      robot:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_manipulation
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+        max_age: 0.3
+        future_tolerance: 0.0
+        pose_source: physical
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_manipulation
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - localization_sensor_config
+  deployment_reactive_manipulation_noise_study:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_saturated
+        initial_position:
+        - 0.5390366178
+        - 0.109268132
+        - 1.85
+      robot:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+        max_age: 0.3
+        future_tolerance: 0.0
+        pose_source: physical
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_manipulation
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      localization_sensor_config:
+        package: robot_experiments
+        path: config/experiments.yaml
+        group: resources.localization_noise
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+  deployment_reactive_manipulation_wrist15:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_saturated
+        initial_position:
+        - 0.5390366178
+        - 0.109268132
+        - 1.85
+      robot:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist15
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+        max_age: 0.3
+        future_tolerance: 0.0
+        pose_source: physical
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_manipulation
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - localization_sensor_config
+  deployment_reactive_manipulation_wrist30:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_saturated
+        initial_position:
+        - 0.5390366178
+        - 0.109268132
+        - 1.85
+      robot:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.gazebo_robot_wrist30
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+        max_age: 0.3
+        future_tolerance: 0.0
+        pose_source: physical
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_manipulation
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - localization_sensor_config
+  deployment_reactive_target:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_fight_flight
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_reactive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_target_3d:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_3d
+        initial_position:
+        - 2.0
+        - 0.25
+        - 1.0
+        initial_velocity:
+        - 0.0
+        - 0.1
+        - -0.12
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_reactive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_target_3d_aggressive:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_3d_aggressive
+        initial_position:
+        - 2.0
+        - 0.25
+        - 1.0
+        initial_velocity:
+        - 0.0
+        - 0.1
+        - -0.12
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_reactive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_target_low_damping:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_fight_flight_low_damping
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_reactive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_target_oscillatory_aggressive:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_3d
+        initial_position:
+        - 2.0
+        - 0.25
+        - 1.0
+        initial_velocity:
+        - 0.0
+        - 0.1
+        - -0.12
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_oscillatory_aggressive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_target_oscillatory_aggressive_reference:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_3d
+        initial_position:
+        - 2.0
+        - 0.25
+        - 1.0
+        initial_velocity:
+        - 0.0
+        - 0.1
+        - -0.12
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_oscillatory_aggressive_reference
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+  deployment_reactive_target_saturated:
+    base:
+      package: robot_simulation
+      path: config/deployment.yaml
+    overrides:
+      target:
+        config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.target_saturated
+        initial_position:
+        - 2.0
+        - 0.25
+        - 1.0
+        initial_velocity:
+        - 0.0
+        - 0.1
+        - -0.12
+      robot:
+        config:
+          package: robot_simulation
+          path: config/gazebo/robot.yaml
+        joint_position_hold:
+          package: robot_simulation
+          path: config/gazebo/joint_position_hold.yaml
+      tracking:
+        source: tf
+      simulation:
+        environment_config:
+          package: robot_experiments
+          path: config/experiments.yaml
+          group: resources.environment_reactive
+        config:
+          package: robot_simulation
+          path: config/simulation.yaml
+        measurement_config:
+          package: robot_simulation
+          path: config/measurements.yaml
+      world:
+        source:
+          package: robot_simulation
+          path: worlds/tracking_testbed.sdf.xacro
+        terrain_config:
+          package: robot_simulation
+          path: config/terrain/flat.yaml
+    omit:
+    - tracking.pose_source
+    - physical_context
+    - localization_sensor_config
+direct_launch:
+  cases:
+    reactive_manipulation_noise_study:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_manipulation_noise_study
+    optimal_tracking:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_optimal_tracking
+    reactive_manipulation_wrist15:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_manipulation_wrist15
+    reactive_manipulation_wrist30:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_manipulation_wrist30
+    reactive_tracking_low_damping:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_low_damping
+    reactive_tracking_oscillatory:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_oscillatory
+    reactive_tracking_3d:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_3d
+    reactive_tracking_saturated:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_saturated
+    reactive_tracking:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking
+    reactive_tracking_oscillatory_aggressive_reference:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_oscillatory_aggressive_reference
+    reactive_tracking_3d_aggressive:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_3d_aggressive
+    reactive_manipulation:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_manipulation
+    reactive_tracking_oscillatory_aggressive:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_tracking_oscillatory_aggressive
+    closed_loop:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_closed_loop
+    reactive_manipulation_localized:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.case_reactive_manipulation_localized
+    standalone:
+      package: robot_experiments
+      path: config/experiments.yaml
+      group:
+      - compositions.common
+      - compositions.selections.standalone
+  controllers:
+    whole_body_manipulation_arm_priority:
+      type: weighted_least_squares
+      strategy:
+        package: robot_control
+        path: config/control.yaml
+        group: distance_pointing
+      strategy_overrides:
+        controller:
+          parameters:
+            motion_weights:
+            - 1.0
+            - 12.0
+            - 3.0
+            - 3.0
+            - 3.0
+            - 2.0
+    whole_body:
+      type: weighted_least_squares
+      strategy:
+        package: robot_control
+        path: config/control.yaml
+        group: distance_pointing
+    whole_body_oscillatory_arm_preferred:
+      type: weighted_least_squares
+      strategy:
+        package: robot_control
+        path: config/control.yaml
+        group: distance_pointing
+      strategy_overrides:
+        controller:
+          parameters:
+            motion_weights:
+            - 3.0
+            - 4.0
+            - 3.0
+            - 3.0
+            - 3.0
+            - 2.0
+    whole_body_arm_preferred:
+      type: weighted_least_squares
+      strategy:
+        package: robot_control
+        path: config/control.yaml
+        group: distance_pointing
+      strategy_overrides:
+        controller:
+          parameters:
+            motion_weights:
+            - 2.0
+            - 4.0
+            - 3.0
+            - 3.0
+            - 3.0
+            - 2.0
+legacy_resources:
+  robot_description:config/robot/robot_wrist15.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.robot_wrist15
+  robot_description:config/robot/robot_wrist30.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.robot_wrist30
+  robot_simulation:config/gazebo/robot_manipulation.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.gazebo_robot_manipulation
+  robot_simulation:config/gazebo/robot_wrist15.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.gazebo_robot_wrist15
+  robot_simulation:config/gazebo/robot_wrist30.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.gazebo_robot_wrist30
+  robot_simulation:config/sensors/planar_localization_noise_study.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.localization_noise
+  robot_simulation:config/scenarios/environment.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.environment_reactive
+  robot_simulation:config/scenarios/environment_manipulation.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.environment_manipulation
+  robot_simulation:config/scenarios/environment_oscillatory.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.environment_oscillatory
+  robot_simulation:config/scenarios/environment_oscillatory_aggressive.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.environment_oscillatory_aggressive
+  robot_simulation:config/scenarios/environment_oscillatory_aggressive_reference.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.environment_oscillatory_aggressive_reference
+  robot_simulation:config/scenarios/target.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.target_independent
+  robot_simulation:config/scenarios/target_3d.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.target_3d
+  robot_simulation:config/scenarios/target_3d_aggressive.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.target_3d_aggressive
+  robot_simulation:config/scenarios/target_fight_flight_low_damping.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.target_fight_flight_low_damping
+  robot_simulation:config/scenarios/target_geometry.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.target_geometry
+  robot_simulation:config/scenarios/target_saturated.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.target_saturated
+  robot_simulation:config/launch.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_standalone
+  robot_simulation:config/scenarios/base_relative_manipulation.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_base_relative_manipulation
+  robot_simulation:config/scenarios/moving_target.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_moving_target
+  robot_simulation:config/scenarios/oscillatory_reactive_tracking.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_oscillatory_reactive_tracking
+  robot_simulation:config/scenarios/reactive_manipulation.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_manipulation
+  robot_simulation:config/scenarios/reactive_manipulation_noise_study.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_manipulation_noise_study
+  robot_simulation:config/scenarios/reactive_manipulation_wrist15.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_manipulation_wrist15
+  robot_simulation:config/scenarios/reactive_manipulation_wrist30.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_manipulation_wrist30
+  robot_simulation:config/scenarios/reactive_target.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target
+  robot_simulation:config/scenarios/reactive_target_3d.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target_3d
+  robot_simulation:config/scenarios/reactive_target_3d_aggressive.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target_3d_aggressive
+  robot_simulation:config/scenarios/reactive_target_low_damping.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target_low_damping
+  robot_simulation:config/scenarios/reactive_target_oscillatory_aggressive.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target_oscillatory_aggressive
+  robot_simulation:config/scenarios/reactive_target_oscillatory_aggressive_reference.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target_oscillatory_aggressive_reference
+  robot_simulation:config/scenarios/reactive_target_saturated.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group: resources.deployment_reactive_target_saturated
+  robot_experiments:config/systems/cv_prediction.yaml: *id002
+  robot_experiments:config/systems/dls_control.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.dls_control
+  robot_experiments:config/systems/localization_noise_study.yaml: *id004
+  robot_experiments:config/systems/manipulation_B.yaml: *id005
+  robot_experiments:config/systems/manipulation_C.yaml: *id006
+  robot_experiments:config/systems/manipulation_D.yaml: *id007
+  robot_experiments:config/systems/manipulation_E.yaml: *id008
+  robot_experiments:config/systems/mobile_manipulator_pose_tracking.yaml: *id003
+  robot_experiments:config/systems/nominal_tracking.yaml: *id001
+  robot_bringup:config/system_cv.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.cv_prediction
+  robot_bringup:config/system_localization_noise_study.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.localization_noise_study
+  robot_bringup:config/system_manipulation_C.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.manipulation_C
+  robot_bringup:config/system_manipulation_D_localized.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.mobile_manipulator_pose_tracking
+  robot_bringup:config/system_manipulation_B.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.manipulation_B
+  robot_bringup:config/system_manipulation_D.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.manipulation_D
+  robot_bringup:config/system_nominal.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.nominal_tracking
+  robot_bringup:config/system_manipulation_E.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.manipulation_E
+  robot_bringup:config/system_dls.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.dls_control
+  robot_bringup:config/systems/nominal_tracking.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.nominal_tracking
+  robot_bringup:config/systems/mobile_manipulator_pose_tracking.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.mobile_manipulator_pose_tracking
+  robot_bringup:config/systems/cv_prediction.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.cv_prediction
+  robot_bringup:config/systems/dls_control.yaml:
+    package: robot_experiments
+    path: config/experiments.yaml
+    group:
+    - compositions.common
+    - compositions.selections.dls_control

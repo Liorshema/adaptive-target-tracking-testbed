@@ -13,7 +13,7 @@ from m07_verify_installation import run as verify_m07
 
 def run(prefix):
     result=verify_m07(prefix)
-    for name in ['configuration','execution','recording','metrics','benchmarking','reporting','runner','cli']:
+    for name in ['configuration','execution','recording','metrics','benchmarking','reporting','runner','cli','catalog','jobs']:
         module=import_module('robot_experiments.'+name)
         assert Path(module.__file__).resolve().is_relative_to(prefix),module.__file__
     entries=[e for e in distribution('robot_experiments').entry_points if e.group=='console_scripts' and e.name=='run']
@@ -21,14 +21,16 @@ def run(prefix):
     assert callable(entries[0].load())
     share=lambda name:Path(get_package_share_directory(name))
     from robot_experiments.configuration import load_experiment,materialize_run
-    config=share('robot_experiments')/'config/paired_prediction.yaml'
-    spec=load_experiment(config,share)
+    from robot_experiments.catalog import ExperimentCatalog
+    spec=ExperimentCatalog(share=share).prepare('EXP-PREDICTION')
+    assert (share('robot_experiments')/'config/experiments.yaml').is_file()
+    assert not (share('robot_experiments')/'config/paired_prediction.yaml').exists()
     with tempfile.TemporaryDirectory(prefix='m08-installed-') as temporary:
         prepared=materialize_run(spec['variants'][0],917,Path(temporary),share,spec['runtime'])
         assert prepared['snapshot']['seed_consumers']['measurements.target_position.random_seed']==917
         assert prepared['plan']['description_path'].is_relative_to(temporary)
     executable=Path(get_package_prefix('robot_experiments'))/'lib/robot_experiments/run'
-    invocation=subprocess.run([str(executable),'--config','config/paired_prediction.yaml','--validate-only'],capture_output=True,text=True,check=True)
+    invocation=subprocess.run([str(executable),'--experiment','EXP-PREDICTION','--validate-only'],capture_output=True,text=True,check=True)
     parsed=json.loads(invocation.stdout)
     assert parsed['valid'] and len(parsed['variants'])==2
     result['experiment_cli']={'entry_point':entries[0].value,'validation':parsed,'seed_materialization':917}

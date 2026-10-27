@@ -25,4 +25,20 @@ CONTROL_PARAMETERS = {'base_model_type': 'STRING',
  'base_velocity_lower': 'DOUBLE_ARRAY',
  'base_velocity_upper': 'DOUBLE_ARRAY'}
 
-PARAMETERS = {**REQUIRED_PARAMETERS, **CONTROL_PARAMETERS, **{'compute_enabled': 'BOOL', 'publish_commands': 'BOOL', 'safety_enabled': 'BOOL', 'command_topic': 'STRING', 'command_frame_id': 'STRING', 'command_joint_names': 'STRING_ARRAY', 'publish_telemetry': 'BOOL', 'telemetry_topic': 'STRING', 'strategy_config_file': 'STRING', 'robot_description_file': 'STRING', 'feedforward_override': 'STRING', 'lookahead_override': 'STRING'}}
+PARAMETERS = {
+    **REQUIRED_PARAMETERS,
+    **CONTROL_PARAMETERS,
+    'compute_enabled': 'BOOL',
+    'publish_commands': 'BOOL',
+    'safety_enabled': 'BOOL',
+    'command_topic': 'STRING',
+    'command_frame_id': 'STRING',
+    'command_joint_names': 'STRING_ARRAY',
+    'publish_telemetry': 'BOOL',
+    'telemetry_topic': 'STRING',
+    'strategy_config_file': 'STRING',
+    'strategy_configuration': 'STRING',
+    'robot_description_file': 'STRING',
+    'feedforward_override': 'STRING',
+    'lookahead_override': 'STRING',
+}

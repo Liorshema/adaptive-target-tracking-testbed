@@ -23,8 +23,8 @@ def main():
         if output.exists():
             raise RuntimeError(f'Refusing to overwrite existing evidence: {output}')
         command = [sys.executable, str(Path(__file__).with_name('v2_tracking_gazebo.py')),
-            '--case', 'reactive', '--config', configuration,
-            '--strategy-config', 'config/whole_body.yaml', '--physical-ground-truth',
+            '--case', 'reactive', '--scenario', Path(configuration).stem,
+            '--controller', 'whole_body', '--physical-ground-truth',
             '--without-markers', '--shoulder-posture', '--actuation-trace',
             '--duration', str(duration), '--settling-time', '10', '--wall-timeout', '300',
             '--output', str(output)]

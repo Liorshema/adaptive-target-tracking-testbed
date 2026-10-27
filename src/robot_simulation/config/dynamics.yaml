@@ -1,0 +1,15 @@
+# Mathematical defaults only. Scenario selections and explicit overrides stay external.
+dynamics:
+  fight_flight:
+    parameters:
+      alpha: 1.0
+      preferred_distance: 1.0
+      damping: 0.5
+      distance_epsilon: 1.0e-6
+  saturated_fight_flight:
+    parameters:
+      a_max: 0.15
+      transition_length: 0.15
+      preferred_distance: 1.0
+      damping: 0.5
+      distance_epsilon: 1.0e-6

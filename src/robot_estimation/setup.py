@@ -20,9 +20,7 @@ setup(
         (
             "share/" + package_name + "/config",
             [
-                "config/robot_estimator.yaml",
-                "config/robot_localized.yaml",
-                "config/target_estimator.yaml",
+                "config/estimation.yaml",
             ],
         ),
     ],

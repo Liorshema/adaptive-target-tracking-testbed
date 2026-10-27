@@ -1,3 +1,0 @@
-extends: reactive_target_saturated.yaml
-target:
-  config: config/scenarios/target_3d.yaml

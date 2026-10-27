@@ -1,4 +1,5 @@
 """Causal localization startup/recovery tests with the actual robot EKF."""
+from robot_estimation.configuration import load_estimation_parameters
 from pathlib import Path
 import numpy as np
 import pytest
@@ -8,7 +9,7 @@ from robot_estimation.measurement import Measurement
 
 
 def estimator(yaw=0.):
-    parameters = yaml.safe_load((Path(__file__).parents[1]/'config/robot_estimator.yaml').read_text())['estimation_node']['ros__parameters']
+    parameters = load_estimation_parameters(Path(__file__).parents[1]/'config/estimation.yaml', 'robot_ekf')['estimation_node']['ros__parameters']
     parameters.update(joint_bounds_enabled=False, planar_slip_noise_std=.15, yaw_slip_noise_std=.2,
         localization_enabled=True, localization_nis_limit=11.345,
         localization_consensus_window=5, localization_consensus_inliers=4,

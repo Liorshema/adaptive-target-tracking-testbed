@@ -5,6 +5,8 @@ SafeVelocityCommand through the real VelocityActuationNode. Adapter internals ar
 read solely for validation observations. Native physics stays in actuator.csv.
 """
 
+from robot_experiments.catalog import ExperimentCatalog
+
 import argparse
 import hashlib
 import json
@@ -20,8 +22,11 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 import yaml
 
-from robot_configuration.yaml_loader import load_yaml
-from robot_experiments.configuration import load_experiment, materialize_run
+from functools import partial
+from robot_experiments.composition import load_resource
+from robot_experiments.configuration import resolve_system_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / 'src' / package)
+from robot_experiments.configuration import materialize_run
 from robot_experiments.execution import DomainLease, OwnedLaunch
 from robot_experiments.recording import Recorder
 from robot_experiments.metrics.actuator_trace import analyze_trace
@@ -67,13 +72,16 @@ def prepare_trial(variant, spec, directory, share, seed, engine):
     prepared = materialize_run(
         variant, seed, directory, share, spec['runtime'], record_actuator_trace=True)
     simulation = load_yaml(prepared['simulation_path'])
-    defaults = load_yaml(share('robot_simulation') / 'config/launch.yaml')
+    defaults = load_resource({'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                              'group': 'resources.deployment_standalone'}, share=share)
     simulation['tracking'] = defaults['tracking']
     simulation.pop('physical_context', None)
-    simulation['target']['config'] = str(
-        share('robot_simulation') / 'config/scenarios/target.yaml')
-    simulation['simulation']['environment_config'] = str(
-        share('robot_simulation') / 'config/scenarios/environment.yaml')
+    simulation['target']['config'] = str(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+         'group': 'resources.target_independent'}, directory, share))
+    simulation['simulation']['environment_config'] = str(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+         'group': 'resources.environment_reactive'}, directory, share))
     simulation['world'].setdefault('physics', {})['engine'] = engine
     prepared['simulation_path'].write_text(yaml.safe_dump(simulation, sort_keys=False))
     return prepared, simulation
@@ -325,7 +333,7 @@ def main():
     parser.add_argument('--engine', choices=['dartsim', 'dartsim_recovery'], default='dartsim_recovery')
     args = parser.parse_args()
     share = lambda name: Path(get_package_share_directory(name))
-    spec = load_experiment(share('robot_experiments') / 'config/reactive_manipulation.yaml', share)
+    spec = ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
     policy = load_yaml(Path(__file__).with_suffix('.yaml'))
     variants = [variant for variant in spec['variants'] if variant['name'] in args.variants]
     if {variant['name'] for variant in variants} != set(args.variants):

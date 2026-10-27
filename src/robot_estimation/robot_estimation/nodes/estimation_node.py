@@ -64,8 +64,8 @@ class EstimationNode(Node):
     def __init__(self) -> None:
         super().__init__('estimation_node')
         self._declare_parameters()
-        self.declare_parameter('robot_estimator_type', 'robot_ekf')
-        self.declare_parameter('target_estimator_type', 'kalman')
+        self.declare_parameter('robot_estimator_type', '')
+        self.declare_parameter('target_estimator_type', '')
         self.declare_parameter('full_state_publish_rate', 0.)
         self.declare_parameter('diagnostic_log_period', 5.)
         validate_runtime_parameters(self._runtime_parameters())

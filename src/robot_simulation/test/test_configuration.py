@@ -5,11 +5,23 @@ from pathlib import Path
 
 import pytest
 
-from robot_configuration.yaml_loader import load_yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / package)
 from robot_simulation.factory.registry import ComponentRegistry
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / 'config'
+
+
+def effective_target(reference):
+    """Resolve selected parameters through the same canonical runtime registry."""
+    from robot_simulation.factory.simulation_factory import SimulationFactory
+    target = load_yaml(reference)
+    dynamics = target['target']['dynamics']
+    dynamics['parameters'] = SimulationFactory.with_defaults().dynamics_registry.validate(
+        dynamics['type'], dynamics.get('parameters', {}))
+    return target
 
 
 class ExampleComponent:
@@ -165,14 +177,14 @@ def test_yaml_loading_rejects_recursive_aliases(tmp_path):
 
 def test_moving_target_scenario_preserves_independent_dynamics():
     """Composition must preserve the independent trajectory conditions."""
-    config = load_yaml(CONFIG_DIR / 'scenarios' / 'moving_target.yaml')
+    config = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_moving_target'})
 
     assert config['paths']['base'] == 'package'
     assert config['world']['output_name'] == 'world.sdf'
     assert config['target']['initial_position'] == [2.7, 0.0, 0.85]
     assert config['target']['initial_velocity'] == [0.0, 0.35, 0.0]
     assert config['tracking']['source'] == 'static'
-    target = load_yaml(CONFIG_DIR.parent / config['target']['config'])
+    target = effective_target(CONFIG_DIR.parent / config['target']['config'])
     assert target['target']['dynamics']['parameters'] == {
         'alpha': 0.0,
         'preferred_distance': 1.0,
@@ -183,28 +195,28 @@ def test_moving_target_scenario_preserves_independent_dynamics():
 
 def test_reactive_target_scenario_uses_real_tracking_frame():
     """The optional robot-reactive scenario must enable TF feedback."""
-    config = load_yaml(CONFIG_DIR / 'scenarios' / 'reactive_target.yaml')
+    config = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_reactive_target'})
 
     assert config['tracking']['source'] == 'tf'
     assert config['tracking']['reference_frame'] == 'world'
     assert config['tracking']['tracking_frame'] == 'tracking_frame'
     assert config['target']['initial_position'] == [2.0, 0.0, 1.0]
     assert config['target']['initial_velocity'] == [0.0, 0.0, 0.0]
-    target = load_yaml(CONFIG_DIR.parent / config['target']['config'])
+    target = effective_target(CONFIG_DIR.parent / config['target']['config'])
     assert target['target']['dynamics']['parameters']['alpha'] == 1.0
 
 
 def test_low_damping_experiment_preserves_reactive_tf_and_environment():
     """The experiment changes target damping while retaining baseline resources."""
-    baseline = load_yaml(CONFIG_DIR / 'scenarios/reactive_target.yaml')
-    experiment = load_yaml(CONFIG_DIR / 'scenarios/reactive_target_low_damping.yaml')
+    baseline = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_reactive_target'})
+    experiment = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_reactive_target_low_damping'})
     assert experiment['tracking'] == baseline['tracking']
     assert experiment['tracking']['source'] == 'tf'
     assert experiment['simulation'] == baseline['simulation']
     assert experiment['target']['initial_position'] == baseline['target']['initial_position']
     assert experiment['target']['initial_velocity'] == baseline['target']['initial_velocity']
-    base_target = load_yaml(CONFIG_DIR.parent / baseline['target']['config'])
-    target = load_yaml(CONFIG_DIR.parent / experiment['target']['config'])
+    base_target = effective_target(CONFIG_DIR.parent / baseline['target']['config'])
+    target = effective_target(CONFIG_DIR.parent / experiment['target']['config'])
     assert target['target']['dynamics']['parameters']['damping'] == 0.15
     target['target']['dynamics']['parameters']['damping'] = 0.5
     assert target == base_target
@@ -213,8 +225,8 @@ def test_low_damping_experiment_preserves_reactive_tf_and_environment():
 def test_saturated_scenario_selects_shared_engine_without_inherited_alpha():
     """A new interaction must retain visuals, external fields and live TF feedback."""
     from robot_simulation.factory.simulation_factory import SimulationFactory
-    baseline = load_yaml(CONFIG_DIR / 'scenarios/reactive_target.yaml')
-    scenario = load_yaml(CONFIG_DIR / 'scenarios/reactive_target_saturated.yaml')
+    baseline = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_reactive_target'})
+    scenario = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_reactive_target_saturated'})
     target = load_yaml(CONFIG_DIR.parent / scenario['target']['config'])
     original = load_yaml(CONFIG_DIR / 'target.yaml')
     assert scenario['tracking'] == baseline['tracking']
@@ -235,14 +247,13 @@ def test_launch_without_physics_override_uses_effective_world_step(tmp_path, mon
     from launch import LaunchContext
     from launch_ros.actions import Node
     from launch_ros.utilities import evaluate_parameters
-    from robot_configuration.yaml_loader import load_yaml
     import yaml
     root=Path(__file__).resolve().parents[2]
     spec=importlib.util.spec_from_file_location('simulation_without_physics_override',root/'robot_simulation/launch/simulation.launch.py')
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     monkeypatch.setattr(module,'get_package_share_directory',lambda name:str(root/name))
     monkeypatch.setenv('ROS_LOG_DIR',str(tmp_path/'ros'))
-    cfg=load_yaml(root/'robot_simulation/config/launch.yaml');del cfg['world']['physics']
+    cfg=load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_standalone'});del cfg['world']['physics']
     path=tmp_path/'launch.yaml';path.write_text(yaml.safe_dump(cfg))
     context=LaunchContext();context.launch_configurations.update(
         config=str(path),gui='false',enable_actuation='false',publish_ground_truth='')

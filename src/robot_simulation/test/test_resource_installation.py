@@ -9,9 +9,9 @@ import setuptools
 def test_resource_installation_excludes_backups_and_bytecode(tmp_path, monkeypatch):
     """Use a synthetic resource tree so cleanup alone cannot make the check pass."""
     setup = Path(__file__).resolve().parents[1] / 'setup.py'
-    assets = ['config/scenarios/active.yaml', 'models/target/model.sdf',
+    assets = ['config/sensors/nested/active.yaml', 'models/target/model.sdf',
               'worlds/nested/world.sdf.xacro']
-    debris = ['config/scenarios/active.yaml.bak', 'models/target/model.sdf.orig',
+    debris = ['config/sensors/nested/active.yaml.bak', 'models/target/model.sdf.orig',
               'worlds/nested/__pycache__/cached.pyc', 'models/.hidden/secret.sdf']
     for name in assets + debris:
         path = tmp_path / name

@@ -1,75 +1,20 @@
+"""Retain the control constructor API over the shared trusted registry."""
 
-"""Generic registry for constructing configurable control components."""
+from collections.abc import Mapping
 
-from collections.abc import Callable, Mapping
-from typing import Any
+from robot_configuration.components import ComponentRegistry as RegisteredComponents
 
 
-class ComponentRegistry:
-    """Map component names to externally registered constructors.
+class ComponentRegistry(RegisteredComponents):
+    """Separate runtime task/safety dependencies from validated model parameters."""
 
-    Registration is explicit. No dynamic imports or assumptions about
-    concrete controllers, robots, or reference models are required.
-    """
-
-    def __init__(self) -> None:
-        """Initialize an empty component registry."""
-        self._constructors: dict[str, Callable[..., Any]] = {}
-
-    def register(
-        self,
-        name: str,
-        constructor: Callable[..., Any],
-    ) -> None:
-        """Register a component constructor under a unique name."""
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("Component name must be a nonempty string")
-
-        if not callable(constructor):
-            raise TypeError("Component constructor must be callable")
-
-        if name in self._constructors:
-            raise ValueError(
-                f"Component '{name}' is already registered"
-            )
-
-        self._constructors[name] = constructor
-
-    def create(
-        self,
-        name: str,
-        parameters: Mapping[str, Any] | None = None,
-    ) -> Any:
-        """Create a registered component using named parameters.
-
-        Args:
-            name: Registered component identifier.
-            parameters: Keyword arguments passed to its constructor.
-
-        Returns:
-            Constructed component.
-
-        Raises:
-            KeyError: If the requested component is not registered.
-            TypeError: If parameters are not a mapping.
-        """
-        if name not in self._constructors:
-            available = ", ".join(sorted(self._constructors))
-            raise KeyError(
-                f"Unknown component '{name}'. "
-                f"Available components: {available}"
-            )
-
-        if parameters is None:
-            parameters = {}
-
-        if not isinstance(parameters, Mapping):
-            raise TypeError(
-                "Component parameters must be a mapping"
-            )
-
-        return self._constructors[name](**dict(parameters))
-
-    def names(self) -> tuple[str, ...]:
-        """Return registered component names in sorted order."""
-        return tuple(sorted(self._constructors))
+    def create(self, name, parameters=None, *, context=None, **dependencies):
+        if parameters is not None and not isinstance(parameters, Mapping):
+            raise TypeError('Component parameters must be a mapping')
+        parameters = dict(parameters or {})
+        for key in self._entry(name)['dependencies']:
+            if key in parameters:
+                if key in dependencies:
+                    raise ValueError(f'{name}: shadowed dependency {key}')
+                dependencies[key] = parameters.pop(key)
+        return super().create(name, parameters, context=context, **dependencies)

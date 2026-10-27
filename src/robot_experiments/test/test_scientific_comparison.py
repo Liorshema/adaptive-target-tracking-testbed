@@ -11,6 +11,7 @@ from robot_experiments.benchmarking import summarize
 from robot_experiments.configuration import load_experiment, materialize_run
 
 import yaml
+from robot_experiments.configuration import resolve_system_resource
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -199,16 +200,21 @@ def test_real_inheritance_materialization_and_seeds_are_policy_inputs(tmp_path):
     """Different owner identities with equal resolved values have equal invariants."""
     from robot_experiments.comparison import comparison_views
     source = SRC / 'robot_experiments/config/nominal.yaml'
-    document = {'extends': str(source), 'experiment': {
-        'comparison': policy(), 'variants': [{'name': 'base', 'system_config': {
-            'package': 'robot_bringup', 'path': 'config/system_manipulation_D_localized.yaml'}}]}}
+    from robot_experiments.catalog import ExperimentCatalog
+    document = ExperimentCatalog(share=lambda name: SRC/name).document('EXP-NOMINAL')
+    document['experiment'].update({'comparison': policy(), 'variants': [{'name': 'base',
+                                                                         'system_config': {'package': 'robot_bringup',
+                                                                                           'path': 'config/system_manipulation_D_localized.yaml'}}]})
     path = tmp_path / 'experiment.yaml'
     path.write_text(yaml.safe_dump(document))
     spec = load_experiment(path, lambda p: SRC / p)
     for name in ['one', 'two']:
         if name == 'two':
             child = tmp_path / 'equivalent_system.yaml'
-            parent = SRC / 'robot_bringup/config/system_manipulation_D_localized.yaml'
+            parent = resolve_system_resource(
+                SRC / 'robot_experiments/config/systems/mobile_manipulator_pose_tracking.yaml',
+                Path.cwd(),
+                lambda package: Path(__file__).resolve().parents[2] / package)
             child.write_text(yaml.safe_dump({'extends': str(parent),
                                             'runtime': {'publish_ground_truth': True}}))
             document['experiment']['variants'][0]['system_config'] = str(child)

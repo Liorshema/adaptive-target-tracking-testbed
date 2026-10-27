@@ -310,3 +310,32 @@ def test_reject_invalid_config_type(factory):
     """Require a mapping as the top-level configuration."""
     with pytest.raises(TypeError, match="mapping"):
         factory.build(None)
+
+
+def test_test_only_controller_is_discovered_and_built_without_factory_branches(registries, config):
+    from robot_configuration.components import schema_for
+    from robot_control.interfaces.controller import Controller
+    from robot_control.interfaces.control_data import ControlMode, ControlOutput
+
+    class ExampleController(Controller):
+        def __init__(self, gain, task):
+            self.gain, self.task = gain, task
+
+        def compute(self, control_input, model, model_data):
+            return ControlOutput(command=np.zeros(model.generalized_velocity_dimension),
+                                 mode=ControlMode.VELOCITY)
+
+    registry = registries['controller']
+    registry.register('test_only', ExampleController, defaults={'gain': 2.0},
+                      schema=schema_for({'gain': 2.0}, units={'gain': 's^-1'},
+                                        constraints={'gain': {'minimum': 0.0}}),
+                      dependencies=('task',), capabilities={'test_only': True, 'deployable': False})
+    config['controller'] = {'type': 'test_only', 'parameters': {'gain': 3.0},
+                            'task_selection': [[1., 0., 0., 0., 0., 0.]]}
+    pipeline = ControlFactory(registries).build(config)
+    actual = pipeline._controller._tracking._controller
+    assert isinstance(actual, ExampleController) and actual.gain == 3.0
+    assert registry.describe('test_only')['capabilities']['test_only'] is True
+    config['controller']['parameters']['gain'] = -1.0
+    with pytest.raises(ValueError, match='gain'):
+        ControlFactory(registries).build(config)

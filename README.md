@@ -46,8 +46,10 @@ and intentional internal API removals. Earlier M06 documents describe historical
 M09 adds read-only Gazebo/RViz inspection around the same closed-loop system:
 
 ```bash
+ros2 run robot_experiments run compose --case reactive_tracking_oscillatory --controller whole_body \
+  --seed 42 --output results/visualization_inputs
 ros2 launch robot_bringup visualization.launch.py \
-  system_config:=config/system_nominal.yaml gui:=true rviz:=true
+  system_config:=$PWD/results/visualization_inputs/inputs/system.yaml gui:=true rviz:=true
 ```
 
 Actuation remains disabled unless `enable_actuation:=true` is explicit. Use
@@ -63,7 +65,7 @@ M08 runs experiments through the existing M07 system manifests:
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install --packages-up-to robot_experiments
 source install/setup.bash
-ros2 run robot_experiments run --config config/paired_prediction.yaml
+ros2 run robot_experiments run --experiment EXP-PREDICTION-COMPOSITION
 ```
 
 The example explicitly enables actuation and compares real IMM/CV variants with
@@ -73,20 +75,45 @@ means execution completed with failed or unknown acceptance; physical overspeed
 remains visible. See the [M08 guide](docs/m08_experiments_and_benchmarking.md)
 for compute-only operation, YAML, result contracts and reproduction.
 
-M07 adds one composition entry point to the existing launch:
+The [experiment-management guide](docs/experiment_management.md) documents the
+revisioned catalog, immutable run inputs, headless create/revise/reset/history
+operations and independently owned background workers. Use
+`ros2 run robot_experiments run catalog list` to discover definitions. Study and scenario selections are consolidated into `robot_experiments/config/experiments.yaml`;
+old M08 entry names remain explicit imports. Revision 3 removes 42 redundant YAMLs;
+see [composition workflows and direct-launch migration](docs/experiment_composition.md). Algorithm defaults now have one YAML
+per package; experiment selection lives in `robot_experiments/config/`. Bringup
+assembles validated selections and simulation owns reusable physics and sensing.
+
+The [component configuration guide](docs/component_configuration.md) describes
+canonical model-family YAML, owner registries, strict schemas and extension contracts.
+Inspect IDs, defaults, units and deployment requirements without starting ROS nodes:
+
+```bash
+ros2 run robot_experiments run components list
+ros2 run robot_experiments run components show predictor imm
+```
+
+Continuous simulation uses experiment-owned explicit composition:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
-ros2 launch robot_bringup closed_loop.launch.py system_config:=config/system_nominal.yaml
+ros2 launch robot_experiments tracking.launch.py \
+  case:=reactive_tracking_oscillatory controller:=whole_body gui:=false
+# Existing reactive case and WLS allocation, with physical commands enabled:
+ros2 launch robot_experiments tracking.launch.py \
+  case:=reactive_tracking_oscillatory controller:=whole_body \
+  enable_actuation:=true gui:=false
 ```
 
-Actuation is disabled by default. Add `enable_actuation:=true` explicitly for
-physical closed-loop commands. Select `config/system_cv.yaml` for CV prediction
-or `config/system_dls.yaml` for the existing DLS controller. Existing `config` and
-`strategy_config` launch commands continue to work. See the
-[M07 configuration guide and verification](docs/m07_unified_system_configuration.md)
-for supported combinations, overrides, errors and measured limitations.
+Actuation is disabled by default. Select CV/IMM or DLS/WLS in a catalog variant
+using the shared composition and selection deltas. Direct launch cases
+previously selected by bringup `config:=config/<case>.yaml` now use experiment
+`case:=<case>`; WLS allocation names use `controller:=<name>` instead of the removed
+strategy files. Generic bringup accepts an explicit manifest path and contains no
+experiment default. See the [ownership and migration guide](docs/experiment_management.md)
+for parameter groups, supported selections, compatibility boundaries and evidence.
+The earlier M07 report records its original milestone rather than current paths.
 
 Use the [sensor navigation guide](docs/architecture/sensors.md) to find sensor
 owners, select publisher/fusion settings and inspect the effective M07 inventory.
@@ -99,7 +126,7 @@ reproduction commands are documented in [docs/control_compute_only.md](docs/cont
 - Classical and adaptive prediction methods
 - Online learning and residual correction
 - Replaceable estimation and control algorithms
-- Inherited scenario configurations with recorded validation evidence
+- Catalog-owned scenario recipes with immutable validation evidence
 - Explicit model, prediction, task and safety contracts
 
 `docs/validation/` holds permanent engineering reports. Reusable probes, analyses

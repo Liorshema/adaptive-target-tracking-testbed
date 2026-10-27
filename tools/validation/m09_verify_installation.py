@@ -10,6 +10,7 @@ from launch.actions import IncludeLaunchDescription
 from launch_ros.actions import Node
 from m08_verify_installation import run as verify_m08
 from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.configuration import resolve_system_resource
 
 
 def run(prefix):
@@ -42,7 +43,9 @@ def run(prefix):
     path=root/'launch/visualization.launch.py'
     spec=util.spec_from_file_location('installed_visualization_launch',path)
     module=util.module_from_spec(spec);spec.loader.exec_module(module)
-    context=LaunchContext();context.launch_configurations.update(system_config='config/system_nominal.yaml',visualization_config='config/tracking_visualization.yaml',gui='false',rviz='false',enable_actuation='false')
+    context=LaunchContext();context.launch_configurations.update(system_config=str(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/systems/nominal_tracking.yaml'},
+        share('robot_experiments'), share)),visualization_config='config/tracking_visualization.yaml',gui='false',rviz='false',enable_actuation='false')
     actions=module.configure(context)
     assert sum(isinstance(action,IncludeLaunchDescription) for action in actions)==1
     assert sum(isinstance(action,Node) for action in actions)==1

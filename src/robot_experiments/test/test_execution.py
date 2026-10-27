@@ -117,7 +117,9 @@ def wait_file(path, timeout=3):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         if path.exists():
-            return path.read_text()
+            value = path.read_text()
+            if value:
+                return value
         time.sleep(.01)
     pytest.fail(f'child did not create {path}')
 

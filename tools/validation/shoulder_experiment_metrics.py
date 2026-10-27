@@ -1,4 +1,5 @@
 """Independent native-Gazebo posture and raw target/TF experiment measurements."""
+from robot_control.configuration import load_control_parameters
 
 import json
 from pathlib import Path
@@ -26,7 +27,7 @@ def experiment_metrics(output, streams, description, robot, origin, thresholds, 
     link = description['manipulator']['link1']
     if control is None:
         config = Path(__file__).resolve().parents[2] / 'src/robot_control/config/control.yaml'
-        control = yaml.safe_load(config.read_text())['control_node']['ros__parameters']
+        control = load_control_parameters(config, 'parameters')['control_node']['ros__parameters']
     # The authoritative Xacro puts the link box along +X from its joint origin.
     corners = np.array([[x, y, z, 1.] for x in [0., link['length']]
                         for y in [-link['width'] / 2, link['width'] / 2]

@@ -1,4 +1,6 @@
 """Matched localization trials using the existing M08/M02 launch and trace lifecycle."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 from copy import deepcopy
 from pathlib import Path
@@ -6,8 +8,8 @@ from pathlib import Path
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from robot_bringup.factory.system_configuration import load_system_configuration
-from robot_experiments.configuration import load_experiment
 from robot_experiments.reporting import create_study_directory, write_json
+from robot_experiments.configuration import resolve_system_resource
 import m02_resolution_run as existing
 
 
@@ -22,10 +24,12 @@ def main():
                         default=['original', 'localized', 'disabled'])
     args = parser.parse_args()
     share = lambda package: Path(get_package_share_directory(package))
-    spec = load_experiment(share('robot_experiments')/'config/reactive_manipulation.yaml', share)
+    spec = ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
     original = next(v for v in spec['variants'] if v['name'] == 'D')
     localized = deepcopy(original)
-    localized['system_config'] = share('robot_bringup')/'config/system_manipulation_D_localized.yaml'
+    localized['system_config'] = resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/systems/mobile_manipulator_pose_tracking.yaml'},
+        share('robot_experiments'), share)
     localized['plan'] = load_system_configuration(localized['system_config'], share,
         overrides={'enable_actuation': 'true', 'publish_ground_truth': 'true',
                    'gui': 'false', 'visualize_tracking': 'false'})

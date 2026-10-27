@@ -27,10 +27,11 @@ def main():
     if set(settings) != {'max_gap','max_skew','overhead_region','phase_reference'}:
         raise ValueError('unknown/missing analysis settings')
     phase_ref = settings['phase_reference']
-    if (not isinstance(phase_ref,dict) or set(phase_ref)!={'package','path'}
+    if (not isinstance(phase_ref,dict) or set(phase_ref) not in ({'package','path'}, {'package','path','group'})
             or any(not isinstance(v,str) or not v.strip() for v in phase_ref.values())):
-        raise ValueError('phase_reference requires only nonempty package/path strings')
-    environment = load_yaml(Path(get_package_share_directory(phase_ref['package']))/phase_ref['path'])
+        raise ValueError('phase_reference requires nonempty package/path and optional group strings')
+    from robot_experiments.composition import load_resource
+    environment = load_resource(phase_ref, share=lambda package: Path(get_package_share_directory(package)))
     phases = next(f['parameters']['schedule'] for f in environment['environment']['acceleration_fields']
                   if f['type']=='base_relative_guidance')
     windows = []

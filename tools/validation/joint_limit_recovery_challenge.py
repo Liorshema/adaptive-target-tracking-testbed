@@ -1,10 +1,11 @@
 """Longer unchanged C/D/E runs using the existing M08/M02 trial lifecycle."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 import hashlib
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
-from robot_experiments.configuration import load_experiment
 from robot_simulation.gazebo.physics_engine import physics_engine_library
 from robot_experiments.reporting import create_study_directory, write_json
 
@@ -20,7 +21,7 @@ def main():
     parser.add_argument('--duration',type=float,default=90.)
     args=parser.parse_args()
     share=lambda name:Path(get_package_share_directory(name))
-    spec=load_experiment(share('robot_experiments')/'config/reactive_manipulation.yaml',share)
+    spec=ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
     study=create_study_directory(args.output,'challenge_recovery');print(study,flush=True)
     results=[]
     for variant in spec['variants']:

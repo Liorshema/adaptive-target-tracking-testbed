@@ -1,0 +1,64 @@
+schema_version: 2
+robot:
+  type: mobile_manipulator
+  description:
+    package: robot_description
+    path: config/robot/robot.yaml
+  model:
+    base: differential_drive
+    manipulator: serial_arm
+estimation:
+  robot:
+    type: robot_ekf
+    config:
+      package: robot_estimation
+      path: config/estimation.yaml
+      group: robot_ekf
+  target:
+    type: kalman
+    config:
+      package: robot_estimation
+      path: config/estimation.yaml
+      group: kalman
+  calibration:
+    package: robot_experiments
+    path: config/calibration/simulation.yaml
+prediction:
+  type: constant_acceleration
+  config:
+    package: robot_prediction
+    path: config/prediction.yaml
+  adaptation: residual
+  fusion: weighted_correction
+control:
+  type: weighted_least_squares
+  config:
+    package: robot_control
+    path: config/control.yaml
+    group: parameters
+  strategy:
+    package: robot_control
+    path: config/control.yaml
+    group: distance_pointing
+  adapter: planar
+  reference:
+    geometry: sphere
+    policy: radial
+simulation:
+  config:
+    package: robot_simulation
+    path: config/scenarios/oscillatory_reactive_tracking.yaml
+  robot:
+    package: robot_simulation
+    path: config/gazebo/robot.yaml
+  actuation:
+    package: robot_simulation
+    path: config/actuation.yaml
+  tracking_tf:
+    rate_hz: 20.0
+    max_age: 0.2
+    max_skew: 0.05
+    future_tolerance: 0.01
+runtime:
+  enable_actuation: false
+  gui: false

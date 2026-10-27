@@ -1,10 +1,13 @@
 """Unified composition uses actual owner factories and rejects incompatible deployments."""
+from robot_control.configuration import load_control_parameters
+from robot_estimation.configuration import load_estimation_parameters
 
 from importlib import import_module
 from pathlib import Path
 
 import pytest
 import yaml
+from robot_experiments.configuration import resolve_system_resource
 
 SRC = Path(__file__).resolve().parents[2]
 
@@ -15,11 +18,16 @@ def share(package):
 
 def load(path, **kwargs):
     module = import_module('robot_bringup.factory.system_configuration')
-    return module.load_system_configuration(path, share, **kwargs)
+    return module.load_system_configuration(
+        resolve_system_resource(path, Path.cwd(), share), share, **kwargs)
 
 
 def example(name='system_nominal.yaml'):
-    return SRC / 'robot_bringup/config' / name
+    from robot_experiments.configuration import resolve_system_resource
+    if name == 'system_invalid.yaml':
+        return Path(__file__).parent / 'fixtures/invalid_system.yaml'
+    return resolve_system_resource(
+        {'package': 'robot_bringup', 'path': 'config/'+name}, SRC, share)
 
 
 def changed(tmp_path, section, key, value):
@@ -38,7 +46,9 @@ def test_nominal_selects_actual_owner_components_and_safe_defaults():
     assert plan['identities']['target_estimator'].endswith('.TargetStateEstimator')
     assert plan['runtime']['enable_actuation'] is False
     assert plan['runtime']['publish_commands'] is False
-    assert plan['description_path'] == (share('robot_description') / 'config/robot/robot.yaml').resolve()
+    assert plan['description_path'] == (
+        share('robot_description') /
+        'config/robot/robot.yaml').resolve()
 
 
 def test_alternates_change_real_selected_implementations():
@@ -50,7 +60,7 @@ def test_alternates_change_real_selected_implementations():
 
 def test_explicit_launch_false_and_strategy_override_win_over_manifest():
     plan = load(example(), overrides={'enable_actuation': 'true', 'gui': 'false',
-                                     'strategy_config': 'none', 'publish_commands': 'false'})
+                                      'strategy_config': 'none', 'publish_commands': 'false'})
     assert plan['runtime']['enable_actuation'] is True
     assert plan['runtime']['gui'] is False
     assert plan['runtime']['publish_commands'] is False
@@ -78,7 +88,8 @@ def test_invalid_example_fails_and_never_falls_back():
 def test_schema_version_is_strict(tmp_path):
     data = yaml.safe_load(example().read_text())
     data['schema_version'] = True
-    path = tmp_path / 'bad.yaml'; path.write_text(yaml.safe_dump(data))
+    path = tmp_path / 'bad.yaml'
+    path.write_text(yaml.safe_dump(data))
     with pytest.raises(ValueError, match='schema_version'):
         load(path)
 
@@ -103,41 +114,52 @@ def owner_override(tmp_path, section, content):
 
 
 @pytest.mark.parametrize('key,value,match', [
-    ('joint_names', ['wrist_joint', 'elbow_joint', 'shoulder_joint', 'base_yaw_joint'], 'joint_names'),
+    ('joint_names',
+     ['wrist_joint',
+      'elbow_joint',
+      'shoulder_joint',
+      'base_yaw_joint'],
+     'joint_names'),
     ('wheel_odom_frame', 'map', 'wheel_odom_frame'),
     ('robot_initial_state', [0.]*12, 'dimension'),
     ('joint_position_varianse', .1, 'joint_position_varianse'),
     ('joint_position_variance', float('nan'), 'finite'),
 ])
-def test_owner_estimation_contract_mismatches_are_not_silently_overridden(tmp_path, key, value, match):
-    content = yaml.safe_load((share('robot_estimation') / 'config/robot_estimator.yaml').read_text())
+def test_owner_estimation_contract_mismatches_are_not_silently_overridden(
+        tmp_path, key, value, match):
+    content = load_estimation_parameters(
+        share('robot_estimation') /
+        'config/estimation.yaml',
+        'robot_ekf')
     content['estimation_node']['ros__parameters'][key] = value
     with pytest.raises(ValueError, match=match):
         load(owner_override(tmp_path, 'estimation.robot', content))
 
 
 def test_owner_control_dof_mismatch_is_rejected(tmp_path):
-    content = yaml.safe_load((share('robot_control') / 'config/control.yaml').read_text())
+    content = load_control_parameters(share('robot_control') / 'config/control.yaml', 'parameters')
     content['control_node']['ros__parameters']['joint_count'] = 3
     with pytest.raises(ValueError, match='control.joint_count'):
         load(owner_override(tmp_path, 'control', content))
 
 
 def test_inherited_relative_resource_uses_parent_manifest_directory(tmp_path):
-    parent = tmp_path / 'parent'; parent.mkdir()
+    parent = tmp_path / 'parent'
+    parent.mkdir()
     config = share('robot_prediction') / 'config/prediction.yaml'
     (parent / 'prediction.yaml').write_bytes(config.read_bytes())
     data = yaml.safe_load(example().read_text())
     data['prediction']['config'] = 'prediction.yaml'
     (parent / 'base.yaml').write_text(yaml.safe_dump(data))
-    child = tmp_path / 'child.yaml'; child.write_text('extends: parent/base.yaml\n')
+    child = tmp_path / 'child.yaml'
+    child.write_text('extends: parent/base.yaml\n')
     assert load(child)['prediction_path'] == parent / 'prediction.yaml'
 
 
 @pytest.mark.parametrize('key,value', [('dt', True), ('dt', float('nan')), ('horizon', 2.5)])
 def test_prediction_owner_rejects_invalid_time_contract(tmp_path, key, value):
     content = yaml.safe_load((share('robot_prediction') / 'config/prediction.yaml').read_text())
-    content['prediction'][key] = value
+    content['prediction']['parameters'][key] = value
     with pytest.raises(ValueError, match='prediction|finite'):
         load(owner_override(tmp_path, 'prediction', content))
 
@@ -148,7 +170,8 @@ def test_unknown_launch_override_is_not_ignored():
 
 
 def test_reference_inheritance_cycle_reports_manifest_path(tmp_path):
-    path = tmp_path / 'cycle.yaml'; path.write_text('extends: cycle.yaml\n')
+    path = tmp_path / 'cycle.yaml'
+    path.write_text('extends: cycle.yaml\n')
     with pytest.raises(ValueError, match='cycle.yaml.*cycle'):
         load(path)
 
@@ -159,19 +182,26 @@ def configured_launch(tmp_path, monkeypatch, **overrides):
     monkeypatch.setenv('ROS_LOG_DIR', str(tmp_path / 'ros-log'))
     path = share('robot_bringup') / 'launch/closed_loop.launch.py'
     spec = importlib.util.spec_from_file_location('m07_closed_loop', path)
-    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    import robot_bringup.deployment.launching as module
     monkeypatch.setattr(module, 'get_package_share_directory', lambda package: str(share(package)))
     context = LaunchContext()
     context.launch_configurations.update({key: '' for key in [
         'system_config', 'config', 'gui', 'enable_actuation', 'publish_commands',
         'visualize_tracking', 'publish_ground_truth', 'strategy_config', 'lookahead', 'feedforward']})
+    if overrides.get('system_config'):
+        overrides['system_config'] = str(resolve_system_resource(
+            overrides['system_config'], Path.cwd(), share))
     context.launch_configurations.update(overrides)
     return module, context
 
 
 def test_unified_launch_wires_real_cv_owner_config_and_safety_defaults(tmp_path, monkeypatch):
     from launch_ros.utilities import evaluate_parameters
-    module, context = configured_launch(tmp_path, monkeypatch, system_config=str(example('system_cv.yaml')))
+    module, context = configured_launch(
+        tmp_path, monkeypatch, system_config=str(
+            example('system_cv.yaml')))
     actions = module.configure(context)
     nodes = {n.node_executable: n for n in actions if hasattr(n, 'node_executable')}
     prediction = evaluate_parameters(context, nodes['prediction_node']._Node__parameters)[-1]
@@ -185,16 +215,24 @@ def test_unified_launch_wires_real_cv_owner_config_and_safety_defaults(tmp_path,
 
 
 def test_legacy_launch_defaults_still_use_dls_without_actuation(tmp_path, monkeypatch):
+    """Generic bringup has no experiment selector; the explicit DLS path stays safe."""
     from launch_ros.utilities import evaluate_parameters
     module, context = configured_launch(tmp_path, monkeypatch)
-    nodes = {n.node_executable: n for n in module.configure(context) if hasattr(n, 'node_executable')}
+    with pytest.raises(ValueError, match='system_config is required'):
+        module.configure(context)
+    context.launch_configurations['system_config'] = str(example('system_dls.yaml'))
+    nodes = {n.node_executable: n for n in module.configure(
+        context) if hasattr(n, 'node_executable')}
     control = evaluate_parameters(context, nodes['control_node']._Node__parameters)[-1]
     assert control['strategy_config_file'] == ''
+    assert control['strategy_configuration'] == 'null'
     assert control['publish_commands'] is False
 
 
 def test_invalid_manifest_fails_before_any_process_action_is_constructed(tmp_path, monkeypatch):
-    module, context = configured_launch(tmp_path, monkeypatch, system_config=str(example('system_invalid.yaml')))
+    module, context = configured_launch(
+        tmp_path, monkeypatch, system_config=str(
+            example('system_invalid.yaml')))
     called = []
     monkeypatch.setattr(module, 'Node', lambda **kwargs: called.append(kwargs))
     with pytest.raises(ValueError, match='prediction'):
@@ -218,18 +256,16 @@ def test_explicit_false_disables_manifest_actuation(tmp_path):
 ])
 def test_node_startup_constraints_also_fail_during_preflight(tmp_path, section, key, value):
     package = 'robot_control' if section == 'control' else 'robot_estimation'
-    name = 'control' if section == 'control' else 'robot_estimator'
+    name = 'control' if section == 'control' else 'estimation'
     node = 'control_node' if section == 'control' else 'estimation_node'
-    content = yaml.safe_load((share(package) / 'config' / (name + '.yaml')).read_text())
+    path = share(package) / 'config' / (name + '.yaml')
+    content = (load_control_parameters(path, 'parameters') if section == 'control'
+               else load_estimation_parameters(path, 'robot_ekf'))
     content[node]['ros__parameters'][key] = value
-    # Keep the profile calibration from masking an explicitly invalid optional value.
-    if section != 'control':
-        profile = yaml.safe_load((share('robot_bringup') / 'config/closed_loop.yaml').read_text())
-        profile['simulation_config'] = 'config/scenarios/oscillatory_reactive_tracking.yaml'
-        (tmp_path / 'profile.yaml').write_text(yaml.safe_dump(profile))
     path = owner_override(tmp_path, section, content)
     if section != 'control':
-        data = yaml.safe_load(path.read_text()); data['simulation']['config'] = 'profile.yaml'
+        data = yaml.safe_load(path.read_text())
+        data['estimation'].pop('calibration', None)
         path.write_text(yaml.safe_dump(data))
     with pytest.raises(ValueError, match=key + '|positive'):
         load(path)
@@ -237,13 +273,18 @@ def test_node_startup_constraints_also_fail_during_preflight(tmp_path, section, 
 
 def test_inherited_owner_parameters_are_delivered_to_ros_as_merged_values(tmp_path, monkeypatch):
     from launch_ros.utilities import evaluate_parameters
-    parent = share('robot_estimation') / 'config/robot_estimator.yaml'
+    from robot_estimation.configuration import load_estimation_parameters
+    parent = tmp_path / 'base_owner.yaml'
+    parent.write_text(yaml.safe_dump(load_estimation_parameters(
+        share('robot_estimation') / 'config/estimation.yaml', 'robot_ekf')))
     (tmp_path / 'owner.yaml').write_text(f'extends: {parent}\n')
     data = yaml.safe_load(example().read_text())
     data['estimation']['robot']['config'] = 'owner.yaml'
-    path = tmp_path / 'manifest.yaml'; path.write_text(yaml.safe_dump(data))
+    path = tmp_path / 'manifest.yaml'
+    path.write_text(yaml.safe_dump(data))
     module, context = configured_launch(tmp_path, monkeypatch, system_config=str(path))
-    nodes = {n.node_executable: n for n in module.configure(context) if hasattr(n, 'node_executable')}
+    nodes = {n.node_executable: n for n in module.configure(
+        context) if hasattr(n, 'node_executable')}
     evaluated = evaluate_parameters(context, nodes['estimation_node']._Node__parameters)
     merged = {}
     for item in evaluated:
@@ -275,8 +316,12 @@ def test_localized_profile_is_additive_and_keeps_control_physics_contracts():
 
 
 def test_truth_cannot_be_selected_as_localization_measurement(tmp_path):
-    from robot_configuration.yaml_loader import load_yaml
-    content = load_yaml(share('robot_estimation')/'config/robot_localized.yaml')
+    from robot_estimation.configuration import load_estimation_parameters
+    content = load_estimation_parameters(
+        share('robot_estimation') / 'config/estimation.yaml', ['robot_ekf', 'pose_aiding'])
+    content['estimation_node']['ros__parameters']['robot_description_file'] = str(
+        resolve_system_resource(share('robot_description') / 'config/robot/robot_wrist15.yaml',
+                                Path.cwd(), share))
     content['estimation_node']['ros__parameters']['localization_topic'] = '/simulation/robot/ground_truth'
     (tmp_path/'estimator.yaml').write_text(yaml.safe_dump(content))
     document = {'extends': str(example('system_manipulation_D_localized.yaml')),
@@ -288,6 +333,6 @@ def test_truth_cannot_be_selected_as_localization_measurement(tmp_path):
 
 def test_prediction_horizon_must_cover_selected_control_lookahead(tmp_path):
     content = yaml.safe_load((share('robot_prediction') / 'config/prediction.yaml').read_text())
-    content['prediction']['horizon'] = 1
+    content['prediction']['parameters']['horizon'] = 1
     with pytest.raises(ValueError, match='horizon.*lookahead'):
         load(owner_override(tmp_path, 'prediction', content))

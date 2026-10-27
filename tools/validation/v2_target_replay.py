@@ -4,6 +4,7 @@ Run after sourcing the workspace, with OPENBLAS_NUM_THREADS=1. No ROS nodes
 are started. All cases reuse the same seed-42 synthetic measurement sequence
 and retain the actual sensor covariance; only assumed acceleration noise varies.
 """
+from robot_estimation.configuration import load_estimation_parameters
 
 import argparse
 import json
@@ -46,7 +47,7 @@ def main():
     recorded_positions = np.array([row['target'] for row in rows])
     recorded_tracking = np.array([row['actual_position'] for row in rows])
     trial = json.loads(args.result.read_text())
-    cfg = yaml.safe_load((ROOT / 'src/robot_estimation/config/target_estimator.yaml').read_text())['estimation_node']['ros__parameters']
+    cfg = load_estimation_parameters(ROOT / 'src/robot_estimation/config/estimation.yaml', 'kalman')['estimation_node']['ros__parameters']
     sensor = yaml.safe_load((ROOT / 'src/robot_simulation/config/measurements.yaml').read_text())['measurements']['target_position']
     robot = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
     rotation = Rotation.from_euler('xyz', robot['pose'][3:]).as_matrix()

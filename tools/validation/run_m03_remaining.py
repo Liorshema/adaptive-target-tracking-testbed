@@ -23,7 +23,7 @@ def main():
         if output.exists():
             raise RuntimeError(f'Preserving existing output: {output}')
         command = [sys.executable, str(Path(__file__).with_name('v2_tracking_gazebo.py')),
-            '--case', 'reactive', '--config', config, '--strategy-config', 'config/whole_body.yaml',
+            '--case', 'reactive', '--scenario', Path(config).stem, '--controller', 'whole_body',
             '--physical-ground-truth', '--without-markers', '--shoulder-posture',
             '--estimator-trace', '--duration', str(duration), '--settling-time',
             '5' if drive else '10', '--wall-timeout', '240', '--output', str(output)]

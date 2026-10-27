@@ -7,13 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.catalog import ExperimentCatalog
+
 
 from robot_experiments import cli, recording, runner
 from robot_experiments.configuration import load_experiment, materialize_run
 from robot_experiments.preparation import complete_preparation
 
 import yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+from robot_experiments.configuration import resolve_system_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -30,7 +36,7 @@ def share(package):
 
 def document(path=NOISE, values=None, parameters=None):
     """Use the old study's actual effective settings with independently selected schema2 inputs."""
-    old = load_yaml(SRC / 'robot_experiments/config/sensor_noise_comparison.yaml')
+    old = ExperimentCatalog(share=share).document('EXP-SENSOR-NOISE-LEGACY')
     old['schema_version'] = 2
     ex = old['experiment']
     ex['system_config'] = deepcopy(SYSTEM)
@@ -63,7 +69,7 @@ def test_new_installed_entry_matches_old_contracts_and_all_materialized_owners(t
     old = load_experiment(SRC / 'robot_experiments/config/sensor_noise_comparison.yaml', share)
     new = load_experiment(SRC / 'robot_experiments/config/sensor_noise_study.yaml', share)
     assert new['system_config'] == (
-        SRC / 'robot_bringup/config/system_manipulation_D_localized.yaml')
+        resolve_system_resource(SRC / 'robot_experiments/config/systems/mobile_manipulator_pose_tracking.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package))
     for key in ['name', 'seeds', 'metrics', 'duration', 'settling_time', 'runtime', 'execution']:
         assert new[key] == old[key]
     before = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in SRC.rglob('*.yaml')}
@@ -107,13 +113,14 @@ def test_noise_explain_has_assignment_origin_actual_values_and_no_runtime(
     assert doc['comparison']['runtime_eligibility'] is None
     assert len(doc['runs']) == 2
     for run, expected in zip(doc['runs'], [BASE, HIGH]):
-        assert run['system']['source'].endswith('system_manipulation_D_localized.yaml')
+        assert 'mobile_manipulator_pose_tracking' in run['system']['source']
         v = run['experimental_variables']['pose_white_noise_std']
         assert v['value'] == expected
         assert v['assignment']['requested_value'] == expected
         assert v['assignment']['baseline_value'] == BASE
         assert v['assignment']['owner_source'].endswith('sensors/planar_localization.yaml')
-        assert v['assignment']['source']['document'] == str(p)
+        assert v['assignment']['source']['document'] == str(
+            SRC/'robot_experiments/config/experiments.yaml')
         assert v['owner_resources'] == [v['assignment']['owner_source']]
         assert run['seed_consumers']['localization_sensor.random_seed'] == 3872720740
     assert not (tmp_path / 'results').exists()
@@ -237,7 +244,7 @@ def test_global_reference_uses_the_declaring_document_and_invalid_inheritance_fa
     d = document()
     d['experiment']['system_config'] = 'system.yaml'
     (parent / 'system.yaml').write_text(yaml.safe_dump({
-        'extends': str(SRC / 'robot_bringup/config/system_manipulation_D_localized.yaml')}))
+        'extends': str(resolve_system_resource(SRC / 'robot_experiments/config/systems/mobile_manipulator_pose_tracking.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package))}))
     write(parent, d, 'base.yaml')
     child = write(tmp_path, {'extends': 'parent/base.yaml'}, 'child.yaml')
     spec = load_experiment(child, share)
@@ -301,15 +308,19 @@ def test_disabled_producer_cannot_receive_sensor_assignments(tmp_path):
         'extends': str(SRC / 'robot_simulation/config/sensors/planar_localization.yaml'),
         'localization_sensor': {'enabled': False}}, 'sensor.yaml')
     simulation = write(tmp_path, {
-        'extends': str(SRC / 'robot_simulation/config/scenarios'
-                       / 'base_relative_manipulation.yaml'),
+        'extends': str(resolve_system_resource(SRC / 'robot_simulation/config/scenarios'
+                       / 'base_relative_manipulation.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package)),
         'localization_sensor_config': str(sensor)}, 'simulation.yaml')
-    profile = write(tmp_path, {
-        'extends': str(SRC / 'robot_bringup/config/reactive_manipulation_localized.yaml'),
-        'simulation_config': str(simulation)}, 'profile.yaml')
-    system = write(tmp_path, {
-        'extends': str(SRC / 'robot_bringup/config/system_manipulation_D_localized.yaml'),
-        'simulation': {'config': str(profile)}}, 'system.yaml')
+    data = load_yaml(
+        resolve_system_resource(
+            SRC /
+            'robot_experiments/config/systems/mobile_manipulator_pose_tracking.yaml',
+            Path.cwd(),
+            lambda package: Path(__file__).resolve().parents[2] /
+            package))
+    data['simulation']['config'] = str(simulation)
+    data['simulation']['localization_sensor'] = str(sensor)
+    system = write(tmp_path, data, 'system.yaml')
     d = document()
     d['experiment']['system_config'] = str(system)
     with pytest.raises(ValueError, match='producer unavailable or disabled'):

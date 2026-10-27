@@ -8,7 +8,11 @@ from launch import LaunchContext
 
 import pytest
 
-from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.launching import launch_profile
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 SOURCE = Path(__file__).resolve().parents[2]
 
@@ -17,6 +21,8 @@ SOURCE = Path(__file__).resolve().parents[2]
 def launch_log_directory(tmp_path, monkeypatch):
     """Keep launch action construction independent of the user's ROS log tree."""
     monkeypatch.setenv('ROS_LOG_DIR', str(tmp_path / 'ros-log'))
+    import robot_bringup.deployment.launching as mechanics
+    monkeypatch.setattr(mechanics, 'get_package_share_directory', lambda p: str(SOURCE / p))
 
 
 def test_aggressive_environment_changes_only_sinusoidal_parameters():
@@ -31,21 +37,23 @@ def test_aggressive_environment_changes_only_sinusoidal_parameters():
     assert experiment == expected
     scene = load_yaml(root / 'reactive_target_oscillatory_aggressive.yaml')
     base_scene = load_yaml(root / 'oscillatory_reactive_tracking.yaml')
-    base_scene['simulation']['environment_config'] = (
-        'config/scenarios/environment_oscillatory_aggressive.yaml')
+    from robot_experiments.configuration import resolve_system_resource
+    base_scene['simulation']['environment_config'] = str(resolve_system_resource(
+        root / 'environment_oscillatory_aggressive.yaml', Path.cwd(), lambda p: SOURCE / p))
     assert scene == base_scene
     assert scene['tracking']['source'] == 'tf'
-    master = load_yaml(
-        SOURCE / 'robot_bringup/config/reactive_tracking_oscillatory_aggressive.yaml')
-    assert master['simulation_config'] == (
-        'config/scenarios/reactive_target_oscillatory_aggressive.yaml')
+    master = launch_profile(
+        'reactive_tracking_oscillatory_aggressive', lambda p: SOURCE / p)['profile']
+    assert load_yaml(master['simulation_config']) == scene
 
 
 def test_allocation_changes_only_base_penalties():
     """Resolve strategy inheritance exactly as the production Control loader does."""
-    root = SOURCE / 'robot_control/config'
-    original = load_yaml(root / 'whole_body.yaml')
-    experiment = load_yaml(root / 'whole_body_oscillatory_arm_preferred.yaml')
+    original = launch_profile(
+        'closed_loop', lambda p: SOURCE / p, controller='whole_body')['strategy']
+    experiment = launch_profile(
+        'closed_loop', lambda p: SOURCE / p,
+        controller='whole_body_oscillatory_arm_preferred')['strategy']
     expected = deepcopy(original)
     expected['controller']['parameters']['motion_weights'] = [3., 4., 3., 3., 3., 2.]
     assert experiment == expected
@@ -56,17 +64,19 @@ def test_allocation_changes_only_base_penalties():
     ('false', 'false', 'false'), ('true', 'true', 'true')])
 def test_ground_truth_is_independent_of_marker_node(visualize, override, expected):
     """Physical diagnostics can stay enabled without an unused visualizer."""
-    path = SOURCE / 'robot_bringup/launch/closed_loop.launch.py'
+    path = SOURCE / 'robot_experiments/launch/tracking.launch.py'
     spec = importlib.util.spec_from_file_location('closed_loop_under_test', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.get_package_share_directory = lambda p: str(SOURCE / p)
     context = LaunchContext()
     context.launch_configurations.update({
         'config': 'config/reactive_tracking_oscillatory.yaml', 'gui': 'false',
         'enable_actuation': 'false', 'publish_commands': 'false',
         'visualize_tracking': visualize, 'publish_ground_truth': override,
+        'controller': '', 'case': 'reactive_tracking_oscillatory', 'system_config': '',
         'strategy_config': '', 'lookahead': '', 'feedforward': ''})
-    nodes = module.configure(context)
+    nodes = module.select(context)
     arguments = dict(next(node for node in nodes
                           if hasattr(node, 'launch_arguments')).launch_arguments)
     assert arguments['publish_ground_truth'] == expected
@@ -78,18 +88,20 @@ def test_ground_truth_is_independent_of_marker_node(visualize, override, expecte
 @pytest.mark.parametrize('visualize,override', [('true', 'false'), ('false', 'invalid')])
 def test_inconsistent_diagnostic_selection_is_rejected(visualize, override):
     """Do not silently create a visualization missing its physical pose input."""
-    path = SOURCE / 'robot_bringup/launch/closed_loop.launch.py'
+    path = SOURCE / 'robot_experiments/launch/tracking.launch.py'
     spec = importlib.util.spec_from_file_location('closed_loop_invalid_test', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.get_package_share_directory = lambda p: str(SOURCE / p)
     context = LaunchContext()
     context.launch_configurations.update({
         'config': 'config/reactive_tracking_oscillatory.yaml', 'gui': 'false',
         'enable_actuation': 'false', 'publish_commands': 'false',
         'visualize_tracking': visualize, 'publish_ground_truth': override,
+        'controller': '', 'case': 'reactive_tracking_oscillatory', 'system_config': '',
         'strategy_config': '', 'lookahead': '', 'feedforward': ''})
     with pytest.raises(ValueError, match='ground_truth|visualization'):
-        module.configure(context)
+        module.select(context)
 
 
 def test_user_wide_stress_environment_and_live_tf_are_preserved():

@@ -15,7 +15,8 @@ def factory():
 
 
 def test_imm_and_cv_select_distinct_real_implementations_and_valid_trajectories():
-    imm = factory().create(predictor_type='imm')
+    imm = factory().create(
+        predictor_type='imm', adaptation_type='residual', fusion_type='weighted_correction')
     cv = factory().create(predictor_type='constant_velocity', adaptation_type='none', fusion_type='none')
     assert type(imm._predictor).__name__ == 'IMMPredictor'
     assert type(cv._predictor).__name__ == 'ConstantVelocityPredictor'
@@ -31,12 +32,13 @@ def test_imm_and_cv_select_distinct_real_implementations_and_valid_trajectories(
 @pytest.mark.parametrize('model', ['immm', 'constant_acceleration', 'coordinated_turn', 'learned'])
 def test_unsupported_deployed_predictor_is_never_silently_imm(model):
     with pytest.raises(ValueError, match='predictor|prediction.type'):
-        factory().create(predictor_type=model)
+        factory().create(
+            predictor_type=model, adaptation_type='residual', fusion_type='weighted_correction')
 
 
 def test_incompatible_adaptation_fusion_rejected():
     with pytest.raises(ValueError, match='fusion'):
-        factory().create(adaptation_type='residual', fusion_type='none')
+        factory().create(predictor_type='imm', adaptation_type='residual', fusion_type='none')
 
 
 def test_cv_selection_survives_node_clock_reset():
@@ -49,3 +51,19 @@ def test_cv_selection_survives_node_clock_reset():
     node._on_time_jump(None)
     assert type(node._system._predictor).__name__ == 'ConstantVelocityPredictor'
     assert node._system.last_prediction is None
+
+
+def test_factory_does_not_choose_models_without_explicit_selection():
+    with pytest.raises(TypeError):
+        factory().create()
+
+
+@pytest.mark.parametrize('section', ['prediction', 'adaptations', 'fusions'])
+def test_parameter_documents_cannot_select_runtime_components(tmp_path, section):
+    import yaml
+    data = PredictionConfig(Path(__file__).parents[1] / 'config/prediction.yaml').data
+    data[section]['type'] = 'imm'
+    source = tmp_path / 'invalid_selection.yaml'
+    source.write_text(yaml.safe_dump(data))
+    with pytest.raises(ValueError, match='parameters|unsupported'):
+        PredictionConfig(source)

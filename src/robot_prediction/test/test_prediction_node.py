@@ -18,7 +18,11 @@ def node():
     """Supply local ROS boundaries with the actual configured predictor."""
     predictor = object.__new__(PredictionNode)
     predictor._config = PredictionConfig(Path(__file__).parents[1] / 'config' / 'prediction.yaml')
-    predictor._system = PredictionSystemFactory(config=predictor._config).create()
+    predictor._selection = {
+        'predictor_type': 'imm', 'adaptation_type': 'residual',
+        'fusion_type': 'weighted_correction'}
+    predictor._system = PredictionSystemFactory(config=predictor._config).create(
+        **predictor._selection)
     predictor._dt = 0.1
     predictor._horizon = 20
     predictor._last_timestamp = None

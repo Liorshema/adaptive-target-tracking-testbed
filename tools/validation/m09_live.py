@@ -1,4 +1,6 @@
 """Bounded real M09 marker/path/TF verification using the M08 recorder/lifecycle."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 import json
 import os
@@ -17,7 +19,7 @@ from robot_description.model_parameters import robot_model_parameters_from_descr
 from robot_bringup.factory.model_factory import create_robot_model
 from robot_bringup.factory.system_configuration import load_system_configuration
 from robot_models.whole_body.kinematics import WholeBodyKinematics
-from robot_experiments.configuration import load_experiment, materialize_run
+from robot_experiments.configuration import materialize_run
 from robot_experiments.execution import DomainLease, OwnedLaunch, run_window
 from robot_experiments.recording import Recorder
 from robot_experiments.recording.normalization import message_data
@@ -43,7 +45,7 @@ def main():
     args=parser.parse_args()
     directory=create_study_directory(args.output,'gui' if args.gui else 'headless')
     share=lambda package:Path(get_package_share_directory(package))
-    spec=load_experiment(share('robot_experiments')/'config/nominal.yaml',share)
+    spec=ExperimentCatalog(share=share).prepare('EXP-NOMINAL')
     if args.compute_only:
         spec['runtime']['enable_actuation']=False
         variant=spec['variants'][0]

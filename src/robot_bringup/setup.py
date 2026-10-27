@@ -15,8 +15,6 @@ setup(
         ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
         ('share/' + package_name + '/config', glob('config/*.yaml')),
         ('share/' + package_name + '/config', glob('config/*.rviz')),
-        ('share/' + package_name + '/config/systems', glob('config/systems/*.yaml')),
-        ('share/' + package_name + '/config/calibration', glob('config/calibration/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

@@ -7,17 +7,19 @@ import xml.etree.ElementTree as ET
 
 import pytest
 from setuptools import find_packages
+from robot_experiments.configuration import resolve_system_resource
 
 SRC = Path(__file__).resolve().parents[2]
 ALLOWED = {
     'robot_configuration': set(), 'robot_description': set(), 'robot_interfaces': set(),
-    'robot_models': set(), 'robot_estimation': {'robot_description', 'robot_interfaces'},
+    'robot_models': set(), 'robot_estimation': {'robot_description', 'robot_interfaces', 'robot_configuration'},
     'robot_prediction': {'robot_interfaces', 'robot_configuration'},
     'robot_control': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
     'robot_simulation': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration'},
     # Experiment materialization reuses the actual simulation sensor-owner validators.
     'robot_experiments': {'robot_bringup', 'robot_configuration', 'robot_description',
-                          'robot_models', 'robot_interfaces', 'robot_simulation'},
+                          'robot_models', 'robot_interfaces', 'robot_simulation', 'robot_control',
+                          'robot_estimation', 'robot_prediction'},
     'robot_bringup': {'robot_description', 'robot_models', 'robot_interfaces', 'robot_configuration',
                       'robot_simulation', 'robot_estimation', 'robot_prediction', 'robot_control'},
 }
@@ -71,6 +73,7 @@ def test_declared_and_imported_project_dependencies_are_acyclic_and_owned():
                 target = module.split('.')[0]
                 if target in ALLOWED and target != package:
                     assert target in allowed and target in declared, (path, module)
+
     def visit(package, ancestors):
         assert package not in ancestors, (package, ancestors)
         for target in graph[package]:
@@ -85,7 +88,8 @@ def test_numerical_layers_do_not_import_ros_nodes_or_gazebo():
         root = SRC / package / package
         for path in root.rglob('*.py'):
             relative = path.relative_to(root)
-            if folders is not None and len(relative.parts) > 1 and relative.parts[0] not in folders:
+            if folders is not None and len(
+                    relative.parts) > 1 and relative.parts[0] not in folders:
                 continue
             for module in imports(path):
                 assert module.split('.')[0] not in ROS, (path, module)
@@ -123,26 +127,28 @@ def test_canonical_nodes_have_one_implementation(module):
 
 
 def test_active_launch_profile_resource_references_resolve():
-    """Exercise the existing inherited profiles, without defining a new configuration schema."""
+    """Every experiment-owned launch group and installed system preflights."""
     from robot_configuration.yaml_loader import load_yaml
-    for profile in (SRC / 'robot_bringup/config').glob('*.yaml'):
-        config = load_yaml(profile)
-        if 'simulation_config' not in config:
-            continue
-        for key, package in [('simulation_config', 'robot_simulation'),
-                             ('actuation_config', 'robot_simulation'), ('control_config', 'robot_control'),
-                             ('robot_estimator_config', 'robot_estimation'),
-                             ('target_estimator_config', 'robot_estimation')]:
-            assert (SRC / package / config[key]).is_file(), (profile, key)
-        simulation_path = SRC / 'robot_simulation' / config['simulation_config']
-        simulation = load_yaml(simulation_path)
-        base = SRC / 'robot_simulation' if simulation['paths']['base'] == 'package' else simulation_path.parent
-        for reference in [simulation['world']['source'], simulation['world']['terrain_config'],
-                          simulation['target']['config'], simulation['simulation']['config'],
-                          simulation['simulation']['environment_config'],
-                          simulation['simulation']['measurement_config'],
-                          simulation['robot']['config'], simulation['robot']['joint_position_hold']]:
-            assert (base / reference).is_file(), (profile, reference)
+    from robot_experiments.launching import launch_profile
+    from robot_bringup.factory.system_configuration import load_system_configuration
+
+    def share(name):
+        return SRC / name
+    definitions = load_yaml(
+        share('robot_experiments') /
+        'config/experiments.yaml')['direct_launch']
+    assert definitions['cases']
+    for name in definitions['cases']:
+        plan = launch_profile(name, share)
+        assert Path(plan['profile']['simulation_config']).is_file()
+        assert plan['runtime']['enable_actuation'] is False
+    selections = load_yaml(share('robot_experiments') /
+                           'config/experiments.yaml')['compositions']['selections']
+    for name in selections:
+        reference = {'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                     'group': ['compositions.common', 'compositions.selections.' + name]}
+        source = resolve_system_resource(reference, Path.cwd(), share)
+        assert load_system_configuration(source, share)['identities']
 
 
 def test_semantic_layout_has_no_generic_common_or_replaced_namespaces():

@@ -11,6 +11,7 @@ from robot_bringup.factory.system_configuration import load_system_configuration
 from robot_configuration.yaml_loader import load_yaml
 
 import yaml
+from robot_experiments.configuration import resolve_system_resource
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -23,7 +24,9 @@ def share(package):
 
 def system(name='system_nominal.yaml'):
     """Choose a real M07 system fixture."""
-    return share('robot_bringup') / 'config' / name
+    from robot_experiments.configuration import resolve_system_resource
+    return resolve_system_resource(
+        {'package': 'robot_bringup', 'path': 'config/'+name}, SRC, share)
 
 
 def inventory(plan):
@@ -34,29 +37,39 @@ def inventory(plan):
 
 def write_yaml(path, value):
     """Write isolated owner overrides without modifying installed resources."""
-    path.write_text(yaml.safe_dump(value))
+    from robot_experiments.reporting import plain
+    path.write_text(yaml.safe_dump(plain(value)))
     return str(path)
 
 
+def legacy_profile_fixture(tmp_path, source, profile):
+    """Exercise saved schema-1 readers without shipping selection profiles."""
+    document = load_yaml(source)
+    document['schema_version'] = 1
+    document['estimation'].pop('calibration', None)
+    document['simulation'] = {'config': write_yaml(tmp_path / 'profile.yaml', profile)}
+    return write_yaml(tmp_path / 'system.yaml', document)
+
+
 def modified_localization(tmp_path, *, publisher=None, fusion=None, omit_sensor=False):
-    """Use real inherited owners; no fake estimator/sensor implementations."""
-    plan = load_system_configuration(system('system_manipulation_D_localized.yaml'), share)
-    profile = load_yaml(plan['profile_path'])
+    """Change independent explicit publisher and fusion selections."""
+    source = system('system_manipulation_D_localized.yaml')
+    data = load_yaml(source)
+    plan = load_system_configuration(resolve_system_resource(source, Path.cwd(), share), share)
     deployment = load_yaml(plan['profile']['simulation_config'])
     if omit_sensor:
         deployment.pop('localization_sensor_config')
+        data['simulation'].pop('localization_sensor', None)
     elif publisher is not None:
         sensor = load_yaml(share('robot_simulation') / deployment['localization_sensor_config'])
         sensor['localization_sensor']['enabled'] = publisher
-        deployment['localization_sensor_config'] = write_yaml(tmp_path / 'sensor.yaml', sensor)
-    profile['simulation_config'] = write_yaml(tmp_path / 'simulation.yaml', deployment)
-    manifest = {'extends': str(system('system_manipulation_D_localized.yaml')),
-                'simulation': {'config': write_yaml(tmp_path / 'profile.yaml', profile)}}
+        path = write_yaml(tmp_path / 'sensor.yaml', sensor)
+        deployment['localization_sensor_config'] = path
+        data['simulation']['localization_sensor'] = path
     if fusion is not None:
-        manifest['estimation'] = {'robot': {'config': write_yaml(tmp_path / 'estimator.yaml', {
-            'extends': str(share('robot_estimation') / 'config/robot_localized.yaml'),
-            'estimation_node': {'ros__parameters': {'localization_enabled': fusion}}})}}
-    return Path(write_yaml(tmp_path / 'system.yaml', manifest))
+        data['estimation']['robot']['parameters']['localization_enabled'] = fusion
+    data['simulation']['config'] = write_yaml(tmp_path / 'simulation.yaml', deployment)
+    return Path(write_yaml(tmp_path / 'system.yaml', data))
 
 
 @pytest.mark.parametrize('name,wheel,holdback', [
@@ -65,7 +78,9 @@ def modified_localization(tmp_path, *, publisher=None, fusion=None, omit_sensor=
 ])
 def test_inventory_uses_effective_overrides_not_base_estimator_defaults(name, wheel, holdback):
     """Base YAML values must not leak past the selected bringup calibration."""
-    plan = load_system_configuration(system(name), share)
+    plan = load_system_configuration(
+        resolve_system_resource(
+            system(name), Path.cwd(), share), share)
     sources = inventory(plan)
     odometry = sources['wheel_odometry']
     assert odometry['measurement']['assumed_variance'] == wheel
@@ -87,7 +102,7 @@ def test_inventory_uses_effective_overrides_not_base_estimator_defaults(name, wh
 
 def test_imu_subscription_does_not_imply_builtin_publisher_or_health():
     """A consumer without a built-in producer is external-dependent, not live."""
-    plan = load_system_configuration(system(), share)
+    plan = load_system_configuration(resolve_system_resource(system(), Path.cwd(), share), share)
     sources = inventory(plan)
     imu = sources['imu']
     assert imu['producer']['configured'] is False
@@ -103,7 +118,12 @@ def test_imu_subscription_does_not_imply_builtin_publisher_or_health():
 
 def test_localized_inventory_preserves_generator_and_transported_covariance_contracts():
     """Keep generated imperfections distinct from incoming full pose covariance."""
-    plan = load_system_configuration(system('system_manipulation_D_localized.yaml'), share)
+    plan = load_system_configuration(
+        resolve_system_resource(
+            system('system_manipulation_D_localized.yaml'),
+            Path.cwd(),
+            share),
+        share)
     source = inventory(plan)['external_planar_localization']
     assert source['producer']['configured'] is True
     assert source['fusion']['subscription_configured'] is True
@@ -124,8 +144,8 @@ def test_localized_inventory_preserves_generator_and_transported_covariance_cont
 @pytest.mark.parametrize('publisher,fusion', [(False, True), (True, False), (False, False)])
 def test_publisher_and_fusion_are_independent_configured_choices(tmp_path, publisher, fusion):
     """A publisher outage must not be mislabeled as disabled fusion."""
-    plan = load_system_configuration(modified_localization(
-        tmp_path, publisher=publisher, fusion=fusion), share)
+    plan = load_system_configuration(resolve_system_resource(modified_localization(
+        tmp_path, publisher=publisher, fusion=fusion), Path.cwd(), share), share)
     source = inventory(plan)['external_planar_localization']
     assert source['producer']['configured'] is publisher
     assert source['fusion']['enabled'] is fusion
@@ -137,7 +157,14 @@ def test_publisher_and_fusion_are_independent_configured_choices(tmp_path, publi
 
 def test_missing_optional_sensor_resource_is_external_not_fabricated(tmp_path):
     """Missing source settings cannot become invented rates or noise models."""
-    plan = load_system_configuration(modified_localization(tmp_path, omit_sensor=True), share)
+    plan = load_system_configuration(
+        resolve_system_resource(
+            modified_localization(
+                tmp_path,
+                omit_sensor=True),
+            Path.cwd(),
+            share),
+        share)
     source = inventory(plan)['external_planar_localization']
     assert source['producer']['configured'] is False
     assert source['producer']['rate_hz'] == 'not configured'
@@ -155,7 +182,13 @@ def test_truth_context_and_derived_tf_are_not_independent_fused_sensors(
     name, truth, pose_source, context,
 ):
     """Physical truth may feed simulation context without direct EKF fusion."""
-    sources = inventory(load_system_configuration(system(name), share))
+    sources = inventory(
+        load_system_configuration(
+            resolve_system_resource(
+                system(name),
+                Path.cwd(),
+                share),
+            share))
     base = sources['physical_base_context']
     assert base['producer']['configured'] is truth
     assert base['fusion']['enabled'] is False
@@ -177,8 +210,13 @@ def test_truth_context_and_derived_tf_are_not_independent_fused_sensors(
 
 def test_inventory_uses_changed_topics_and_last_override_resource(tmp_path):
     """Inventory must follow the selected owner rather than scenario literals."""
-    plan = load_system_configuration(system('system_manipulation_D_localized.yaml'), share)
-    profile = load_yaml(plan['profile_path'])
+    plan = load_system_configuration(
+        resolve_system_resource(
+            system('system_manipulation_D_localized.yaml'),
+            Path.cwd(),
+            share),
+        share)
+    profile = dict(plan['profile'])
     deployment = load_yaml(plan['profile']['simulation_config'])
     robot = load_yaml(share('robot_simulation') / deployment['robot']['config'])
     robot['robot']['differential_drive']['odom_topic'] = '/study/wheels'
@@ -188,10 +226,15 @@ def test_inventory_uses_changed_topics_and_last_override_resource(tmp_path):
     override_path = write_yaml(tmp_path / 'calibration.yaml', overrides)
     profile['estimation_overrides'] = override_path
     profile['simulation_config'] = write_yaml(tmp_path / 'simulation.yaml', deployment)
-    path = write_yaml(tmp_path / 'system.yaml', {
-        'extends': str(system('system_manipulation_D_localized.yaml')),
-        'simulation': {'config': write_yaml(tmp_path / 'profile.yaml', profile)}})
-    wheel = inventory(load_system_configuration(path, share))['wheel_odometry']
+    path = legacy_profile_fixture(
+        tmp_path, system('system_manipulation_D_localized.yaml'), profile)
+    wheel = inventory(
+        load_system_configuration(
+            resolve_system_resource(
+                path,
+                Path.cwd(),
+                share),
+            share))['wheel_odometry']
     assert wheel['transport']['topic'] == '/study/wheels'
     assert wheel['measurement']['assumed_variance'] == [.123, .04]
     assert (
@@ -203,7 +246,7 @@ def test_inventory_is_deterministic_json_metadata_and_does_not_mutate_inputs(mon
     """Metadata construction and later consumer edits cannot alter owner state."""
     from robot_bringup.factory.sensor_inventory import build_sensor_inventory
 
-    plan = load_system_configuration(system(), share)
+    plan = load_system_configuration(resolve_system_resource(system(), Path.cwd(), share), share)
     deployment = load_yaml(plan['profile']['simulation_config'])
     inputs = {
         'deployment': deployment,
@@ -233,43 +276,57 @@ def test_inventory_is_deterministic_json_metadata_and_does_not_mutate_inputs(mon
     assert inputs == before, 'Consumer edits to metadata must not mutate owner values'
     target = build_sensor_inventory(**inputs)['sources']['target_position']
     assert target['measurement']['generated_covariance'][0][0] == .01
-    again = load_system_configuration(system(), share)
+    again = load_system_configuration(resolve_system_resource(system(), Path.cwd(), share), share)
     assert json.dumps(plan['sensor_inventory'], sort_keys=True) == json.dumps(
         again['sensor_inventory'], sort_keys=True)
 
 
 def test_target_timing_does_not_invent_robot_buffer_age_admission():
     """The target filter has separate chronology, not robot-buffer age admission."""
-    source = inventory(load_system_configuration(system(), share))['target_position']
+    source = inventory(
+        load_system_configuration(
+            resolve_system_resource(
+                system(),
+                Path.cwd(),
+                share),
+            share))['target_position']
     assert source['timing']['admission_max_age'] == 'not configured'
     assert 'separate target filter chronology' in source['timing']['ordering']
 
 
 def test_absent_calibration_override_reports_selected_estimator_owner(tmp_path):
     """Without a calibration overlay, both effective R and provenance revert."""
-    plan = load_system_configuration(system(), share)
-    profile = load_yaml(plan['profile_path'])
+    plan = load_system_configuration(resolve_system_resource(system(), Path.cwd(), share), share)
+    profile = dict(plan['profile'])
     profile.pop('estimation_overrides')
-    path = write_yaml(tmp_path / 'system.yaml', {
-        'extends': str(system()),
-        'simulation': {'config': write_yaml(tmp_path / 'profile.yaml', profile)}})
-    source = inventory(load_system_configuration(path, share))['wheel_odometry']
+    path = legacy_profile_fixture(tmp_path, system(), profile)
+    source = inventory(
+        load_system_configuration(
+            resolve_system_resource(
+                path,
+                Path.cwd(),
+                share),
+            share))['wheel_odometry']
     assert source['measurement']['assumed_variance'] == [.05, .02]
     assert source['configuration']['parameter_sources']['wheel_linear_velocity_variance'] == str(
-        share('robot_estimation') / 'config/robot_estimator.yaml')
+        share('robot_estimation') / 'config/estimation.yaml')
 
 
 def test_static_tracking_does_not_claim_tf_producer_selected(tmp_path):
     """An available broadcaster is not a selected producer in static mode."""
-    plan = load_system_configuration(system(), share)
-    profile = load_yaml(plan['profile_path'])
+    plan = load_system_configuration(resolve_system_resource(system(), Path.cwd(), share), share)
+    profile = dict(plan['profile'])
     deployment = load_yaml(plan['profile']['simulation_config'])
     deployment['tracking']['source'] = 'static'
     profile['simulation_config'] = write_yaml(tmp_path / 'simulation.yaml', deployment)
-    path = write_yaml(tmp_path / 'system.yaml', {
-        'extends': str(system()),
-        'simulation': {'config': write_yaml(tmp_path / 'profile.yaml', profile)}})
-    source = inventory(load_system_configuration(path, share))['tracking_frame_tf']
+    path = legacy_profile_fixture(tmp_path, system(), profile)
+    source = inventory(
+        load_system_configuration(
+            resolve_system_resource(
+                path,
+                Path.cwd(),
+                share),
+            share))['tracking_frame_tf']
     assert source['producer']['configured'] is False
     assert source['producer']['rate_hz'] == 'not applicable'
     assert source['measurement']['pose_source'] == 'static'
@@ -279,7 +336,12 @@ def test_summary_is_configured_not_live_and_shows_effective_observation_noise():
     """Startup output must qualify availability and fit a concise log entry."""
     from robot_bringup.factory.sensor_inventory import format_sensor_inventory
 
-    plan = load_system_configuration(system('system_manipulation_D_localized.yaml'), share)
+    plan = load_system_configuration(
+        resolve_system_resource(
+            system('system_manipulation_D_localized.yaml'),
+            Path.cwd(),
+            share),
+        share)
     summary = format_sensor_inventory(plan['sensor_inventory'])
     assert 'not live' in summary
     assert 'external' in summary.lower()

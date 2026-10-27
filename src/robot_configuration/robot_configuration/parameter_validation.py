@@ -1,7 +1,7 @@
 """Validate explicit primitive parameter contracts without ROS dependencies."""
 
-import math
 from copy import deepcopy
+import math
 
 
 def validate_parameters(parameters, schema, *, required=(), path='parameters'):
@@ -29,3 +29,41 @@ def validate_parameters(parameters, schema, *, required=(), path='parameters'):
         if basic == 'DOUBLE':
             normalized[key] = [float(item) for item in value] if array else float(value)
     return normalized
+
+
+def override_parameters(defaults, overrides, *, path='overrides'):
+    """
+    Copy known parameter leaves; mappings merge and lists replace in full.
+
+    Structural/physical validation remains with the consuming owner factory.
+    Selection must use composition, not invent new parameter keys here.
+    """
+    if not isinstance(defaults, dict) or not isinstance(overrides, dict):
+        raise ValueError(f'{path}: expected mapping')
+    unknown = set(overrides) - set(defaults)
+    if unknown:
+        raise ValueError(f'{path}: unknown keys {sorted(unknown)}')
+    result = deepcopy(defaults)
+    for key, value in overrides.items():
+        previous = defaults[key]
+        label = f'{path}.{key}'
+        if isinstance(previous, dict):
+            result[key] = override_parameters(previous, value, path=label)
+            continue
+        if type(previous) in (int, float):
+            valid = type(value) in (int, float) and math.isfinite(value)
+            if type(previous) is int:
+                valid = valid and type(value) is int
+        else:
+            valid = type(value) is type(previous)
+        if not valid:
+            raise ValueError(f'{label}: invalid parameter type/value')
+        if isinstance(value, list):
+            def finite(item):
+                if isinstance(item, list):
+                    return all(finite(v) for v in item)
+                return type(item) not in (int, float) or math.isfinite(item)
+            if not finite(value):
+                raise ValueError(f'{label}: nonfinite list values')
+        result[key] = deepcopy(value)
+    return result

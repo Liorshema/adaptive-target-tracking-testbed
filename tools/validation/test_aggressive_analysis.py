@@ -1,4 +1,5 @@
 """Check the geometric certificate independently of live tracking accuracy."""
+from robot_control.configuration import load_control_parameters
 
 from pathlib import Path
 
@@ -19,7 +20,7 @@ def snapshot():
     return {
         'description': load('src/robot_description/config/robot/robot.yaml')['robot'],
         'robot': load('src/robot_simulation/config/gazebo/robot.yaml')['robot'],
-        'control': load('src/robot_control/config/control.yaml')['control_node']['ros__parameters']}
+        'control': load_control_parameters('src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']}
 
 
 def test_valid_virtual_endpoint_family_constructs_exact_distance_pointing_poses(tmp_path, snapshot):

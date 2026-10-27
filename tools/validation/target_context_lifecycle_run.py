@@ -1,4 +1,6 @@
 """Inspect real launch ownership; qualify repeated root/group SIGINT shutdowns."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 from datetime import datetime, timezone
 import json
@@ -11,7 +13,7 @@ import time
 import psutil
 from ament_index_python.packages import get_package_share_directory
 from robot_bringup.factory.system_configuration import load_system_configuration
-from robot_experiments.configuration import load_experiment, materialize_run
+from robot_experiments.configuration import materialize_run, resolve_system_resource
 from robot_experiments.execution import DomainLease, OwnedLaunch, run_window
 from robot_experiments.recording import Recorder
 from robot_experiments.reporting import create_study_directory, write_json
@@ -55,9 +57,12 @@ def main():
     parser.add_argument('--failure', choices=['none', 'server', 'bridge', 'bad_config', 'context_delay', 'context_gap'], default='none')
     args = parser.parse_args()
     share = lambda p: Path(get_package_share_directory(p))
-    spec = load_experiment(share('robot_experiments')/'config/reactive_manipulation.yaml', share)
+    spec = ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
     variant = next(v for v in spec['variants'] if v['name'] == 'D')
-    variant['plan'] = load_system_configuration(share('robot_bringup')/'config/system_manipulation_D_localized.yaml', share,
+    system = resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/systems/mobile_manipulator_pose_tracking.yaml'},
+        share('robot_experiments'), share)
+    variant['plan'] = load_system_configuration(system, share,
         overrides={'enable_actuation': 'true', 'publish_ground_truth': 'true', 'gui': 'false', 'visualize_tracking': 'false'})
     study = create_study_directory(args.output, 'lifecycle')
     results = []

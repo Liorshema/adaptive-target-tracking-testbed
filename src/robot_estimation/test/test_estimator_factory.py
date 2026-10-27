@@ -5,14 +5,15 @@ import numpy as np
 import pytest
 import yaml
 
+from robot_estimation.configuration import load_estimation_parameters
 from robot_estimation.factory.estimator_factory import create_robot_estimator, create_target_estimator
 
 
 def configuration():
     root = Path(__file__).resolve().parents[2]
     parameters = {}
-    for name in ['robot_estimator', 'target_estimator']:
-        parameters.update(yaml.safe_load((root/'robot_estimation/config'/f'{name}.yaml').read_text())['estimation_node']['ros__parameters'])
+    for name in ['robot_ekf', 'kalman']:
+        parameters.update(load_estimation_parameters(root/'robot_estimation/config/estimation.yaml', name)['estimation_node']['ros__parameters'])
     physical = yaml.safe_load((root/'robot_description/config/robot/robot.yaml').read_text())['robot']['manipulator']['joints']
     return parameters, physical
 

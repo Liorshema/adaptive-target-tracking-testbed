@@ -1,3 +1,0 @@
-extends: oscillatory_reactive_tracking.yaml
-simulation:
-  environment_config: config/scenarios/environment_oscillatory_aggressive.yaml

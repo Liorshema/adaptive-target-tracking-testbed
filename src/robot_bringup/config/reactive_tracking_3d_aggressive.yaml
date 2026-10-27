@@ -1,2 +1,0 @@
-extends: reactive_tracking_3d.yaml
-simulation_config: config/scenarios/reactive_target_3d_aggressive.yaml

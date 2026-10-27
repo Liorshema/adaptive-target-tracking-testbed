@@ -287,7 +287,6 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "config",
-                default_value="config/launch.yaml",
                 description=(
                     "Absolute or package-relative path "
                     "to the simulation launch YAML"

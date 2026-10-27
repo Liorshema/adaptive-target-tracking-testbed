@@ -3,6 +3,7 @@
 No validation-only model or alternative controller is constructed. The FK
 model includes its FixedMountModel once. References come from real Control.
 """
+from robot_control.configuration import load_control_parameters
 
 import argparse
 from collections import Counter
@@ -49,12 +50,12 @@ def main():
     os.environ['ROS_LOG_DIR'] = str(args.output / 'ros-log')
     config = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
     physical = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
-    control = yaml.safe_load((ROOT / 'src/robot_control/config/control.yaml').read_text())['control_node']['ros__parameters']
+    control = load_control_parameters(ROOT / 'src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     joint_names = [config['joint_name_template'].format(key=key)
                    for key in physical['manipulator']['joints']]
     model = create_robot_model()
     enabled = args.case != 'baseline'
-    command = ['ros2', 'launch', 'robot_bringup', 'closed_loop.launch.py',
+    command = ['ros2', 'launch', 'robot_experiments', 'tracking.launch.py',
                'gui:=false', f'enable_actuation:={str(enabled).lower()}']
     if args.case == 'disabled':
         command.append('publish_commands:=false')

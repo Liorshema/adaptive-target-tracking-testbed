@@ -1,4 +1,6 @@
 """Bounded matched actuator trials using M08 lifecycle and immutable input snapshots."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 import hashlib
 import os
@@ -9,7 +11,7 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 
 from robot_configuration.yaml_loader import load_yaml
-from robot_experiments.configuration import load_experiment, materialize_run
+from robot_experiments.configuration import materialize_run
 from robot_experiments.execution import DomainLease, OwnedLaunch, run_window
 from robot_experiments.metrics import evaluate
 from robot_experiments.metrics.actuator_trace import analyze_trace
@@ -90,7 +92,7 @@ def main():
     parser.add_argument('--settling', type=float, default=2.)
     args = parser.parse_args()
     share = lambda package: Path(get_package_share_directory(package))
-    spec = load_experiment(share('robot_experiments')/'config/paired_prediction.yaml', share)
+    spec = ExperimentCatalog(share=share).prepare('EXP-PREDICTION')
     study = create_study_directory(args.output, 'm02_actuator')
     results = []
     for backend in args.backends:

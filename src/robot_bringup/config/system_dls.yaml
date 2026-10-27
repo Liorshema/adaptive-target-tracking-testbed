@@ -1,4 +1,0 @@
-extends: system_nominal.yaml
-control:
-  type: jacobian
-  strategy: null

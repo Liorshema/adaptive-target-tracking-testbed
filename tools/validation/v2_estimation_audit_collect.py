@@ -1,4 +1,5 @@
 """Isolated observational estimate/odometry capture; changes no node settings."""
+from robot_estimation.configuration import load_estimation_parameters
 import json, os, signal, subprocess, time
 from pathlib import Path
 import numpy as np
@@ -14,13 +15,13 @@ OUT=ROOT/'results/validation/v2_estimation_audit'
 OUT.mkdir(parents=True,exist_ok=True)
 os.environ.update(ROS_DOMAIN_ID='121',GZ_PARTITION=f'v2-estimation-audit-{os.getpid()}',GZ_IP='127.0.0.1',ROS_LOG_DIR=str(OUT/'ros-log'))
 robot=yaml.safe_load((ROOT/'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
-estcfg=yaml.safe_load((ROOT/'src/robot_estimation/config/robot_estimator.yaml').read_text())['estimation_node']['ros__parameters']
+estcfg=load_estimation_parameters(ROOT/'src/robot_estimation/config/estimation.yaml', 'robot_ekf')['estimation_node']['ros__parameters']
 desc=yaml.safe_load((ROOT/'src/robot_description/config/robot/robot.yaml').read_text())['robot']
 names=[robot['joint_name_template'].format(key=key) for key in desc['manipulator']['joints']]
 streams={'estimate':[],'odom':[],'joint':[]}
 def stamp(message):return message.header.stamp.sec+message.header.stamp.nanosec*1e-9
 log=(OUT/'runtime.log').open('w')
-command=['ros2','launch','robot_bringup','closed_loop.launch.py','gui:=false','enable_actuation:=true','strategy_config:=config/whole_body.yaml']
+command=['ros2','launch','robot_experiments','tracking.launch.py','gui:=false','enable_actuation:=true','controller:=whole_body']
 proc=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
 node=None
 try:

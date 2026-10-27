@@ -13,6 +13,7 @@ from sensor_msgs.msg import Imu
 import yaml
 
 from robot_estimation.nodes.estimation_node import EstimationNode
+from robot_estimation.configuration import load_estimation_parameters
 
 
 @pytest.fixture
@@ -20,9 +21,9 @@ def node():
     """Provide local parameters and publication sinks without DDS."""
     estimate = object.__new__(EstimationNode)
     parameters = {}
-    for name in ['robot_estimator', 'target_estimator']:
-        path = Path(__file__).parents[1] / 'config' / f'{name}.yaml'
-        parameters.update(yaml.safe_load(path.read_text())['estimation_node']['ros__parameters'])
+    for name in ['robot_ekf', 'kalman']:
+        path = Path(__file__).parents[1] / 'config' / 'estimation.yaml'
+        parameters.update(load_estimation_parameters(path, name)['estimation_node']['ros__parameters'])
     parameters.setdefault('joint_names', [
         'base_yaw_joint', 'shoulder_joint', 'elbow_joint', 'wrist_joint',
     ])

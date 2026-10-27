@@ -7,6 +7,8 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from robot_bringup.factory.system_configuration import load_system_configuration
+from robot_experiments.configuration import resolve_system_resource
+from robot_experiments.composition import load_resource, resource_sources
 from m06_verify_installation import verify
 
 
@@ -19,18 +21,24 @@ def run(prefix):
                  'robot_simulation.factory.actuation_factory']:
         assert Path(import_module(name).__file__).resolve().is_relative_to(prefix), name
     share = lambda package: Path(get_package_share_directory(package))
-    root = share('robot_bringup') / 'config'
+    root = share('robot_experiments') / 'config/systems'
     cases = {}
-    for name in ['system_nominal', 'system_cv', 'system_dls']:
-        plan = load_system_configuration(root / (name + '.yaml'), share)
-        assert plan['description_path'].is_relative_to(prefix)
-        assert plan['prediction_path'].is_relative_to(prefix)
+    for name, filename in [('system_nominal','nominal_tracking'), ('system_cv','cv_prediction'), ('system_dls','dls_control')]:
+        selected = resolve_system_resource(root / (filename + '.yaml'), root, share)
+        plan = load_system_configuration(selected, share)
+        for key in ['description_path', 'prediction_path']:
+            origins = resource_sources(plan[key])
+            assert origins and all(Path(origin['path']).is_relative_to(prefix)
+                                   for origin in origins), (key, origins)
         assert all(not value for value in plan['runtime'].values())
         cases[name] = plan['identities']
     assert cases['system_nominal']['predictor'] != cases['system_cv']['predictor']
     assert cases['system_nominal']['controller'] != cases['system_dls']['controller']
     try:
-        load_system_configuration(root / 'system_invalid.yaml', share)
+        from robot_bringup.factory.system_configuration import assemble_system_configuration
+        invalid = load_resource(root / 'nominal_tracking.yaml', share=share)
+        invalid['prediction']['type'] = 'constant_acceleration'
+        assemble_system_configuration(invalid, root/'invalid-test.yaml', share)
     except ValueError as error:
         assert 'prediction' in str(error) and 'constant_acceleration' in str(error)
         result['negative_error'] = str(error)

@@ -1,2 +1,0 @@
-extends: closed_loop.yaml
-estimation_overrides: config/simulation_estimation.yaml

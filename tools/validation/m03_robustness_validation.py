@@ -6,6 +6,7 @@ from time import perf_counter
 import numpy as np
 from scipy.spatial.transform import Rotation
 from robot_configuration.yaml_loader import load_yaml
+from robot_estimation.configuration import load_estimation_parameters
 from robot_estimation.factory.estimator_factory import create_robot_estimator
 from robot_estimation.parameter_schema import POSE_POLICY_PARAMETERS
 from robot_estimation.measurement import Measurement
@@ -47,7 +48,7 @@ def replay(directory):
             events.append((t,source,Measurement(z,R,t)))
     events.sort(key=lambda item:item[:2])
     physical=context['description']['robot']['manipulator']['joints']
-    configured=load_yaml(Path('src/robot_estimation/config/robot_localized.yaml'))['estimation_node']['ros__parameters']
+    configured=load_estimation_parameters(Path('src/robot_estimation/config/estimation.yaml'), ['robot_ekf','pose_aiding'])['estimation_node']['ros__parameters']
     truth=read('base_truth');output={}
     for mode in ['legacy','robust']:
         selected=dict(parameters)

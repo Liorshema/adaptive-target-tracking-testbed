@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from robot_bringup.factory.system_configuration import load_system_configuration
+from robot_experiments.configuration import resolve_system_resource
 from robot_configuration.yaml_loader import load_yaml
 from robot_simulation.gazebo.physics_engine import physics_engine_library
 import hashlib
@@ -25,8 +26,12 @@ def main():
         if a.copied:
             assert path.is_relative_to(a.prefix.resolve()), (name, path)
         origins[name] = str(path)
-    base = load_system_configuration(share('robot_bringup')/'config/system_manipulation_D.yaml', share)
-    localized = load_system_configuration(share('robot_bringup')/'config/system_manipulation_D_localized.yaml', share)
+    base = load_system_configuration(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/systems/manipulation_D.yaml'},
+        share('robot_experiments'), share), share)
+    localized = load_system_configuration(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/systems/mobile_manipulator_pose_tracking.yaml'},
+        share('robot_experiments'), share), share)
     assert base['control_parameters'] == localized['control_parameters']
     assert base['description_path'] == localized['description_path']
     assert base['identities'] == localized['identities']

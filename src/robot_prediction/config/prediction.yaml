@@ -1,37 +1,48 @@
 prediction:
-  dt: 0.1
-  horizon: 20
-
-history:
-  window_duration: 1.0
-
-confidence:
-  residual_scale: 0.5
-
-imm:
-  model_probabilities:
-    - 0.333333
-    - 0.333333
-    - 0.333334
-
-  transition_matrix:
-    - [0.90, 0.05, 0.05]
-    - [0.05, 0.90, 0.05]
-    - [0.05, 0.05, 0.90]
-
-  likelihood_variance: 1.0
-
-coordinated_turn:
-  turn_rate_epsilon: 1.0e-6
-
-fusion:
-  default_weights:
-    - 1.0
-
-adaptation:
+  parameters:
+    dt: 0.1
+    horizon: 20
+monitoring:
+  parameters:
+    window_duration: 1.0
+    residual_scale: 0.5
+predictors:
+  constant_velocity:
+    parameters: {}
+  constant_acceleration:
+    parameters: {}
+  coordinated_turn:
+    parameters:
+      turn_rate_epsilon: 1.0e-06
+  imm:
+    parameters:
+      model_probabilities:
+      - 0.333333
+      - 0.333333
+      - 0.333334
+      transition_matrix:
+      - - 0.9
+        - 0.05
+        - 0.05
+      - - 0.05
+        - 0.9
+        - 0.05
+      - - 0.05
+        - 0.05
+        - 0.9
+      likelihood_variance: 1.0
+adaptations:
   residual:
-    correction_gain: 1.0
-
+    parameters:
+      correction_gain: 1.0
   rls:
-    forgetting_factor: 0.99
-    initial_covariance: 100.0
+    parameters:
+      forgetting_factor: 0.99
+      initial_covariance: 100.0
+fusions:
+  weighted_correction:
+    parameters: {}
+  baseline:
+    parameters:
+      default_weights:
+      - 1.0

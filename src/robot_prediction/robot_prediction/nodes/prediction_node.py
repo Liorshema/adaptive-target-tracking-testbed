@@ -141,7 +141,7 @@ class PredictionNode(Node):
 
     def _on_time_jump(self, _jump) -> None:
         """Discard prediction/adaptation history when ROS time changes epoch."""
-        self._system = PredictionSystemFactory(config=self._config).create(**getattr(self, '_selection', {}))
+        self._system = PredictionSystemFactory(config=self._config).create(**self._selection)
         self._last_timestamp = None
         self._state_dimension = None
         self._frame_id = None

@@ -7,7 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
-from robot_configuration.yaml_loader import load_yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / package)
 
 from robot_simulation.factory.deployment_configuration import validate_deployment_configuration
 from robot_simulation.gazebo.world_builder import build_world
@@ -40,7 +42,7 @@ def test_selected_motor_backend_is_written_inside_physics_system(tmp_path):
 def test_preflight_accepts_only_supported_physics_engines(engine):
     """Allow explicit stock and corrected engines without requiring a build."""
     root = Path(__file__).parents[1]
-    d = load_yaml(root / 'config/scenarios/oscillatory_reactive_tracking.yaml')
+    d = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_oscillatory_reactive_tracking'})
     d['world']['physics']['engine'] = engine
     validate_deployment_configuration(
         d, load_yaml(root / d['target']['config']),
@@ -53,7 +55,7 @@ def test_preflight_accepts_only_supported_physics_engines(engine):
 def test_preflight_rejects_invalid_physics_engine(engine):
     """Do not silently fall back from an unsupported or malformed selector."""
     root = Path(__file__).parents[1]
-    d = load_yaml(root / 'config/scenarios/oscillatory_reactive_tracking.yaml')
+    d = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml', 'group': 'resources.deployment_oscillatory_reactive_tracking'})
     d['world']['physics']['engine'] = engine
     with pytest.raises(ValueError):
         validate_deployment_configuration(

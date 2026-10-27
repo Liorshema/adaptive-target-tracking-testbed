@@ -6,10 +6,17 @@ from pathlib import Path
 
 import pytest
 
+from robot_experiments.catalog import ExperimentCatalog
+
 from robot_experiments import cli, recording, runner
 from robot_experiments.configuration import load_experiment
 
 import yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+from robot_experiments.configuration import resolve_system_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 
 SRC = Path(__file__).resolve().parents[2]
@@ -98,7 +105,7 @@ def test_noise_study_shows_actual_values_sources_and_both_hashes(capsys):
         assert variable['path'] == 'localization_sensor.localization_sensor.white_noise_std'
         assert expected in variable['declared_values']
         assert variable['owner_resources']
-        assert all('planar_localization' in p for p in variable['owner_resources'])
+        assert all(p in run['sources']['resources'] for p in variable['owner_resources'])
         sensor = run['sensors']['sources']['external_planar_localization']
         assert sensor['simulated_effects']['white_noise_std'] == expected
         assert sensor['simulated_effects']['random_seed'] == 3872720740
@@ -129,19 +136,21 @@ def test_explain_is_stable_and_cleans_materialization_without_creating_results(
     assert str(tmp_path) not in json.dumps(a['runs'])
     assert {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in before} == before
     resources = a['runs'][1]['sources']['resources']
-    noise = str(SRC / 'robot_simulation/config/sensors/planar_localization_noise_study.yaml')
-    assert resources[noise]['parents'] == [str(
-        SRC / 'robot_simulation/config/sensors/planar_localization.yaml')]
-    assert a['experiment']['source_ancestry'][0].endswith('sensor_noise_comparison.yaml')
-    assert a['experiment']['source_ancestry'][-1].endswith('paired_prediction.yaml')
+    assert str(SRC / 'robot_simulation/config/sensors/planar_localization.yaml') in resources
+    assert str(SRC / 'robot_experiments/config/experiments.yaml') in resources
+    assert any('resources.localization_noise' in key for key in resources)
+    assert a['experiment']['source_ancestry'] == [
+        str(SRC / 'robot_experiments/config/experiments.yaml')]
+    assert a['experiment']['experiment_identity']['id'] == 'EXP-SENSOR-NOISE-LEGACY'
 
 
 def write_experiment(tmp_path, updates):
     """Use real baseline inheritance, without editing the owner YAML."""
     p = tmp_path / 'experiment.yaml'
-    p.write_text(yaml.safe_dump({
-        'extends': str(SRC / 'robot_experiments/config/sensor_noise_comparison.yaml'),
-        'experiment': updates}))
+    data = ExperimentCatalog(share=SHARE).document('EXP-SENSOR-NOISE-LEGACY')
+    # These fixtures intentionally introduce malformed declarations to exercise preflight.
+    data['experiment'].update(updates)
+    p.write_text(yaml.safe_dump(data))
     return p
 
 
@@ -306,20 +315,22 @@ def test_protected_scenario_delta_is_explained_by_the_existing_sensor_policy(
     """An authorized noise difference must not conceal a second physical/scenario change."""
     scenario = tmp_path / 'scenario.yaml'
     scenario.write_text(yaml.safe_dump({
-        'extends': str(SRC / 'robot_simulation/config/scenarios/'
-                       'reactive_manipulation_noise_study.yaml'),
+        'extends': str(resolve_system_resource(SRC / 'robot_simulation/config/scenarios/'
+                       'reactive_manipulation_noise_study.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package)),
         'target': {'initial_velocity': [.01, 0., 0.]}}))
-    profile = tmp_path / 'profile.yaml'
-    profile.write_text(yaml.safe_dump({
-        'extends': str(SRC / 'robot_bringup/config/reactive_manipulation_noise_study.yaml'),
-        'simulation_config': str(scenario)}))
+    selected = load_yaml(
+        resolve_system_resource(
+            SRC /
+            'robot_experiments/config/systems/localization_noise_study.yaml',
+            Path.cwd(),
+            lambda package: Path(__file__).resolve().parents[2] /
+            package))
+    selected['simulation']['config'] = str(scenario)
     system = tmp_path / 'system.yaml'
-    system.write_text(yaml.safe_dump({
-        'extends': str(SRC / 'robot_bringup/config/system_localization_noise_study.yaml'),
-        'simulation': {'config': str(profile)}}))
+    system.write_text(yaml.safe_dump(selected))
     p = write_experiment(tmp_path, {'variants': [
         {'name': 'baseline', 'system_config': str(
-            SRC / 'robot_bringup/config/system_manipulation_D_localized.yaml')},
+            resolve_system_resource(SRC / 'robot_experiments/config/systems/mobile_manipulator_pose_tracking.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package))},
         {'name': 'higher_noise', 'system_config': str(system)}]})
     assert cli.main(['--config', str(p), '--explain'], share=SHARE) == 0
     doc = json.loads(capsys.readouterr().out)

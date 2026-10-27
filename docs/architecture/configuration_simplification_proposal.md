@@ -1,5 +1,12 @@
 # Configuration architecture audit and simplification proposal
 
+Current ownership, canonical configuration paths and direct-launch migration are
+documented in the [experiment-management guide](../experiment_management.md).
+The milestone/design details below retain their original historical context.
+
+
+> Historical audit from 2026-10-23. Subsequent authorized migrations changed this inventory and implemented parts of the proposal. See [current experiment management](../experiment_management.md) for the catalog/backend cut and remaining work. This dated inventory is not current deletion authority.
+
 Status: **READ-ONLY AUDIT + DESIGN; migration not implemented or authorized.** Inspected current working tree on 2026-10-23. This report is the only repository write. Existing dirty work, YAML, launch code, algorithms, scientific comparison policy and historical results are preserved.
 
 ## 1. Executive summary

@@ -7,8 +7,10 @@
   <exec_depend>robot_bringup</exec_depend><exec_depend>robot_configuration</exec_depend>
   <exec_depend>robot_description</exec_depend><exec_depend>robot_models</exec_depend>
   <exec_depend>robot_simulation</exec_depend>
+  <exec_depend>robot_control</exec_depend><exec_depend>robot_estimation</exec_depend>
+  <exec_depend>robot_prediction</exec_depend>
   <exec_depend>robot_interfaces</exec_depend><exec_depend>rclpy</exec_depend>
-  <exec_depend>ament_index_python</exec_depend><exec_depend>ros2launch</exec_depend>
+  <exec_depend>launch</exec_depend><exec_depend>ament_index_python</exec_depend><exec_depend>ros2launch</exec_depend>
   <exec_depend>rosgraph_msgs</exec_depend><exec_depend>geometry_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend><exec_depend>nav_msgs</exec_depend><exec_depend>std_msgs</exec_depend>
   <exec_depend>python3-numpy</exec_depend><exec_depend>python3-scipy</exec_depend>

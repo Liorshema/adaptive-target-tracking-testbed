@@ -42,8 +42,8 @@ def main():
     parser.add_argument('--case', choices=[
         'hold', 'v1', 'v2', 'no_feedforward', 'no_lookahead', 'reactive'], required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--config', default='config/optimal_tracking.yaml')
-    parser.add_argument('--strategy-config', default='config/whole_body.yaml')
+    parser.add_argument('--scenario', default='optimal_tracking', help='Experiment-owned direct-launch case')
+    parser.add_argument('--controller', default='whole_body', help='Experiment-owned controller allocation group')
     parser.add_argument('--system-config', default='',
                         help='Exercise the existing bringup unified-manifest entry point')
     parser.add_argument('--gui', action='store_true')
@@ -90,25 +90,38 @@ def main():
     os.environ.setdefault('ROS_DOMAIN_ID', '115')
     os.environ.update(GZ_PARTITION=f'v2-evaluation-{os.getpid()}', GZ_IP='127.0.0.1',
                       ROS_LOG_DIR=str(args.output / 'ros-log'))
-    robot = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
-    description = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
-    control = yaml.safe_load((ROOT / 'src/robot_control/config/control.yaml').read_text())['control_node']['ros__parameters']
-    actuator = yaml.safe_load((ROOT / 'src/robot_simulation/config/actuation.yaml').read_text())['actuation']
+    from robot_experiments.launching import launch_profile
+    from robot_experiments.configuration import resolve_system_resource
+    from robot_experiments.reporting import plain
+    from robot_bringup.factory.system_configuration import load_system_configuration
+    share = lambda package: ROOT / 'src' / package
+    enabled = args.case != 'hold'
+    if args.system_config:
+        manifest = Path(args.system_config)
+        if not manifest.is_absolute():
+            manifest = resolve_system_resource(
+                {'package':'robot_bringup','path':args.system_config}, ROOT, share)
+        plan = load_system_configuration(manifest, share)
+    else:
+        plan = launch_profile(args.scenario, share,
+                              controller=(args.controller
+                                          if args.case not in ['hold', 'v1'] else ''))
+    master = plain(plan['profile'])
+    simulation = load_yaml(master['simulation_config'])
+    base = share('robot_simulation') if simulation['paths']['base']=='package' else Path(master['simulation_config']).parent
+    robot = load_yaml(base / simulation['robot']['config'])['robot']
+    description = load_yaml(plan['description_path'])['robot']
+    control = plan['control_parameters']
+    actuator = load_yaml(master['actuation_config'])['actuation']
     names = [robot['joint_name_template'].format(key=key) for key in description['manipulator']['joints']]
     model = create_robot_model()
     initial = robot['pose']
     world_odom_rotation = Rotation.from_euler('xyz', initial[3:]).as_matrix()
-    enabled = args.case != 'hold'
+    selected_system = args.output / 'selected_system.yaml'
+    selected_system.write_text(yaml.safe_dump(plain(plan['manifest'])))
     command = ['ros2', 'launch', 'robot_bringup', 'closed_loop.launch.py',
-               f'gui:={str(args.gui).lower()}',
-               f'config:={args.config}',
-               f'enable_actuation:={str(enabled).lower()}']
-    if args.system_config:
-        command = ['ros2', 'launch', 'robot_bringup', 'closed_loop.launch.py',
-                   f'system_config:={args.system_config}', f'gui:={str(args.gui).lower()}',
-                   f'enable_actuation:={str(enabled).lower()}']
-    elif args.case not in ['hold', 'v1']:
-        command.append(f'strategy_config:={args.strategy_config}')
+               f'system_config:={selected_system.resolve()}',
+               f'gui:={str(args.gui).lower()}', f'enable_actuation:={str(enabled).lower()}']
     if args.case == 'no_feedforward':
         command.append('feedforward:=false')
     if args.case == 'no_lookahead':
@@ -118,19 +131,10 @@ def main():
                        if args.without_markers else ['visualize_tracking:=true'])
     if args.drive_fixture:
         command.append('publish_commands:=false')
-    master = load_yaml(ROOT / 'src/robot_bringup' / args.config)
-    if args.system_config:
-        from robot_bringup.factory.system_configuration import load_system_configuration
-        manifest = Path(args.system_config)
-        if not manifest.is_absolute():
-            manifest = ROOT / 'src/robot_bringup' / manifest
-        plan = load_system_configuration(manifest, lambda package: ROOT / 'src' / package)
-        master = {key: str(value) if isinstance(value, Path) else value
-                  for key, value in plan['profile'].items()}
     snapshot = {'bringup': master, 'robot': robot,
                 'simulation': load_yaml(ROOT / 'src/robot_simulation' / master['simulation_config']),
                 'description': description, 'actuation': actuator, 'control': control,
-                'strategy': load_yaml(ROOT / 'src/robot_control' / args.strategy_config),
+                'strategy': plan['strategy'],
                 'estimation_overrides': load_yaml(
                     ROOT / 'src/robot_bringup' / master['estimation_overrides']),
                 'launch': command}
@@ -145,13 +149,14 @@ def main():
         simulation_resource / sim_cfg['robot']['joint_position_hold'])['joint_position_hold']
     snapshot['environment'] = load_yaml(simulation_resource / sim_cfg['simulation']['environment_config'])
     snapshot['joint_order'] = names
-    snapshot['estimator'] = yaml.safe_load((ROOT / 'src/robot_estimation' /
-        master['robot_estimator_config']).read_text())['estimation_node']['ros__parameters']
+    snapshot['estimator'] = dict(plan['estimation_parameters'])
     snapshot['before_m03_estimation'] = args.before_m03_estimation
     if args.drive_fixture:
         snapshot['drive_fixture'] = load_yaml(args.drive_fixture)
     if args.target_trace or args.estimator_trace or args.actuation_trace or args.profile_control:
-        code = (ROOT / 'src/robot_bringup/launch/closed_loop.launch.py').read_text()
+        code = ((ROOT / 'src/robot_bringup/robot_bringup/deployment/launching.py').read_text() + '\n' +
+                (ROOT / 'src/robot_bringup/launch/closed_loop.launch.py').read_text().replace(
+                    'from robot_bringup.deployment.launching import configure', ''))
         code = code.replace('from pathlib import Path', 'from pathlib import Path\nimport sys')
         if args.target_trace:
             os.environ['TARGET_DYNAMICS_TRACE'] = str((args.output / 'target_trace.json').resolve())

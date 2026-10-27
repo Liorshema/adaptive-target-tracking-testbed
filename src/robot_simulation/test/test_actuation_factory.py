@@ -1,4 +1,5 @@
 """Preflight and the ROS adapter share actual actuator startup construction."""
+from robot_control.configuration import load_control_parameters
 
 from pathlib import Path
 from copy import deepcopy
@@ -15,7 +16,7 @@ def inputs():
     robot = load_yaml(src / 'robot_simulation/config/gazebo/robot.yaml')['robot']
     physical = load_yaml(src / 'robot_description/config/robot/robot.yaml')['robot']['manipulator']['joints']
     holding = load_yaml(src / 'robot_simulation/config/gazebo/joint_position_hold.yaml')['joint_position_hold']
-    control = load_yaml(src / 'robot_control/config/control.yaml')['control_node']['ros__parameters']
+    control = load_control_parameters(src / 'robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     return config, robot, physical, holding, control['base_velocity_lower'], control['base_velocity_upper']
 
 

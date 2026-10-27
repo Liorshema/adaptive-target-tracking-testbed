@@ -10,7 +10,9 @@ from robot_models.target.target_state import TargetState
 
 from robot_simulation.disturbances.sinusoidal_field import (
     SinusoidalAccelerationField, SinusoidalFieldParameters)
-from robot_configuration.yaml_loader import load_yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / package)
 from robot_simulation.factory.simulation_factory import SimulationFactory
 from robot_simulation.state.simulation_state import SimulationState
 
@@ -36,7 +38,8 @@ def test_periodic_field_rejects_invalid_frequencies(frequency):
     'oscillatory_reactive_tracking.yaml', 'reactive_target_oscillatory_aggressive_reference.yaml'])
 def test_configured_motion_remains_spatial_bounded_and_repeatable(scenario):
     """Both selected fields must sustain post-transient Y/Z reversals with RK4."""
-    scene = load_yaml(CONFIG / 'scenarios' / scenario)
+    scene = load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                       'group': 'resources.deployment_' + Path(scenario).stem})
     target = load_yaml(CONFIG.parent / scene['target']['config'])
     environment = load_yaml(CONFIG.parent / scene['simulation']['environment_config'])
     integration = load_yaml(CONFIG.parent / scene['simulation']['config'])

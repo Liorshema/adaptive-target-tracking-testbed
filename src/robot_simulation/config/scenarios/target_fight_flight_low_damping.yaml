@@ -1,7 +1,0 @@
-# Keep the reactive target's geometry, alpha, radius and epsilon unchanged.
-extends: ../target.yaml
-
-target:
-  dynamics:
-    parameters:
-      damping: 0.15

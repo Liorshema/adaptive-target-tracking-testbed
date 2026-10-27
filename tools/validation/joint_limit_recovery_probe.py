@@ -1,4 +1,6 @@
 """Bounded real-native boundary probe using normal simulation launch/M08 isolation."""
+
+from robot_experiments.catalog import ExperimentCatalog
 import argparse
 import hashlib
 import json
@@ -13,8 +15,11 @@ from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from std_msgs.msg import Float64
 
-from robot_configuration.yaml_loader import load_yaml
-from robot_experiments.configuration import load_experiment, materialize_run
+from functools import partial
+from robot_experiments.composition import load_resource
+from robot_experiments.configuration import resolve_system_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / 'src' / package)
+from robot_experiments.configuration import materialize_run
 from robot_experiments.execution import DomainLease, OwnedLaunch
 from robot_experiments.recording import Recorder
 from robot_experiments.reporting import create_study_directory, write_json
@@ -31,10 +36,15 @@ def trial(variant, spec, directory, share, joint_key, side, backend, policy, eng
         sim['world']['physics']['engine'] = engine
     # Isolate arm physics from target motion/controller: retain the actual robot,
     # selected limits, native holding, world and physical timestep.
-    defaults=load_yaml(share('robot_simulation')/'config/launch.yaml')
+    defaults=load_resource({'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                            'group': 'resources.deployment_standalone'}, share=share)
     sim['tracking']=defaults['tracking'];sim.pop('physical_context',None)
-    sim['target']['config']=str(share('robot_simulation')/'config/scenarios/target.yaml')
-    sim['simulation']['environment_config']=str(share('robot_simulation')/'config/scenarios/environment.yaml')
+    sim['target']['config']=str(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+         'group': 'resources.target_independent'}, directory, share))
+    sim['simulation']['environment_config']=str(resolve_system_resource(
+        {'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+         'group': 'resources.environment_reactive'}, directory, share))
     holding_path=Path(sim['robot']['joint_position_hold']);holding=load_yaml(holding_path)
     holding['joint_position_hold']['backend']=backend
     holding_path.write_text(yaml.safe_dump(holding,sort_keys=False))
@@ -131,7 +141,7 @@ def main():
     parser.add_argument('--starts',type=int,default=1)
     args=parser.parse_args()
     share=lambda name:Path(get_package_share_directory(name))
-    spec=load_experiment(share('robot_experiments')/'config/reactive_manipulation.yaml',share)
+    spec=ExperimentCatalog(share=share).prepare('EXP-MANIPULATION')
     policy=load_yaml(Path(__file__).with_suffix('.yaml'))
     study=create_study_directory(args.output,'native_boundary')
     print(study,flush=True)

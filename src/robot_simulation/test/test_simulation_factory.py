@@ -7,7 +7,9 @@ import numpy as np
 import pytest
 
 from robot_models.target.target_state import TargetState
-from robot_configuration.yaml_loader import load_yaml
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(__file__).resolve().parents[2] / package)
 from robot_simulation.factory.simulation_factory import SimulationFactory
 from robot_simulation.state.simulation_state import SimulationState
 
@@ -18,7 +20,8 @@ CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 def load_configs():
     """Load the three simulation configuration files."""
     return (
-        load_yaml(CONFIG_DIR / "target.yaml"),
+        load_yaml({'package': 'robot_experiments', 'path': 'config/experiments.yaml',
+                   'group': 'resources.target_fight_flight'}),
         load_yaml(CONFIG_DIR / "environment.yaml"),
         load_yaml(CONFIG_DIR / "simulation.yaml"),
     )

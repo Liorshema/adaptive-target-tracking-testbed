@@ -1,2 +1,0 @@
-extends: base_relative_manipulation.yaml
-localization_sensor_config: config/sensors/planar_localization_noise_study.yaml

@@ -1,9 +1,0 @@
-# Same physical challenge, WLS, prediction and actuation; new localization selection.
-extends: system_manipulation_D.yaml
-estimation:
-  robot:
-    config: {package: robot_estimation, path: config/robot_localized.yaml}
-simulation:
-  config: {package: robot_bringup, path: config/reactive_manipulation_localized.yaml}
-runtime:
-  publish_ground_truth: true # Available only to the explicit sensor simulation layer.

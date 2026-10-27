@@ -1,4 +1,5 @@
 """Compare configured optical FK to Gazebo link poses and actual EKF callback order."""
+from robot_control.configuration import load_control_parameters
 
 import argparse
 import json
@@ -53,7 +54,7 @@ def main():
     os.environ.setdefault('ROS_DOMAIN_ID', '132')
     robot = load_yaml(ROOT / 'src/robot_simulation/config/gazebo/robot.yaml')['robot']
     description = load_yaml(ROOT / 'src/robot_description/config/robot/robot.yaml')['robot']
-    control = load_yaml(ROOT / 'src/robot_control/config/control.yaml')['control_node']['ros__parameters']
+    control = load_control_parameters(ROOT / 'src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     names = [robot['joint_name_template'].format(key=key) for key in description['manipulator']['joints']]
     mount = np.eye(4)
     mount[:3, :3] = Rotation.from_euler('xyz', description['tracking_frame']['rotation_rpy']).as_matrix()
@@ -71,7 +72,7 @@ def main():
     launch = args.output / 'observed.launch.py'
     launch.write_text(code)
     command = ['ros2', 'launch', str(launch.resolve()), 'gui:=false',
-               'config:=config/optimal_tracking.yaml', 'strategy_config:=config/whole_body.yaml',
+               'case:=optimal_tracking', 'controller:=whole_body',
                'enable_actuation:=true']
     if args.visualization:
         command.append('visualize_tracking:=true')

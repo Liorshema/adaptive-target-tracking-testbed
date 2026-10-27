@@ -16,11 +16,15 @@ from robot_models.constraints.joint_limits import JointLimits
 from robot_models.constraints.velocity_limits import VelocityLimits
 
 from robot_simulation.actuation.position_reference import PositionReference
-from robot_configuration.yaml_loader import load_yaml
+from robot_experiments.launching import launch_profile
 
 from scipy.spatial.transform import Rotation
 
 import xacro
+from functools import partial
+from robot_experiments.composition import load_resource
+load_yaml = partial(load_resource, share=lambda package: Path(
+    __file__).resolve().parents[2] / package)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -90,9 +94,9 @@ def test_first_link_geometry_and_fk_raise_for_positive_shoulder(angle):
 
 def test_experiment_bringup_inherits_baseline_pipeline():
     """Changing experiment selection must retain the same control and estimation."""
-    baseline = load_yaml(ROOT / 'robot_bringup/config/reactive_tracking.yaml')
-    experiment = load_yaml(ROOT / 'robot_bringup/config/reactive_tracking_low_damping.yaml')
-    assert experiment.pop('simulation_config') == (
-        'config/scenarios/reactive_target_low_damping.yaml')
+    baseline = launch_profile('reactive_tracking', lambda p: ROOT / p)['profile']
+    experiment = launch_profile('reactive_tracking_low_damping', lambda p: ROOT / p)['profile']
+    selected = load_yaml(experiment.pop('simulation_config'))
+    assert selected['tracking']['source'] == 'tf'
     baseline.pop('simulation_config')
     assert experiment == baseline
