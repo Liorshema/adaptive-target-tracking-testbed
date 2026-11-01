@@ -196,7 +196,7 @@ runpy.run_path(sys.argv[0],run_name='__main__')
             node.create_subscription(msgtype, topic, lambda msg, k=key: receive(k, msg), 100)
         if args.references:
             robot = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
-            physical = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']['manipulator']['joints']
+            physical = yaml.safe_load((ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml').read_text())['robot']['manipulator']['joints']
             for joint_key in physical:
                 name = robot['joint_name_template'].format(key=joint_key)
                 topic = robot['joint_position_topic_template'].format(model=robot['entity_name'], joint=name)

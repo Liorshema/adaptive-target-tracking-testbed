@@ -38,7 +38,8 @@ def main():
     rows, result = samples['v2'], results['v2']
     t = np.array([row['time'] for row in rows]) - result['target_initialization_time']
     q = np.array([row['joints'] for row in rows])
-    physical = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())
+    description_path = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
+    physical = yaml.safe_load(description_path.read_text())
     names = list(physical['robot']['manipulator']['joints'])
     for index, name in enumerate(names):
         axes[1, 1].plot(t, q[:, index], label=name)

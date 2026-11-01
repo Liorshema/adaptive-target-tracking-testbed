@@ -20,6 +20,9 @@ from robot_simulation.factory.registry import ComponentRegistry
 from robot_simulation.integration.rk4 import RK4Integrator
 
 
+DYNAMICS_MODEL_NAMESPACE = 'robot_simulation.dynamics.target'
+
+
 def make_fight_flight(
     environment_field=None,
     tangential=None,
@@ -165,6 +168,9 @@ class SimulationFactory:
         factory.field_registry.register('base_relative_guidance', BaseRelativeGuidance)
         factory.integrator_registry.register('rk4', make_rk4)
 
+        from robot_configuration.model_registration import discover_models
+
+        discover_models(factory.dynamics_registry, DYNAMICS_MODEL_NAMESPACE, data['dynamics'])
         return factory
 
     def create(

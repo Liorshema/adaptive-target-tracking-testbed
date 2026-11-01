@@ -81,8 +81,8 @@ def wait_until(predicate, label, timeout=25):
 
 try:
     OUT.mkdir(parents=True, exist_ok=True)
-    robot = yaml.safe_load(
-        (ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
+    description_path = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
+    robot = yaml.safe_load(description_path.read_text())['robot']
     deployment = yaml.safe_load(
         (ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
     hold = yaml.safe_load(

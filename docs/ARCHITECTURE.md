@@ -252,7 +252,7 @@ time. Its rigid conversion assumes fixed inertial frames; moving-frame transport
 terms are unsupported. Optical forward is tracking-frame +X; generic image-camera
 projection uses optical +Z and needs an explicit camera transform when integrated.
 
-Physical geometry/limits come from `robot_description/config/robot/robot.yaml`.
+Physical geometry/limits come from `robot_description/config/robots/mobile_manipulator.yaml`.
 Gazebo, model construction, control safety, estimator conditioning and actuator
 startup read/derive that source. Simulation owns PID/holding/recovery policy;
 control owns task radius/weights and the current base command envelope. No new

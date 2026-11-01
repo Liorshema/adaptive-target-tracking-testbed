@@ -20,7 +20,7 @@ from robot_models.whole_body.kinematics import WholeBodyKinematics
 
 def create_robot_model():
     """Build the configured tracking model without depending on orchestration."""
-    path = Path(__file__).parents[2] / 'robot_description/config/robot/robot.yaml'
+    path = Path(__file__).parents[2] / 'robot_description/config/robots/mobile_manipulator.yaml'
     description = yaml.safe_load(path.read_text())
     config = robot_configuration_from_description(description)
     registry = create_project_registries()

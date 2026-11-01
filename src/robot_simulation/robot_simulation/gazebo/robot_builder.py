@@ -51,7 +51,7 @@ def configure_robot_model(model, description, config, hold):
 
     Holding targets use robot-description joint keys. Gazebo joint names are
     resolved using the externally configured name template and checked against
-    the rendered model. Limits and effort saturation come from robot.yaml.
+    the rendered model. Limits and effort saturation come from the physical description.
     JointPositionController.initial_position sets the startup target; joints
     physically converge under PID effort, without modifying link geometry.
     """

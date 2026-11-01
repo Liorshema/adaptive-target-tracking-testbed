@@ -49,7 +49,7 @@ def main():
     os.environ['GZ_IP'] = '127.0.0.1'
     os.environ['ROS_LOG_DIR'] = str(args.output / 'ros-log')
     config = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
-    physical = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
+    physical = yaml.safe_load((ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml').read_text())['robot']
     control = load_control_parameters(ROOT / 'src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     joint_names = [config['joint_name_template'].format(key=key)
                    for key in physical['manipulator']['joints']]

@@ -4,6 +4,9 @@ Bounded experiment workers independent of clients, with persistent provenance.
 Workers delegate all ROS/Gazebo ownership to the existing M08 runner. Stopping
 requests cooperative cancellation, preserving its normal finally/cleanup path.
 """
+from contextlib import contextmanager
+import fcntl
+import signal
 from datetime import datetime
 from datetime import timezone
 import json
@@ -31,31 +34,122 @@ class ExperimentJobs:
             raise ValueError('job ID must be a canonical UUID')
         return self.directory/identifier
 
-    def start(self, catalog, identifier, revision=None, *, output=None, runtime_overrides=None):
-        # Validate before reserving a job or acquiring any simulator process.
-        spec = catalog.prepare(
-            identifier, revision, output=output, runtime_overrides=runtime_overrides)
-        job_id = str(uuid.uuid4())
-        directory = self._path(job_id)
-        directory.mkdir(parents=True)
-        request = {'job_id': job_id, 'record': spec['experiment_definition'],
-                   'catalog': str(catalog.path), 'output': str(spec['output']['directory']),
-                   'runtime_overrides': runtime_overrides or {}}
-        write_json(directory/'request.json', request)
-        write_json(directory/'status.json', {
-            'job_id': job_id, 'state': 'queued',
-            'experiment_identity': spec['experiment_identity'],
-            'created_utc': datetime.now(timezone.utc).isoformat()})
+    @contextmanager
+    def _preview_lock(self):
+        self.directory.mkdir(parents=True, exist_ok=True)
+        with (self.directory/'simulation.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try: yield
+            finally: fcntl.flock(lock, fcntl.LOCK_UN)
+
+    def preview_status(self, identifier=None):
+        pointer=self.directory/'simulation.json'
+        if identifier is None:
+            if not pointer.exists():
+                return {'state':'closed','job_id':None,'kind':'simulation',
+                        'cleanup_complete':True,'error':None}
+            identifier=json.loads(pointer.read_text())['job_id']
+        request=json.loads((self._path(identifier)/'request.json').read_text())
+        if request.get('kind')!='simulation':
+            raise ValueError('Job is not an interactive simulation')
+        return self.status(identifier)
+
+    def _preview_blocks(self):
+        status=self.preview_status()
+        return bool(status['job_id'] and (
+            status['state'] in {'opening','paused','running','closing','worker_lost'}
+            or not status.get('cleanup_complete',False)))
+
+    def start(self, catalog, identifier, revision=None, *, output=None, runtime_overrides=None,
+              preview_id=None):
+        # The preview shares this existing owner, not a competing process engine.
+        with self._preview_lock():
+            # Preflight before closing anything: an invalid Play must preserve preview.
+            spec=catalog.prepare(identifier, revision, output=output,
+                                 runtime_overrides=runtime_overrides)
+            if spec['runtime'].get('gui'):
+                from .simulation import display_capabilities
+                display=display_capabilities()
+                if not display['available']: raise ValueError(display['reason'])
+            extra={}
+            if preview_id is not None:
+                current=self.preview_status()
+                if (current.get('job_id') != preview_id or current['state'] != 'paused'
+                        or current.get('experiment_identity') != spec['experiment_identity']):
+                    raise ValueError('Play requires the exact paused saved revision; Close before changing selection')
+                if not spec['runtime'].get('gui'):
+                    raise ValueError('Preview handoff requires a visible scored GUI')
+                closed=self.stop(preview_id)
+                if closed['state'] != 'closed' or closed.get('cleanup_complete') is not True:
+                    raise ValueError('Preview cleanup unresolved; no scored Run was started')
+                extra['handoff_from']=preview_id
+            if self._preview_blocks():
+                raise ValueError('Close the interactive simulation and verify cleanup before Run')
+            return self._create(catalog,spec,runtime_overrides or {},**extra)
+
+    def start_simulation(self,catalog,identifier,revision,*,variant,seed=None):
+        from .simulation import display_capabilities
+        display=display_capabilities()
+        if not display['available']: raise ValueError(display['reason'])
+        with self._preview_lock():
+            current=self.preview_status()
+            if self._preview_blocks():
+                if current['state'] in {'opening','paused','running'} and (
+                    current.get('experiment_identity',{}).get('id')==identifier
+                    and current['experiment_identity']['revision']==revision
+                    and current.get('variant')==variant
+                    and (seed is None or current.get('seed')==seed)):
+                    return current
+                raise ValueError('Close the existing simulation and resolve cleanup before restart')
+            for path in self.directory.glob('*/request.json'):
+                state=self.status(path.parent.name)
+                if state['state'] in {'queued','running','worker_lost'}:
+                    raise ValueError('Close/cancel the active Job before opening a preview')
+            runtime={'enable_actuation':False,'gui':True}
+            spec=catalog.prepare(identifier,revision,output=self.directory/'preview',
+                                 runtime_overrides=runtime)
+            if variant not in {v['name'] for v in spec['variants']}:
+                raise ValueError('Select a saved variant for the simulation')
+            seed=spec['seeds'][0] if seed is None else seed
+            if type(seed) is not int or seed not in spec['seeds']:
+                raise ValueError('Select a seed from the saved revision')
+            owner=psutil.Process()
+            return self._create(catalog,spec,runtime,kind='simulation',variant=variant,seed=seed,
+                                owner={'pid':owner.pid,'created':owner.create_time()})
+
+    def _spawn_worker(self,directory):
+        with (directory/'worker.log').open('x') as log:
+            process=subprocess.Popen(
+                [sys.executable,'-m','robot_experiments.jobs','--worker',str(directory)],
+                stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
         try:
-            with (directory/'worker.log').open('x') as log:
-                process = subprocess.Popen(
-                    [sys.executable, '-m', 'robot_experiments.jobs', '--worker', str(directory)],
-                    stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-            write_json(directory/'process.json', {'pid': process.pid,
-                       'created': psutil.Process(process.pid).create_time()})
+            write_json(directory/'process.json',{'pid':process.pid,
+                       'created':psutil.Process(process.pid).create_time()})
         except Exception as error:
-            write_json(directory/'status.json', {
-                'job_id': job_id, 'state': 'failed', 'error': str(error)})
+            raise RuntimeError('Worker spawned but identity recording failed; cleanup unknown') from error
+
+    def _create(self,catalog,spec,runtime,**extra):
+        job_id=str(uuid.uuid4());directory=self._path(job_id);directory.mkdir(parents=True)
+        request={'job_id':job_id,'record':spec['experiment_definition'],
+                 'catalog':str(catalog.path),'output':str(spec['output']['directory']),
+                 'runtime_overrides':runtime,**extra}
+        write_json(directory/'request.json',request)
+        preview=extra.get('kind')=='simulation'
+        status={'job_id':job_id,'state':'opening' if preview else 'queued',
+                'experiment_identity':spec['experiment_identity'],
+                'created_utc':datetime.now(timezone.utc).isoformat()}
+        if 'handoff_from' in extra:
+            status['handoff_from']=extra['handoff_from']
+        if preview:
+            status.update(kind='simulation',variant=extra['variant'],seed=extra['seed'],
+                          enable_actuation=False,gui=True,cleanup_complete=False)
+            write_json(self.directory/'simulation.json',{'job_id':job_id})
+        write_json(directory/'status.json',status)
+        try: self._spawn_worker(directory)
+        except Exception as error:
+            status.update(state='error' if preview else 'failed',error=str(error),
+                          cleanup_complete=isinstance(error,OSError))
+            write_json(directory/'status.json',status)
             raise
         return self.status(job_id)
 
@@ -64,7 +158,7 @@ class ExperimentJobs:
         status = json.loads((directory/'status.json').read_text())
         status['artifacts'] = str(directory)
         status['stop_requested'] = (directory/'stop.request').exists()
-        if status['state'] in {'queued', 'running'} and (directory/'process.json').exists():
+        if status['state'] in {'queued', 'opening', 'paused', 'running', 'closing'} and (directory/'process.json').exists():
             owner = json.loads((directory/'process.json').read_text())
             if not self._alive(owner):
                 status.update(
@@ -84,7 +178,7 @@ class ExperimentJobs:
     def stop(self, identifier, *, timeout=25.):
         directory = self._path(identifier)
         status = self.status(identifier)
-        if status['state'] not in {'queued', 'running'}:
+        if status['state'] not in {'queued', 'opening', 'paused', 'running', 'closing'}:
             return status
         # A cooperative request is idempotent. It cannot asynchronously interrupt
         # native launch cleanup, even when clients retry or stop concurrently.
@@ -92,7 +186,7 @@ class ExperimentJobs:
         deadline = time.monotonic()+timeout
         while time.monotonic() < deadline:
             status = self.status(identifier)
-            if status['state'] not in {'queued', 'running'}:
+            if status['state'] not in {'queued', 'opening', 'paused', 'running', 'closing'}:
                 return status
             time.sleep(.05)
         raise TimeoutError(
@@ -128,7 +222,14 @@ def worker(directory):
     if record['sha256'] != definition_hash(record['definition'], record['overrides']):
         raise ValueError('job definition fingerprint mismatch')
     status = json.loads((directory/'status.json').read_text())
-    status.update(state='running', started_utc=datetime.now(timezone.utc).isoformat())
+    preview=request.get('kind')=='simulation'
+    if preview:
+        def request_close(signum,frame):
+            (directory/'stop.request').touch(exist_ok=True)
+        signal.signal(signal.SIGTERM,request_close)
+        signal.signal(signal.SIGINT,request_close)
+    status.update(state='opening' if preview else 'running',
+                  started_utc=datetime.now(timezone.utc).isoformat())
     write_json(directory/'status.json', status)
     code = 1
     try:
@@ -139,15 +240,29 @@ def worker(directory):
         spec = catalog._prepare(record, request['output'], request['runtime_overrides'])
         if (directory/'stop.request').exists():
             raise KeyboardInterrupt()
+        if preview:
+            from .simulation import run_preview
+            return run_preview(spec,request,directory,catalog.share,status,
+                               lambda:(directory/'stop.request').exists())
         from .runner import run_experiment
-        study, code = run_experiment(spec, catalog.share,
-                                     cancel_requested=lambda: (directory/'stop.request').exists())
+
+        def study_created(study):
+            status['study'] = str(study)
+            write_json(directory/'status.json', status)
+
+        study, code = run_experiment(
+            spec, catalog.share, on_study_created=study_created,
+            cancel_requested=lambda: (directory/'stop.request').exists())
         status.update(study=str(study), state='cancelled' if (directory/'stop.request').exists()
                       else 'completed' if code in (0, 3) else 'failed', exit_code=code)
     except KeyboardInterrupt:
-        status.update(state='cancelled', error='interrupted', exit_code=1)
+        status.update(state='closed' if preview else 'cancelled', error='interrupted',
+                      cleanup_complete=True,exit_code=1)
     except Exception as error:
-        status.update(state='failed', error=f'{type(error).__name__}: {error}', exit_code=1)
+        status.update(state='error' if preview else 'failed',
+                      error=f'{type(error).__name__}: {error}',
+                      cleanup_complete=(status.get('cleanup_complete',False)
+                                        or 'launch_owner' not in status),exit_code=1)
     finally:
         status['ended_utc'] = datetime.now(timezone.utc).isoformat()
         write_json(directory/'status.json', status)

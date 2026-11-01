@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import hashlib
+import os
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
@@ -43,23 +44,51 @@ def resolve_system_resource(reference, base, share):
 
     catalog = Path(share('robot_experiments')) / 'config/experiments.yaml'
     aliases = load_resource_group(catalog).get('legacy_resources', {})
-    key = None
-    if isinstance(reference, dict) and set(reference) == {'package', 'path'}:
-        key = reference['package'] + ':' + reference['path']
-    elif isinstance(reference, (str, Path)):
-        candidate = Path(reference)
-        if not candidate.is_absolute():
-            candidate = Path(base) / candidate
-        candidate = candidate.resolve()
-        for package in ['robot_experiments', 'robot_bringup',
-                        'robot_simulation', 'robot_description']:
-            root = Path(share(package)).resolve()
-            if candidate.is_relative_to(root):
-                key = package + ':' + str(candidate.relative_to(root))
-                break
-    if key in aliases:
-        reference = aliases[key]
-    path = materialize_resource(reference, base, share)
+
+    def legacy_key(value, origin):
+        if isinstance(value, dict) and set(value) == {'package', 'path'}:
+            return value['package'] + ':' + value['path']
+        if isinstance(value, (str, Path)):
+            candidate = Path(value)
+            if not candidate.is_absolute():
+                candidate = Path(origin) / candidate
+            # Identify the declared filename before following a leaf symlink;
+            # otherwise a conflicting old file could evade its checksum guard.
+            candidate = Path(os.path.abspath(candidate))
+            candidates = (candidate, candidate.parent.resolve() / candidate.name)
+            for package in ['robot_experiments', 'robot_bringup',
+                            'robot_simulation', 'robot_description']:
+                declared = Path(os.path.abspath(share(package)))
+                for root in (declared, declared.resolve()):
+                    for path in candidates:
+                        if path.is_relative_to(root):
+                            key = package + ':' + str(path.relative_to(root))
+                            if key in aliases:
+                                return key
+        return None
+
+    def resolve_alias(value, origin):
+        key = legacy_key(value, origin)
+        if key not in aliases:
+            return materialize_resource(value, origin, share)
+        alias = deepcopy(aliases[key])
+        guarded = isinstance(alias, dict) and 'sha256' in alias
+        expected = alias.pop('sha256') if guarded else None
+        if guarded and (not isinstance(expected, str)
+                        or re.fullmatch(r'[0-9a-f]{64}', expected) is None):
+            raise ValueError(f'legacy resource {key}: invalid SHA256 guard')
+        target = materialize_resource(alias, origin, share)
+        if guarded:
+            package, relative = key.split(':', 1)
+            original = Path(share(package)) / relative
+            for candidate in (target, original):
+                if (candidate.is_file()
+                        and hashlib.sha256(candidate.read_bytes()).hexdigest() != expected):
+                    raise ValueError(f'legacy resource {key}: physical/source SHA256 mismatch: '
+                                     f'{candidate}')
+        return target
+
+    path = resolve_alias(reference, base)
     # Saved external manifests keep their declaration origins while migrating only
     # the bounded historical resource names. Reuse the existing M07 resolver.
     if path.suffix in {'.yaml', '.yml'}:
@@ -68,28 +97,43 @@ def resolve_system_resource(reference, base, share):
             from robot_bringup.factory.system_configuration import _resolve_references
             from robot_experiments.composition import _store_document, resource_sources
             from robot_experiments.reporting import plain
-            changed = [False]
+            records = resource_sources(path)
 
-            def migrate(value):
+            def migrate(value, origin):
+                if legacy_key(value, origin) in aliases:
+                    target = resolve_alias(value, origin)
+                    for record in [*resource_sources(catalog), *resource_sources(target)]:
+                        if record not in records:
+                            records.append(record)
+                    return str(target)
                 if isinstance(value, dict):
-                    if set(value) == {'package', 'path'}:
-                        alias = aliases.get(value['package'] + ':' + value['path'])
-                        if alias is not None:
-                            changed[0] = True
-                            return str(materialize_resource(alias, base, share))
-                    return {k: migrate(v) for k, v in value.items()}
+                    if {'package', 'path'} <= value.keys():
+                        return value  # preserve unrelated/unknown package resource declarations
+                    return {k: migrate(v, origin) for k, v in value.items()}
                 if isinstance(value, list):
-                    return [migrate(v) for v in value]
+                    return [migrate(v, origin) for v in value]
                 return value
 
             def transform(value, origin):
-                return _resolve_references(migrate(value), origin, share)
+                for record in resource_sources(origin):
+                    if record not in records:
+                        records.append(record)
+                return _resolve_references(migrate(value, origin.parent), origin, share)
 
-            if any((isinstance(v, dict) and set(v) == {'package', 'path'}
-                    and v['package'] + ':' + v['path'] in aliases)
-                   for v in _mapping_values(document)):
+            found = [False]
+
+            def detect(value, origin):
+                if any(legacy_key(item, origin.parent) in aliases
+                       for item in _mapping_values(value)):
+                    found[0] = True
+                return value
+
+            # Relative inherited references belong to each declaring file, not
+            # the merged child's directory. Detect before resolving any owners.
+            load_yaml(path, transform=detect)
+            if found[0]:
                 document = load_yaml(path, transform=transform)
-                return _store_document(plain(document), resource_sources(path))
+                return _store_document(plain(document), records)
     return path
 
 
@@ -220,10 +264,13 @@ def load_experiment(path, share, output_override=None):
         ex['output']['directory'] = (
             Path(output_override or ex['output']['directory']).expanduser().resolve()
         )
-        runtime = mapping(ex.get('runtime', {}), {'enable_actuation'}, set(), 'runtime')
+        runtime = mapping(ex.get('runtime', {}), {'enable_actuation', 'gui'}, set(), 'runtime')
         if 'enable_actuation' in runtime and type(runtime['enable_actuation']) is not bool:
             raise ValueError('runtime.enable_actuation: expected boolean')
-        ex['runtime'] = {'enable_actuation': runtime.get('enable_actuation', False)}
+        if 'gui' in runtime and type(runtime['gui']) is not bool:
+            raise ValueError('runtime.gui: expected boolean')
+        ex['runtime'] = {'enable_actuation': runtime.get('enable_actuation', False),
+                         'gui': runtime.get('gui', False)}
         execution = mapping(ex.get('execution', {}), DEFAULT_EXECUTION, set(), 'execution')
         ex['execution'] = {**DEFAULT_EXECUTION, **execution}
         for key in DEFAULT_EXECUTION.keys() - {'failure_policy', 'record_actuator_trace'}:
@@ -270,7 +317,7 @@ def load_experiment(path, share, output_override=None):
                 overrides={
                     'enable_actuation': str(ex['runtime']['enable_actuation']).lower(),
                     'publish_ground_truth': 'true',
-                    'gui': 'false',
+                    'gui': str(ex['runtime']['gui']).lower(),
                     'visualize_tracking': 'false',
                 },
             )
@@ -301,7 +348,8 @@ def _write(path, data):
     return str(path)
 
 
-def materialize_run(variant, seed, directory, share, runtime, record_actuator_trace=False):
+def materialize_run(variant, seed, directory, share, runtime, record_actuator_trace=False,
+                    *, start_running=None):
     """
     Snapshot selected owner values and wire the supported sensor RNG to this seed.
 
@@ -389,6 +437,11 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
         return value
 
     original_manifest = deepcopy(plan['manifest'])
+    from robot_estimation.configuration import estimation_configuration_path
+
+    # Algorithm defaults are resolved outside grouped physical resources. Preserve
+    # their declaring owner too; execution uses the complete frozen role mappings.
+    read(estimation_configuration_path())
     if Path(plan['source']).is_file():
         read(plan['source'])
     if Path(plan['profile_path']).is_file():
@@ -493,6 +546,10 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
     sim['world']['terrain_config'] = _write(
         inputs / 'terrain.yaml', read(sim['world']['terrain_config'])
     )
+    if start_running is not None:
+        if type(start_running) is not bool:
+            raise ValueError('start_running must be a boolean')
+        sim['gazebo']['start_running'] = start_running
     sim['paths']['base'] = 'config'
     simulation_file = inputs / 'simulation.yaml'
     _write(simulation_file, sim)
@@ -584,7 +641,7 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
             **plan['runtime'],
             'enable_actuation': runtime['enable_actuation'],
             'publish_ground_truth': True,
-            'gui': False,
+            'gui': runtime.get('gui', False),
             'visualize_tracking': False,
         },
     }

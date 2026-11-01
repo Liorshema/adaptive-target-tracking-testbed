@@ -1,0 +1,18 @@
+# Test fixtures only; these IDs never enter production owner defaults/inventory.
+robot_simulation:
+  dynamics:
+    example_spring:
+      parameters: {stiffness: 0.4, damping: 0.2}
+robot_prediction:
+  predictors:
+    example_forecast:
+      parameters: {acceleration: 0.1}
+robot_control:
+  controllers:
+    example_feedback:
+      parameters: {gain: 0.02}
+robot_estimation:
+  estimators:
+    example_fading_kf:
+      parameters:
+        fading_factor: 1.5

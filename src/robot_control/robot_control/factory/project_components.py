@@ -40,6 +40,12 @@ def create_project_registries(configuration_path=None) -> dict[str, ComponentReg
 
     registries['task'] = ComponentRegistry()
     _register_algorithms(registries, configuration_path)
+    from robot_configuration.model_registration import discover_models
+    from robot_configuration.yaml_loader import load_yaml
+    from robot_control.configuration import control_configuration_path
+
+    owner = load_yaml(configuration_path or control_configuration_path())
+    discover_models(registries['controller'], 'robot_control.controllers', owner['controllers'])
     return registries
 
 
@@ -115,6 +121,7 @@ def _register_algorithms(registries, configuration_path):
             description=name.replace('_', ' '),
             capabilities={
                 'deployable': True,
+                'task_binding': 'selection_matrix' if name == 'jacobian' else 'task',
                 'command_layout': 'body_base_joint_velocity',
                 'command_dimension': 'base_velocity_dimension + joint_count',
                 'safety': 'independent final projection; WLS shares feasible bounds',
@@ -192,5 +199,6 @@ def _register_algorithms(registries, configuration_path):
             'deployable': True,
             'spatial_dimension': 3,
             'task_dimension': 'selection_matrix row count',
+            'selection_parameter': 'selection_matrix',
         },
     )

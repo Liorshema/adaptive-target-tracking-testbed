@@ -53,7 +53,8 @@ def main():
                       ESTIMATION_TIMING_LOG=str(args.output.resolve() / 'processing.json'))
     os.environ.setdefault('ROS_DOMAIN_ID', '132')
     robot = load_yaml(ROOT / 'src/robot_simulation/config/gazebo/robot.yaml')['robot']
-    description = load_yaml(ROOT / 'src/robot_description/config/robot/robot.yaml')['robot']
+    description_path = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
+    description = load_yaml(description_path)['robot']
     control = load_control_parameters(ROOT / 'src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     names = [robot['joint_name_template'].format(key=key) for key in description['manipulator']['joints']]
     mount = np.eye(4)

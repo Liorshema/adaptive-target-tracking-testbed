@@ -1,15 +1,22 @@
-# Mathematical defaults only. Scenario selections and explicit overrides stay external.
+# Mathematical defaults only; scenario selections and overrides stay external.
+# Target state: [position_world (m), velocity_world (m/s)].
+# With delta = target - tracking_position_world, d = ||delta||,
+# direction = delta / sqrt(d^2 + distance_epsilon^2):
+# p_dot = v; v_dot = radial(d)*direction - damping*v + external acceleration.
+# Positive radial(d) points away from the tracker; negative points toward it.
 dynamics:
   fight_flight:
     parameters:
-      alpha: 1.0
-      preferred_distance: 1.0
-      damping: 0.5
-      distance_epsilon: 1.0e-6
+      # radial(d) = alpha*(d - preferred_distance).
+      alpha: 1.0  # s^-2; slope of radial acceleration versus distance
+      preferred_distance: 1.0  # m; zero radial interaction, not a hard constraint
+      damping: 0.5  # s^-1; velocity-proportional drag
+      distance_epsilon: 1.0e-6  # m; smooth direction normalization near coincidence
   saturated_fight_flight:
     parameters:
-      a_max: 0.15
-      transition_length: 0.15
-      preferred_distance: 1.0
-      damping: 0.5
-      distance_epsilon: 1.0e-6
+      # radial(d) = a_max*tanh((d - preferred_distance)/transition_length).
+      a_max: 0.15  # m/s^2; bound on radial scalar, excluding drag/external fields
+      transition_length: 0.15  # m; transition width; local slope is a_max/length
+      preferred_distance: 1.0  # m
+      damping: 0.5  # s^-1
+      distance_epsilon: 1.0e-6  # m

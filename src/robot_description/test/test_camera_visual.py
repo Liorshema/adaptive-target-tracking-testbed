@@ -15,7 +15,7 @@ import yaml
 
 
 PACKAGE = Path(__file__).resolve().parents[1]
-CONFIG = PACKAGE / 'config' / 'robot' / 'robot.yaml'
+CONFIG = PACKAGE / 'config' / 'robots' / 'mobile_manipulator.yaml'
 # Complete expanded bf71fdb URDF, excluding only visuals/materials. This includes
 # joint origins, connectivity, axes, limits, dynamics, collisions and inertials.
 M08_PHYSICAL_SHA256 = (

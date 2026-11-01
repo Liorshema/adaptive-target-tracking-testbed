@@ -47,7 +47,7 @@ def test_mapping_reference_origin_is_declaration_directory(tmp_path):
         lambda package: Path(__file__).resolve().parents[2] /
         package)
     document = load_yaml(source)
-    description = share('robot_description') / 'config/robot/robot.yaml'
+    description = share('robot_description') / 'config/robots/mobile_manipulator.yaml'
     document['robot']['description'] = 'description.yaml'
     (tmp_path / 'description.yaml').symlink_to(description)
     assert hasattr(configuration, 'assemble_system_configuration')

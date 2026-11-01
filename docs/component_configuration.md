@@ -2,7 +2,7 @@ Current scenario composition and direct-launch migration: [experiment compositio
 
 # Canonical component configuration and extension contracts
 
-Updated 2026-10-27. This guide describes Task 1's implemented architecture; the
+Updated 2026-10-28. This guide describes canonical ownership and its implemented extensions; the
 [experiment guide](experiment_management.md) owns catalog, launch and history
 contracts. Large-scale scenario consolidation is reserved for Task 2. No dashboard
 or arbitrary YAML-driven code loading is introduced.
@@ -11,7 +11,7 @@ or arbitrary YAML-driven code loading is introduced.
 
 | Owner | Canonical document and top-level groups |
 |---|---|
-| Estimation | `robot_estimation/config/estimation.yaml`: `robot_estimators`, `target_estimators`, `transport`, `runtime`, `profiles` |
+| Estimation | `robot_estimation/config/estimation.yaml`: `schema_version`, `estimators`, `process_models`, `measurement_models`, `initialization`, `deployment_adapters`, `bindings`, `transport`, `runtime`, `profiles` |
 | Prediction | `robot_prediction/config/prediction.yaml`: `prediction`, `monitoring`, `predictors`, `adaptations`, `fusions` |
 | Control | `robot_control/config/control.yaml`: `controllers`, `tasks`, `tracking`, `references`, `operating_bounds`, `transport`, `runtime` |
 | Simulation | `robot_simulation/config/dynamics.yaml`: `dynamics`; independent physics, sensing, actuation, fields and scenario resources remain |
@@ -38,10 +38,11 @@ selects `prediction.type`, `prediction.adaptation`, `prediction.fusion`,
 scenario selects its dynamics. Source defaults stay immutable during experiments.
 Mappings merge recursively; lists replace. Empty/false overrides remain meaningful.
 
-Estimation separates numerical robot/target groups from topics, frames, queueing,
-freshness and node settings. Disabled pose-aiding numerical options live under
-`robot_estimators.robot_ekf.optional_parameters`; the `pose_aiding` profile remains
-a selected calibration delta. Control separates DLS/WLS mathematics from Cartesian
+Estimation separates generic filter algorithms from process/measurement models,
+initialization, role adapters, transport and runtime. Named algorithm-free bindings
+are selected as resources; historical groups `robot_ekf` and `kalman` still project
+the same values. Disabled pose-aiding options belong to their process or deployment
+adapter groups; `pose_aiding` remains an explicitly selected calibration delta. Control separates DLS/WLS mathematics from Cartesian
 and Distance + Pointing tasks, tracking axes/radius/lookahead, reference generation,
 command envelopes, transport and runtime flags. Description-derived bounds are
 still injected from the selected physical robot, never copied into a controller
@@ -211,3 +212,137 @@ Final measurements, commands, source-change manifest and limitations are recorde
 in [the Task 1 validation report](validation/component_configuration.md).
 Local raw evidence is under `results/component_architecture/`; it is ignored and
 must accompany scientific results when transferred. It is not installed as code.
+
+## Optional mathematical APIs (Task B)
+
+The full `Dynamics`, `Predictor` and `Controller` interfaces remain authoritative.
+The following optional decorators return `ModelRegistration` argument bundles,
+not global registry entries. Parameters are mappings; numerical defaults are read
+only from the existing owning YAML.
+
+| Owner API | Mathematical function | Bounded contract |
+| --- | --- | --- |
+| `robot_simulation.dynamics.acceleration_model.acceleration_model(id, *, dimension, schema, required_context=(), frame_id='world', requirements=None)` | `(position, velocity, time, parameters, context) -> acceleration` | Cartesian `[p,v]`; simulation-stage time in seconds; model-local acceleration plus the existing environment exactly once; fixed world metres/seconds. Current deployment is 3D; other dimensions are library-only. |
+| `robot_prediction.baseline.stateless_model.predictor_model(id, *, parameters_schema, spatial_dimension=3)` | `(state, relative_horizons, parameters) -> states` | `[p,v]` in the same fixed input frame; offsets `dt*[1,...,horizon]`; packaged timestamps `input.timestamp + offsets`, without resampling. |
+| `robot_control.controllers.feedback_model.velocity_feedback_model(id, *, schema, selection_matrix, frame_id, mode=ControlMode.VELOCITY)` | `(error, jacobian, target_rate, robot_velocity, parameters) -> generalized_velocity` | Exact declared `CartesianVelocityTask` selection; `error_dot = J*u + target_rate`, current-minus-desired error; explicit task/safety injection; model-derived command dimension and velocity mode only. |
+
+Prediction arrays produce absent covariance/confidence. A function may return a
+mapping with `states` and optional genuine `covariance`/`confidence`, or a genuine
+`TrajectoryPrediction` whose absolute timestamps must equal the requested grid.
+Covariance is `(horizon, 2*d, 2*d)`, symmetric positive semidefinite; confidence is
+`(horizon,)` in `[0,1]`. Input covariance is validated but never silently propagated
+by these stateless functions. Prediction contracts contain no frame IDs, so the
+adapter cannot verify or transform frames. Use the full interface for richer
+state, history, adaptation, uncertainty propagation or other output structures.
+
+The controller rejects unsupported task/frame/mode, malformed/nonfinite/complex
+arrays and commands outside the injected owner's physical velocity envelope.
+The existing downstream safety still independently projects acceleration and joint
+position constraints. No physical limits or safety tolerances live in the adapter.
+It is a convenience API for uncomplicated Cartesian velocity feedback, not a
+replacement for DLS/WLS or arbitrary optimal-control interfaces.
+
+Adding a compatible model requires only:
+
+1. One trusted Python file under `robot_simulation/dynamics/target`,
+   `robot_prediction/baseline`, or `robot_control/controllers`. Decorate the function
+   and export the declaration in `COMPONENTS = (your_function,)` in that same file.
+2. One `<id>.parameters` group under `dynamics`, `predictors`, or `controllers` in
+   the corresponding canonical owner YAML. The declaration supplies a closed
+   parameter schema with types/bounds/units, without independent numerical defaults.
+3. Rebuild the owning package. Existing registry discovery and `run author discover`
+   expose the ID; select it in the same `components.target_dynamics`, `predictor`,
+   or `controller` slot and use existing owner parameter overrides. No factory,
+   bringup, node, runner, Catalog or recipe edits are needed for each new model.
+
+Owner factories enumerate their fixed trusted namespaces in sorted order, read
+explicit `COMPONENTS` tuples and call the existing `ComponentRegistry.register`.
+Duplicate IDs, missing defaults/metadata and invalid schemas/parameters reject.
+Experiment YAML never provides Python import paths. Declarations hold no numerical
+defaults or mutable registry; each factory receives detached owner values.
+`deployable` describes current adapter compatibility, while `runtime_validation`
+marks these extensions as unit-tested; registration does not certify Gazebo or
+real-hardware performance.
+
+The three short mathematical examples and their single test-default source live
+under `src/robot_experiments/test/model_fixtures/`. They are isolated fixtures,
+not installed production models. At Task B completion the production inventory contained 20 components.
+Tests exercise public `ExperimentAuthor` preview/validate/save/revise, actual
+construction, reset, parameter isolation and inventory restoration in both source
+and copied-install contexts. See `results/mathematical_models/` for evidence.
+
+At Task B completion estimator IDs/groups and role adapters were untouched: `robot_ekf` and `kalman`
+remain the public assignments. Future role-neutral algorithm/model binding needs
+its own estimator owner and compatibility migration; the shared declaration loader
+has no estimator-role assumptions. No dashboard, latent-state dynamics projection,
+analytical-trajectory engine, learned-model pipeline or optimal-control framework
+is introduced here.
+
+
+## Role-neutral estimation (Task E)
+
+`factory/algorithm_factory.py` registers the existing numerical `KalmanFilter` as
+`kf` and `ExtendedKalmanFilter` as `ekf`. Both operate on supplied state/model
+arrays and callables, with no role, ROS message, fixed dimension or experiment ID.
+Their core predict/update equations are unchanged. Initial distributions and
+callable contracts are validated; model output checks occur when evaluated,
+without modifying matrices or prematurely evaluating robot state-dependent Q.
+
+`factory/model_factory.py` registers process models (`robot_motion`, `target_cv`),
+measurement models (`robot_sensors`, `target_position`) and deployment adapters
+(`robot_state`, `target_state`) using the same `ComponentRegistry`. The existing
+role factory composes these with the selected algorithm. `RobotStateEstimator`
+now accepts an optional injected `filter_factory`; its old constructor fallback
+remains compatible. Sensor routing, pose acceptance/recovery and joint conditioning
+remain with that adapter. `TargetStateEstimator` retains its delegated filter.
+No estimator selection belongs to package defaults.
+
+| Canonical algorithm + supported deployment | Historical selection / parameter group |
+| --- | --- |
+| `ekf` + robot motion/sensors + robot adapter | `robot_ekf` → same `ekf` / `robot_state` binding |
+| `kf` + Cartesian CV/position + target adapter | `kalman` → same `kf` / `target_state` binding |
+
+The owner YAML contains algorithm parameter groups (currently empty intrinsic
+settings), physical model parameters, separate initial distributions and adapter
+settings. `bindings.robot_state` and `bindings.target_state` are named resources,
+not selected algorithms. Existing base-case group references supply these resources;
+legacy group names project to them. Transport/runtime/profile values and effective
+flat ROS snapshots are preserved. Old role-centered owner files and historical flat
+snapshots remain readable. Algorithm aliases never rewrite historical experiments.
+
+Robot continuous white-acceleration density amplitudes retain their integrated Q;
+target discrete acceleration standard deviation retains its distinct Q. Assumed
+measurement variances remain independent of simulated sensor noise. Physical joint
+bounds still come only from the selected robot description.
+
+Discovery exposes `estimator`, `estimation_process`, `estimation_measurement` and
+`estimation_adapter` families alongside existing role families. Role families expose
+only supported bindings (`ekf`/`robot_ekf`, `kf`/`kalman`); bare algorithms/models are
+not directly deployable. Current inventory: 14 families, 30 entries including the
+historical aliases. Scientific status remains conditional independently of capability.
+
+To register another compatible numerical algorithm, add a trusted file under
+`robot_estimation/filters` exporting `COMPONENTS` declarations and one owner
+`estimators.<id>.parameters` group. Sorted Task B discovery loads it into the same
+registry. A role facade is available only when its declared model capabilities and
+constructor/update dependencies satisfy the existing adapter contract. Generic
+library reuse does not advertise production robot KF or target EKF support.
+Task E.1 transports nonempty intrinsic settings as independent per-role
+`algorithm_parameters` mappings. Authoring uses the same component schemas and
+recursive override rules: owner defaults, inherited settings, then local edits.
+M07 resolves the complete mapping; existing run inputs freeze
+`robot_algorithm_parameters` and `target_algorithm_parameters` as ROS STRING JSON
+objects containing canonical `algorithm` identity and `parameters`. Reconstruction
+validates the frozen map and constructs with `use_defaults=False`; newer defaults
+never fill its missing leaves. Historical missing fields remain supported only
+for empty-setting algorithms. Nonempty settings without a frozen transport reject
+at the ROS boundary. Schemas still control whether zero, false and empty values
+are valid; the existing typed declaration schema does not support null settings.
+Programmatic model registries can be injected into `create_estimation_registries`;
+unsupported physical/layout/source/frame/covariance combinations must still pass
+actual owner construction and M07 preflight. No YAML-controlled imports are added.
+
+See [experiment bindings](experiment_composition.md#estimator-algorithms-and-bindings)
+and [Task E.1 evidence](validation/estimation_parameters.md). Existing algorithms,
+PID/actuation, physical limits, predictor/controller mathematics and runtime gates
+were not tuned. Dashboard and new sensors/filters remain outside this task.

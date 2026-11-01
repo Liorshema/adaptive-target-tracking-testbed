@@ -21,7 +21,7 @@ from robot_models.task_space.distance_pointing import DistancePointingGeometry
 from robot_models.whole_body.jacobian import WholeBodyJacobian
 
 ROOT = Path(__file__).resolve().parents[2]
-DESCRIPTION = ROOT / 'src/robot_description/config/robot/robot.yaml'
+DESCRIPTION = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
 DEPLOYMENT = ROOT / 'src/robot_simulation/config/gazebo/robot.yaml'
 PARAMETERS = load_robot_model_parameters(DESCRIPTION)
 ROBOT = create_robot_model(PARAMETERS)

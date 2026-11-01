@@ -82,10 +82,10 @@ def verify(prefix):
                        for p in share.rglob('*')), share
     share = Path(get_package_share_directory('robot_description'))
     urdf = subprocess.run(['xacro', str(share / 'urdf/robot.urdf.xacro'),
-                           'config_file:='+str(share / 'config/robot/robot.yaml')],
+                           'config_file:='+str(share / 'config/robots/mobile_manipulator.yaml')],
                           check=True, capture_output=True, text=True).stdout
     robot = ET.fromstring(urdf)
-    physical = yaml.safe_load((share / 'config/robot/robot.yaml').read_text())['robot']['manipulator']['joints']
+    physical = yaml.safe_load((share / 'config/robots/mobile_manipulator.yaml').read_text())['robot']['manipulator']['joints']
     for key, limits in physical.items():
         joint = robot.find("joint[@name='"+key+"_joint']")
         assert joint is not None

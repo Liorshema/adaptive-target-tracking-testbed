@@ -41,7 +41,7 @@ def main():
     if args.output.exists():
         raise FileExistsError(args.output)
     """Solve the actual configured objective at four measured arm yaw positions."""
-    description_path = ROOT / 'src/robot_description/config/robot/robot.yaml'
+    description_path = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
     control_path = ROOT / 'src/robot_control/config/control.yaml'
     from robot_experiments.launching import launch_profile
     share = lambda package: ROOT / 'src' / package

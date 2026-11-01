@@ -14,12 +14,12 @@ CONFIG = Path(__file__).parents[1] / 'config' / 'estimation.yaml'
 def test_canonical_configuration_and_group_adapter_preserve_values(tmp_path):
     from robot_estimation.configuration import load_estimation_parameters
     document = yaml.safe_load(CONFIG.read_text())
-    assert 'robot_estimators' in document and 'transport' in document
+    assert 'estimators' in document and 'transport' in document
     robot = load_estimation_parameters(CONFIG, 'robot_ekf')['estimation_node']['ros__parameters']
     assert robot['linear_acceleration_noise_std'] == .1
     assert robot['wheel_odometry_topic'] == '/wheel/odometry'
     assert robot['robot_initial_state'] == [0.] * 13
-    assert 'wheel_odometry_topic' not in document['robot_estimators']['robot_ekf']['parameters']
+    assert 'wheel_odometry_topic' not in document['process_models']['robot_motion']['parameters']
     aided = load_estimation_parameters(CONFIG, ['robot_ekf', 'pose_aiding'])['estimation_node']['ros__parameters']
     assert aided['reorder_holdback'] == .08 and aided['linear_acceleration_noise_std'] == .3
     legacy = tmp_path / 'legacy.yaml'
@@ -32,7 +32,7 @@ def test_canonical_configuration_and_group_adapter_preserve_values(tmp_path):
 def test_discovery_defaults_isolation_and_numerical_construction():
     registries = factory.create_estimation_registries()
     registry = registries['target_estimator']
-    assert registry.names() == ('kalman',)
+    assert registry.names() == ('kalman', 'kf')
     info = registry.describe('kalman')
     assert info['capabilities']['state_layout'] == 'position_velocity'
     assert info['schema']['properties']['target_acceleration_noise_std']['unit'] == 'm/s^2'

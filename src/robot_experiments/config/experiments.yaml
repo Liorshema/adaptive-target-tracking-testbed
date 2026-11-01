@@ -1157,7 +1157,7 @@ compositions:
       type: mobile_manipulator
       description:
         package: robot_description
-        path: config/robot/robot.yaml
+        path: config/robots/mobile_manipulator.yaml
       model:
         base: differential_drive
         manipulator: serial_arm
@@ -1605,7 +1605,7 @@ resources:
   robot_wrist15:
     base:
       package: robot_description
-      path: config/robot/robot.yaml
+      path: config/robots/mobile_manipulator.yaml
     overrides:
       robot:
         manipulator:
@@ -1616,7 +1616,7 @@ resources:
   robot_wrist30:
     base:
       package: robot_description
-      path: config/robot/robot.yaml
+      path: config/robots/mobile_manipulator.yaml
     overrides:
       robot:
         manipulator:
@@ -2775,6 +2775,10 @@ direct_launch:
             - 3.0
             - 2.0
 legacy_resources:
+  robot_description:config/robot/robot.yaml:
+    package: robot_description
+    path: config/robots/mobile_manipulator.yaml
+    sha256: fd6877be3fb2c8cc20d13c85ddb776e9aad1657d90afa1c6014dce68a0694c76
   robot_description:config/robot/robot_wrist15.yaml:
     package: robot_experiments
     path: config/experiments.yaml

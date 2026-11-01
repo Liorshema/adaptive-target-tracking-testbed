@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>robot_dashboard</name>
+  <version>0.1.0</version>
+  <description>Optional experiment authoring, execution and recorded-results client.</description>
+  <maintainer email="liorshema@gmail.com">user</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>robot_experiments</exec_depend>
+  <exec_depend>python3-dash-pip</exec_depend>
+  <exec_depend>python3-plotly</exec_depend>
+  <test_depend>python3-pytest</test_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>

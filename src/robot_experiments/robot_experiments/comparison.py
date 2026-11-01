@@ -141,6 +141,18 @@ def _metric_evidence(run: dict, view: dict) -> list[str]:
     return reasons
 
 
+def metric_comparison_reasons(first: dict, second: dict) -> list[str]:
+    """Share the existing recorded metric-definition/unit guards with session clients."""
+    reasons = []
+    if first.get('metrics', {}).get('contract') != second.get('metrics', {}).get('contract'):
+        reasons.append('metric definitions mismatch')
+    first_metrics = first.get('metrics', {}).get('metrics', {})
+    for name, metric in second.get('metrics', {}).get('metrics', {}).items():
+        if name in first_metrics and metric.get('unit') != first_metrics[name].get('unit'):
+            reasons.append(f'metric {name} units mismatch')
+    return reasons
+
+
 def scientific_reasons(runs: list[dict], variants: list[str], seeds: list[int],
                        policy: dict, *, configuration_only: bool = False) -> list[str]:
     """Recompute from original evidence; do not trust a supplied masked hash."""
@@ -185,12 +197,8 @@ def scientific_reasons(runs: list[dict], variants: list[str], seeds: list[int],
                     reasons.append(f'seed {seed}: {field} mismatch: ' + ', '.join(paths))
             if configuration_only:
                 continue
-            if first.get('metrics', {}).get('contract') != run.get('metrics', {}).get('contract'):
-                reasons.append(f'seed {seed}: metric definitions mismatch')
-            first_metrics = first.get('metrics', {}).get('metrics', {})
-            for name, metric in run.get('metrics', {}).get('metrics', {}).items():
-                if name in first_metrics and metric.get('unit') != first_metrics[name].get('unit'):
-                    reasons.append(f'seed {seed}: metric {name} units mismatch')
+            reasons.extend(f'seed {seed}: {reason}'
+                           for reason in metric_comparison_reasons(first, run))
     return reasons
 
 

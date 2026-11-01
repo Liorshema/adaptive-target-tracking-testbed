@@ -1,0 +1,20 @@
+# Start with a saved, validated scientific condition; inherit its execution defaults.
+schema_version: 1
+experiment:
+  id: EXP-CUSTOM
+  name: Custom reactive tracking
+  base_case: EXP-NOMINAL
+  components:
+    robot_estimator: ekf  # inherit the base case's verified robot model/sensor binding
+    target_estimator: kf  # inherit position/velocity process and position observations
+    predictor: constant_velocity
+    adaptation: none
+    fusion: none
+    controller: jacobian
+    task: cartesian
+  parameters:
+    target_dynamics:
+      damping: 0.23
+  execution:
+    seeds: [42]
+    duration: 6.0

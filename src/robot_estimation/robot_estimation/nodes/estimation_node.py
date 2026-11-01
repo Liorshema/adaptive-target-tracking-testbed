@@ -18,7 +18,8 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from robot_estimation.parameter_schema import (
-    PARAMETERS, LOCALIZATION_PARAMETERS, POSE_POLICY_PARAMETERS)
+    ALGORITHM_PARAMETERS, BINDING_PARAMETERS, PARAMETERS, LOCALIZATION_PARAMETERS,
+    POSE_POLICY_PARAMETERS)
 from robot_estimation.robot.planar_pose import transform_observation
 from scipy.spatial.transform import Rotation
 from rclpy.time import Time
@@ -119,6 +120,11 @@ class EstimationNode(Node):
         """Declare strictly typed parameters supplied by ROS YAML overrides."""
         for name, parameter_type in self._PARAMETERS.items():
             self.declare_parameter(name, parameter_type)
+        self._model_bindings = {}
+        for name, kind in {**BINDING_PARAMETERS, **ALGORITHM_PARAMETERS}.items():
+            supplied = self.declare_parameter(name, getattr(Parameter.Type, kind))
+            if supplied.value is not None:
+                self._model_bindings[name] = supplied.value
         for name, kind in LOCALIZATION_PARAMETERS.items():
             default = (False if name == 'localization_enabled' else 0.
                        if name in ['planar_slip_noise_std', 'yaw_slip_noise_std'] else getattr(Parameter.Type, kind))
@@ -162,6 +168,7 @@ class EstimationNode(Node):
         parameters = {name: self.get_parameter(name).value for name in self._PARAMETERS}
         parameters.update(getattr(self, '_slip_parameters', {}))
         parameters.update(getattr(self, '_pose_policy_parameters', {}))
+        parameters.update(getattr(self, '_model_bindings', {}))
         physical = None
         if parameters['joint_bounds_enabled']:
             path = parameters['robot_description_file']
@@ -170,14 +177,16 @@ class EstimationNode(Node):
                     parameters['robot_description_package'])) / parameters['robot_description_config']
             physical = yaml.safe_load(Path(path).read_text())['robot']['manipulator']['joints']
         estimator, self._joint_constraint = create_robot_estimator(
-            parameters, physical, self.get_parameter('robot_estimator_type').value)
+            parameters, physical, self.get_parameter('robot_estimator_type').value,
+            require_frozen=True)
         return estimator
 
     def _create_target_estimator(self) -> TargetStateEstimator:
         """Delegate target-filter assembly without moving ROS resource policy."""
-        return create_target_estimator({
-            name: self.get_parameter(name).value for name in self._PARAMETERS},
-            self.get_parameter('target_estimator_type').value)
+        parameters = {name: self.get_parameter(name).value for name in self._PARAMETERS}
+        parameters.update(getattr(self, '_model_bindings', {}))
+        return create_target_estimator(
+            parameters, self.get_parameter('target_estimator_type').value, require_frozen=True)
 
     def _create_publishers(self) -> None:
         """

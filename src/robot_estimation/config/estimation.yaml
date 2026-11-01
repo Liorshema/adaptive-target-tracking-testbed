@@ -1,12 +1,48 @@
-# Canonical numerical defaults are independent of manifest model selection.
-# Optional numerical defaults preserve legacy disabled pose-aiding semantics;
-# the ROS compatibility reader exports them only when explicitly selected.
-robot_estimators:
-  robot_ekf:
+# Algorithm selection belongs to experiment composition, never package defaults.
+schema_version: 1
+# Intrinsic numerical settings only; KF/EKF currently have no tunable algorithm settings.
+estimators:
+  kf:
+    parameters: {}
+  ekf:
+    parameters: {}
+# Robot: [x,y,yaw,v,omega,q...,dq...], n=5+2*joints. Continuous density amplitudes
+# (m/s^(3/2), rad/s^(3/2)); Q retains dt^3/3, dt^2/2, dt integration.
+# Target: [p...,v...], n=2*d. Discrete acceleration sigma (m/s^2); Q retains dt^4/4,dt^3/2,dt^2.
+process_models:
+  robot_motion:
     parameters:
-      joint_bounds_enabled: true
-      joint_bounds_numerical_tolerance: 1.0e-09
       joint_count: 4
+      linear_acceleration_noise_std: 0.1
+      angular_acceleration_noise_std: 0.05
+      joint_acceleration_noise_std: 0.1
+    optional_parameters:
+      planar_slip_noise_std: 0.0
+      yaw_slip_noise_std: 0.0
+  target_cv:
+    parameters:
+      target_spatial_dimension: 3
+      target_acceleration_noise_std: 0.1
+# Assumed measurement variances, not noise amplitudes. Wheel [v,omega], IMU [omega],
+# joint [q...,dq...], position [x,y,z]. Units are squared state/measurement units.
+measurement_models:
+  robot_sensors:
+    parameters:
+      wheel_linear_velocity_variance: 0.05
+      wheel_angular_velocity_variance: 0.02
+      imu_yaw_rate_variance: 0.01
+      joint_position_variance: 0.02
+      joint_velocity_variance: 0.02
+  target_position:
+    parameters:
+      target_position_variance:
+      - 0.01
+      - 0.01
+      - 0.01
+# Means follow the process state order; covariance diagonals use squared units.
+initialization:
+  robot_state:
+    parameters:
       robot_initial_state:
       - 0.0
       - 0.0
@@ -35,28 +71,8 @@ robot_estimators:
       - 1.0
       - 1.0
       - 1.0
-      linear_acceleration_noise_std: 0.1
-      angular_acceleration_noise_std: 0.05
-      joint_acceleration_noise_std: 0.1
-      wheel_linear_velocity_variance: 0.05
-      wheel_angular_velocity_variance: 0.02
-      imu_yaw_rate_variance: 0.01
-      joint_position_variance: 0.02
-      joint_velocity_variance: 0.02
-    optional_parameters:
-      planar_slip_noise_std: 0.0
-      yaw_slip_noise_std: 0.0
-      localization_enabled: false
-      localization_consensus_window: 0
-      localization_consensus_inliers: 0
-      localization_consensus_span: 0.0
-      localization_consensus_max_age: 0.0
-      localization_trust_timeout: 0.0
-      localization_recovery_nis_target: 0.0
-target_estimators:
-  kalman:
+  target_state:
     parameters:
-      target_spatial_dimension: 3
       target_initial_state:
       - 0.0
       - 0.0
@@ -71,25 +87,48 @@ target_estimators:
       - 1.0
       - 1.0
       - 1.0
-      target_acceleration_noise_std: 0.1
-      target_position_variance:
-      - 0.01
-      - 0.01
-      - 0.01
+# Role-specific conditioning/pose acceptance; no filtering recursion or algorithm choice.
+deployment_adapters:
+  robot_state:
+    parameters:
+      joint_bounds_enabled: true
+      joint_bounds_numerical_tolerance: 1.0e-09
+    optional_parameters:
+      localization_enabled: false
+      localization_consensus_window: 0
+      localization_consensus_inliers: 0
+      localization_consensus_span: 0.0
+      localization_consensus_max_age: 0.0
+      localization_trust_timeout: 0.0
+      localization_recovery_nis_target: 0.0
+  target_state:
+    parameters: {}
+# Named algorithm-free deployment resources. A base experiment explicitly selects a group.
+# Legacy groups robot_ekf/kalman resolve to robot_state/target_state with identical values.
+bindings:
+  robot_state:
+    role: robot
+    process_model: robot_motion
+    measurement_model: robot_sensors
+    initialization: robot_state
+    adapter: robot_state
+  target_state:
+    role: target
+    process_model: target_cv
+    measurement_model: target_position
+    initialization: target_state
+    adapter: target_state
+# ROS transport and frame contracts; joint_names follow state q/dq order above.
 transport:
   robot:
     diagnostic_topic: /estimation/diagnostics
     robot_description_file: ''
     robot_description_package: robot_description
-    robot_description_config: config/robot/robot.yaml
+    robot_description_config: config/robots/mobile_manipulator.yaml
     wheel_odom_frame: odom
     base_frame: base_link
     imu_frame: base_link
-    joint_names:
-    - base_yaw_joint
-    - shoulder_joint
-    - elbow_joint
-    - wrist_joint
+    joint_names: [base_yaw_joint, shoulder_joint, elbow_joint, wrist_joint]
     imu_topic: /imu
     wheel_odometry_topic: /wheel/odometry
     joint_states_topic: /joint_states
@@ -100,25 +139,28 @@ transport:
     target_measurement_topic: /perception/target_position
     target_state_topic: /estimation/target_state
     target_state_full_topic: /estimation/target_state_full
+# Timestamp/freshness budgets are seconds; *_hz entries are polling/publication rates.
 runtime:
   robot:
     reorder_holdback: 0.03
     reorder_max_age: 0.2
     reorder_rate_hz: 100.0
-    reorder_capacity: 256
+    reorder_capacity: 256  # maximum buffered measurements
     diagnostic_rate_hz: 5.0
     future_tolerance: 0.01
     max_wheel_odometry_age: 0.2
     max_joint_state_age: 0.2
   target: {}
+# Optional calibration delta; explicit group selection merges these values.
+# This profile does not itself enable localization or select an estimator implementation.
 profiles:
   pose_aiding:
     robot_parameters:
-      linear_acceleration_noise_std: 0.3
-      angular_acceleration_noise_std: 0.3
-      planar_slip_noise_std: 0.15
-      yaw_slip_noise_std: 0.2
-      localization_nis_limit: 11.345
+      linear_acceleration_noise_std: 0.3  # m/s^(3/2)
+      angular_acceleration_noise_std: 0.3  # rad/s^(3/2)
+      planar_slip_noise_std: 0.15  # m/s^(1/2)
+      yaw_slip_noise_std: 0.2  # rad/s^(1/2)
+      localization_nis_limit: 11.345  # dimensionless normalized innovation squared gate
       localization_consensus_window: 5
       localization_consensus_inliers: 4
       localization_consensus_span: 0.3
@@ -128,7 +170,7 @@ profiles:
     transport:
       localization_topic: /localization/odometry
       localization_frame: world
-      localization_max_age: 0.15
-      localization_transform_tolerance: 1.0e-06
+      localization_max_age: 0.15  # s; input freshness limit
+      localization_transform_tolerance: 1.0e-06  # numerical allclose tolerance for pose/covariance checks
     runtime:
       reorder_holdback: 0.08

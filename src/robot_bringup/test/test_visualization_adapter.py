@@ -289,7 +289,7 @@ def configured_node(monkeypatch, tmp_path):
     configuration.write_text('{}\n')
     values = {'configuration_file': str(configuration),
               'description_file': str(Path(get_package_share_directory('robot_description')) /
-                                      'config' / 'robot' / 'robot.yaml'),
+                                      'config' / 'robots' / 'mobile_manipulator.yaml'),
               'joint_names': ['j0', 'j1', 'j2', 'j3'], 'joint_topic': '/physical/joints',
               'odom_topic': '/wheel/odom', 'physical_pose_topic': '/physical/pose',
               'reference_frame': 'world', 'odometry_frame': 'odom', 'base_frame': 'base_link',

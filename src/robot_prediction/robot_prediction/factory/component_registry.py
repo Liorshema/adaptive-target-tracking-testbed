@@ -4,6 +4,7 @@ from copy import deepcopy
 
 from robot_configuration.components import ComponentRegistry
 from robot_configuration.components import schema_for
+from robot_configuration.model_registration import discover_models
 from robot_configuration.resources import package_config_path
 from robot_prediction.baseline.constant_acceleration import ConstantAccelerationPredictor
 from robot_prediction.baseline.constant_velocity import ConstantVelocityPredictor
@@ -15,6 +16,9 @@ from robot_prediction.fusion.baseline_fusion import BaselineFusion
 from robot_prediction.fusion.weighted_correction import WeightedCorrection
 from robot_prediction.online_adaptation.classical.residual_adapter import ResidualAdapter
 from robot_prediction.online_adaptation.classical.rls_adapter import RLSAdapter
+
+
+PREDICTOR_MODEL_NAMESPACE = 'robot_prediction.baseline'
 
 
 def create_prediction_registries(config=None, configuration_path=None):
@@ -164,4 +168,5 @@ def create_prediction_registries(config=None, configuration_path=None):
             requirements=requirements,
             capabilities={'deployable': True, 'correction_representation': 'none'},
         )
+    discover_models(result['predictor'], PREDICTOR_MODEL_NAMESPACE, data['predictors'])
     return result

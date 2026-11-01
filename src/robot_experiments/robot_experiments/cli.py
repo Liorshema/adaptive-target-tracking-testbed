@@ -15,6 +15,9 @@ __all__ = ['component_identities', 'main', 'manage']
 
 def main(argv=None, *, share=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == 'author':
+        from .authoring import main as author_main
+        return author_main(argv[1:], share=share)
     if argv and argv[0] == 'compose':
         from .launching import compose
         return compose(argv[1:], share=share)

@@ -33,8 +33,8 @@ setup(
             glob('config/*.rviz'),
         ),
         (
-            os.path.join('share', package_name, 'config', 'robot'),
-            glob('config/robot/*.yaml'),
+            os.path.join('share', package_name, 'config', 'robots'),
+            glob('config/robots/*.yaml'),
         ),
     ],
     install_requires=['setuptools'],

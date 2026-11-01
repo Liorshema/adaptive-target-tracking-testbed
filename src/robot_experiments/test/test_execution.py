@@ -23,7 +23,7 @@ class ClockRecorder:
         self.calls = 0
         self.monotonic = 0.0
 
-    def spin_once(self, timeout):
+    def spin_once(self, timeout, *, until=None):
         self.monotonic += timeout
         self.calls += 1
         self.clock = next(self.values, self.clock)
@@ -282,3 +282,20 @@ def test_stop_allows_launch_to_order_child_shutdown(tmp_path):
         assert outcome['survivors'] == []
     finally:
         launch.stop(grace=.2)
+
+
+def test_partial_launch_start_failure_cleans_spawned_child(tmp_path,monkeypatch):
+    """A monitor-thread startup failure cannot leave the already-spawned process alive."""
+    launch=OwnedLaunch([sys.executable,'-c','import time; time.sleep(30)'],
+                       dict(os.environ),tmp_path/'partial.log')
+    def fail_start(thread):raise RuntimeError('monitor startup failed')
+    monkeypatch.setattr(execution.threading.Thread,'start',fail_start)
+    try:
+        with pytest.raises(RuntimeError,match='monitor startup failed'):
+            launch.start()
+        assert launch.process.poll() is not None
+    finally:
+        # Also clean the intentionally failing RED case.
+        if launch._monitor is not None and launch._monitor.ident is None:
+            launch._monitor=None
+        launch.stop(.5)

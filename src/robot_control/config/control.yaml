@@ -1,79 +1,58 @@
+# Controller/task selection belongs to the manifest; these are numerical defaults.
+# Both controllers output [v_B, omega_B, dq_base_yaw, dq_shoulder, dq_elbow, dq_wrist].
+# Command units: [m/s, rad/s, rad/s, rad/s, rad/s, rad/s]; joint order is robot.yaml order.
 controllers:
   jacobian:
     parameters:
-      gains:
-      - 1.0
-      - 1.0
-      - 1.0
-      damping: 1.0
+      # DLS task order is selected Cartesian axes (default [x, y, z]), not command order.
+      gains: [1.0, 1.0, 1.0]  # s^-1; vector becomes diagonal K
+      # u = J_task.T @ solve(J_task@J_task.T + damping^2*I, twist_task + K*error).
+      damping: 1.0  # task-dependent regularization; not the WLS normalized motion cost
   weighted_least_squares:
     parameters:
-      gains:
-      - 1.0
-      - 3.0
-      - 3.0
-      task_weights:
-      - 4.0
-      - 12.0
-      - 12.0
-      task_scales:
-      - 1.0
-      - 1.0
-      - 1.0
-      motion_weights:
-      - 1.0
-      - 2.0
-      - 3.0
-      - 3.0
-      - 3.0
-      - 2.0
-      damping: 0.08
-      posture_weight: 0.01
-      posture_gain: 0.3
-      smoothness_weight: 0.005
-      limit_avoidance_weight: 0.002
+      # Task vectors follow the selected task rows. For distance_pointing:
+      # [range error (m), tangent-log pointing component 1 (rad), component 2 (rad)].
+      # Cartesian instead follows selected [x,y,z,wx,wy,wz] axes in selection order.
+      gains: [1.0, 3.0, 3.0]  # s^-1; desired error rate = -gains*error - target_rate
+      task_weights: [4.0, 12.0, 12.0]  # dimensionless relative squared-residual costs
+      task_scales: [1.0, 1.0, 1.0]  # row units (m, rad, rad for distance_pointing)
+      # Command order above; penalize u_i / max(|lower_i|, |upper_i|).
+      motion_weights: [1.0, 2.0, 3.0, 3.0, 3.0, 2.0]  # dimensionless
+      damping: 0.08  # dimensionless; squared in normalized motion penalty
+      posture_weight: 0.01  # dimensionless; cost toward midpoint joint posture
+      posture_gain: 0.3  # s^-1; preferred joint rate = gain*(midpoint - position)
+      smoothness_weight: 0.005  # dimensionless; cost of normalized change from previous u
+      limit_avoidance_weight: 0.002  # dimensionless; inflates joint motion cost near bounds
 tasks:
   cartesian:
     parameters:
-      axes:
-      - 0
-      - 1
-      - 2
+      axes: [0, 1, 2]  # select rows from world twist [vx,vy,vz,wx,wy,wz]
   distance_pointing:
     parameters:
-      minimum_distance: 0.001
-      antipodal_tolerance: 1.0e-05
+      minimum_distance: 0.001  # m; reject undefined pointing closer than this
+      antipodal_tolerance: 1.0e-05  # numerical pointing-chart tolerance (angular near poles)
 tracking:
   parameters:
-    radius: 1.0
-    forward_axis_local:
-    - 1.0
-    - 0.0
-    - 0.0
-    up_axis_local:
-    - 0.0
-    - -1.0
-    - 0.0
-    world_up:
-    - 0.0
-    - 0.0
-    - 1.0
-    lookahead_time: 0.0
+    radius: 1.0  # m; desired target-to-tracking-frame separation
+    # Direction vectors are dimensionless in tracking-local/world coordinates.
+    forward_axis_local: [1.0, 0.0, 0.0]
+    up_axis_local: [0.0, -1.0, 0.0]  # also first tangent basis axis for distance_pointing
+    world_up: [0.0, 0.0, 1.0]
+    lookahead_time: 0.0  # s; target sample time relative to control time
   distance_pointing:
-    lookahead_time: 0.25
-    prediction_sampling: linear
-    target_velocity_feedforward: true
+    lookahead_time: 0.25  # s; task-specific tracking default
+    prediction_sampling: linear  # interpolate forecast at selected sample time
+    target_velocity_feedforward: true  # include selected target velocity in task rate
 references:
   radial:
     parameters:
-      epsilon: 1.0e-09
+      epsilon: 1.0e-09  # m; radial direction degeneracy guard
+# Base operating limits [forward body speed (m/s), yaw rate (rad/s)].
+# Joint position/speed limits come from authoritative robot_description/config/robots/mobile_manipulator.yaml.
 operating_bounds:
-  base_velocity_lower:
-  - -0.5
-  - -1.0
-  base_velocity_upper:
-  - 0.5
-  - 1.0
+  base_velocity_lower: [-0.5, -1.0]
+  base_velocity_upper: [0.5, 1.0]
+# ROS names, file/strategy selectors and message layout; no controller gains here.
 transport:
   joint_count: 4
   robot_state_topic: /estimation/robot_state_full
@@ -87,12 +66,13 @@ transport:
   robot_description_file: ''
   feedforward_override: ''
   lookahead_override: ''
+# Freshness/future tolerances are seconds; validation_rate is Hz.
 runtime:
   max_robot_state_age: 0.2
   max_prediction_age: 0.5
   future_tolerance: 0.01
   validation_rate: 20.0
-  compute_enabled: true
+  compute_enabled: true  # compute independently of command publication
   publish_commands: false
   safety_enabled: true
   publish_telemetry: false

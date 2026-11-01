@@ -19,7 +19,7 @@ def configure_model(*args):
 def inputs():
     """Use the existing physical description and custom external actuation data."""
     root = Path(__file__).resolve().parents[2]
-    description = load_yaml(root / 'robot_description/config/robot/robot.yaml')
+    description = load_yaml(root / 'robot_description/config/robots/mobile_manipulator.yaml')
     model = ET.fromstring('<model name="original"><link name="base"/></model>')
     for key in description['robot']['manipulator']['joints']:
         ET.SubElement(model, 'joint', name=f'custom_{key}', type='revolute')
@@ -174,7 +174,7 @@ def test_robot_builder_generates_real_description_without_geometry_changes(tmp_p
     )['joint_position_hold']
     model = build_robot_model(
         root / 'robot_description/urdf/robot.urdf.xacro',
-        root / 'robot_description/config/robot/robot.yaml', robot, hold, tmp_path,
+        root / 'robot_description/config/robots/mobile_manipulator.yaml', robot, hold, tmp_path,
     )
     assert model.find("joint[@name='shoulder_joint']/axis/xyz").text == '0 -1 0'
     assert float(model.findtext("joint[@name='shoulder_joint']/axis/limit/lower")) == 0.0

@@ -65,13 +65,13 @@ def load_robot_model_parameters(
     """
     Load and validate robot-model parameters.
 
-    When no path is supplied, load robot.yaml from the installed
+    When no path is supplied, load the canonical physical description from the installed
     robot_description package.
     """
     path = (
         Path(config_path)
         if config_path is not None
-        else _default_config_path()
+        else default_robot_description_path()
     )
 
     with path.open('r', encoding='utf-8') as stream:
@@ -256,8 +256,8 @@ def robot_model_parameters_from_description(
     )
 
 
-def _default_config_path() -> Path:
-    """Return the installed robot.yaml path."""
+def default_robot_description_path() -> Path:
+    """Return the installed canonical physical description path."""
     from ament_index_python.packages import get_package_share_directory
 
     package_share = Path(
@@ -269,8 +269,8 @@ def _default_config_path() -> Path:
     return (
         package_share
         / 'config'
-        / 'robot'
-        / 'robot.yaml'
+        / 'robots'
+        / 'mobile_manipulator.yaml'
     )
 
 

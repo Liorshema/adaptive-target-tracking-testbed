@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_horizontal_shoulder_cannot_receive_downward_velocity_or_reference():
     """Description-derived bounds stop downward commands at the horizontal pose."""
-    path = ROOT / 'robot_description/config/robot/robot.yaml'
+    path = ROOT / 'robot_description/config/robots/mobile_manipulator.yaml'
     description = load_yaml(path)
     parameters = load_robot_model_parameters(path)
     physical = description['robot']['manipulator']['joints']
@@ -64,7 +64,7 @@ def test_horizontal_shoulder_cannot_receive_downward_velocity_or_reference():
 @pytest.mark.parametrize('angle', [0.0, 0.4, 1.57])
 def test_first_link_geometry_and_fk_raise_for_positive_shoulder(angle):
     """The real Xacro collision box and model agree on the shoulder convention."""
-    path = ROOT / 'robot_description/config/robot/robot.yaml'
+    path = ROOT / 'robot_description/config/robots/mobile_manipulator.yaml'
     document = xacro.process_file(
         str(ROOT / 'robot_description/urdf/robot.urdf.xacro'),
         mappings={'config_file': str(path)})

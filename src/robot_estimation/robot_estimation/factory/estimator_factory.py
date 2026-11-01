@@ -1,21 +1,14 @@
 """Pure construction of the currently supported robot and target estimators."""
 
+from copy import deepcopy
+
 import numpy as np
 
-from robot_estimation.filters.kalman_filter import KalmanFilter
 from robot_estimation.robot.joint_bounds import JointBoundsConditioner
-from robot_estimation.robot.models.measurement_model import ImuYawRateMeasurementModel
-from robot_estimation.robot.models.measurement_model import JointEncoderMeasurementModel
-from robot_estimation.robot.models.measurement_model import WheelOdometryMeasurementModel
-from robot_estimation.robot.models.process_model import RobotProcessModel
 from robot_estimation.robot.planar_pose import pose_acceptance_options
 from robot_estimation.robot.planar_pose import PoseAcceptance
 from robot_estimation.robot.planar_pose import validate_localization_parameters
-from robot_estimation.robot.robot_state_estimator import RobotStateEstimator
 from robot_estimation.state import StateEstimate
-from robot_estimation.target.models.measurement_model import PositionMeasurementModel
-from robot_estimation.target.models.process_model import ConstantVelocityProcessModel
-from robot_estimation.target.target_state_estimator import TargetStateEstimator
 from robot_estimation.timestamp_buffer import TimestampBuffer
 
 
@@ -48,17 +41,11 @@ def validate_runtime_parameters(parameters):
         raise ValueError('Reorder latency must fit within component freshness budgets')
 
 
-def _build_robot_estimator(parameters, physical=None):
+def _build_robot_estimator(
+    parameters, physical, *, process_model, measurement_models, filter_factory, adapter_factory
+):
     """Construct the configured robot EKF."""
     joint_count = int(parameters['joint_count'])
-    process_model = RobotProcessModel(
-        joint_count=joint_count,
-        linear_acceleration_noise_std=float(parameters['linear_acceleration_noise_std']),
-        angular_acceleration_noise_std=float(parameters['angular_acceleration_noise_std']),
-        joint_acceleration_noise_std=float(parameters['joint_acceleration_noise_std']),
-        planar_slip_noise_std=parameters.get('planar_slip_noise_std', 0.0),
-        yaw_slip_noise_std=parameters.get('yaw_slip_noise_std', 0.0),
-    )
     state_dimension = process_model.state_dimension
     initial_mean = np.asarray(parameters['robot_initial_state'], dtype=float)
     covariance_diagonal = np.asarray(parameters['robot_initial_covariance_diagonal'], dtype=float)
@@ -79,9 +66,12 @@ def _build_robot_estimator(parameters, physical=None):
     initial_state = StateEstimate(
         mean=initial_mean, covariance=np.diag(covariance_diagonal), timestamp=None
     )
-    wheel_measurement_model = WheelOdometryMeasurementModel(joint_count=joint_count)
-    imu_measurement_model = ImuYawRateMeasurementModel(joint_count=joint_count)
-    joint_measurement_model = JointEncoderMeasurementModel(joint_count=joint_count)
+    from robot_estimation.factory.model_factory import validate_models
+
+    validate_models(process_model, measurement_models, initial_mean)
+    wheel_measurement_model = measurement_models['wheel']
+    imu_measurement_model = measurement_models['imu']
+    joint_measurement_model = measurement_models['joints']
     constraint = None
     if parameters['joint_bounds_enabled']:
         if len(physical) != joint_count:
@@ -98,7 +88,7 @@ def _build_robot_estimator(parameters, physical=None):
         if parameters.get('localization_enabled', False)
         else None
     )
-    estimator = RobotStateEstimator(
+    estimator = adapter_factory(
         initial_state=initial_state,
         process_model=process_model,
         wheel_measurement_model=wheel_measurement_model,
@@ -106,18 +96,15 @@ def _build_robot_estimator(parameters, physical=None):
         joint_measurement_model=joint_measurement_model,
         state_constraint=constraint,
         pose_acceptance=PoseAcceptance(**options) if options else None,
+        filter_factory=filter_factory,
     )
     return estimator, constraint
 
 
-def _build_target_estimator(parameters):
+def _build_target_estimator(
+    parameters, *, process_model, measurement_model, filter_factory, adapter_factory
+):
     """Construct the configured target Kalman filter."""
-    spatial_dimension = int(parameters['target_spatial_dimension'])
-    process_model = ConstantVelocityProcessModel(
-        spatial_dimension=spatial_dimension,
-        acceleration_noise_std=float(parameters['target_acceleration_noise_std']),
-    )
-    measurement_model = PositionMeasurementModel(spatial_dimension=spatial_dimension)
     initial_mean = np.asarray(parameters['target_initial_state'], dtype=float)
     covariance_diagonal = np.asarray(parameters['target_initial_covariance_diagonal'], dtype=float)
     expected_state_dimension = process_model.state_dimension
@@ -138,145 +125,165 @@ def _build_target_estimator(parameters):
     initial_state = StateEstimate(
         mean=initial_mean, covariance=np.diag(covariance_diagonal), timestamp=None
     )
-    filter_ = KalmanFilter(
+    from robot_estimation.factory.model_factory import validate_models
+
+    validate_models(process_model, measurement_model, initial_mean)
+    filter_ = filter_factory(
         initial_state=initial_state,
         state_transition=process_model.state_transition_matrix,
         process_covariance=process_model.process_covariance,
         measurement_matrix=measurement_model.measurement_matrix(),
     )
-    return TargetStateEstimator(filter_=filter_)
+    return adapter_factory(filter_=filter_)
 
 
-def create_estimation_registries(configuration_path=None):
-    """Register supported estimator contracts using only owner YAML defaults."""
+def create_estimation_registries(configuration_path=None, *, models=None, algorithms=None):
+    """Compose registered algorithms/models into validated existing role contracts."""
     from robot_configuration.components import ComponentRegistry
-    from robot_configuration.components import schema_for
     from robot_configuration.yaml_loader import load_yaml
-    from robot_estimation.configuration import estimation_configuration_path
-    from robot_estimation.interfaces.estimator_interface import EstimatorInterface
-    from robot_estimation.interfaces.robot_estimator import RobotEstimatorProtocol
+    from robot_estimation.configuration import (
+        binding_parameters,
+        canonical_estimation,
+        estimation_configuration_path,
+        LEGACY_ESTIMATORS,
+        role_binding,
+    )
+    from robot_estimation.factory.algorithm_factory import create_algorithm_registry
+    from robot_estimation.factory.model_factory import create_model_registries, parameter_schema
 
-    data = load_yaml(configuration_path or estimation_configuration_path())
-    registries = {'robot_estimator': ComponentRegistry(), 'target_estimator': ComponentRegistry()}
-    robot = data['robot_estimators']['robot_ekf']
-    robot_defaults = {
-        **robot['parameters'],
-        **robot.get('optional_parameters', {}),
-        'max_joint_state_age': data['runtime']['robot']['max_joint_state_age'],
+    data = canonical_estimation(load_yaml(configuration_path or estimation_configuration_path()))
+    algorithms = algorithms if algorithms is not None else create_algorithm_registry(data)
+    models = models if models is not None else create_model_registries(data)
+    registries = {
+        'robot_estimator': ComponentRegistry(),
+        'target_estimator': ComponentRegistry(),
+        'estimator': algorithms,
+        **models,
     }
-    target_defaults = data['target_estimators']['kalman']['parameters']
-
-    def robot_builder(physical=None, **parameters):
-        if parameters['joint_bounds_enabled'] and not isinstance(physical, dict):
-            raise ValueError(
-                'robot_ekf: authoritative physical description required for joint bounds'
-            )
-        result = _build_robot_estimator(parameters, physical)
-        if not isinstance(result[0], RobotEstimatorProtocol):
-            raise TypeError('Robot estimator does not implement the sensor adapter contract')
-        return result
-
-    def target_builder(**parameters):
-        dimension = parameters['target_spatial_dimension']
-        variance = np.asarray(parameters['target_position_variance'])
-        if variance.shape != (dimension,) or np.any(variance < 0):
-            raise ValueError(
-                'target_position_variance dimension must match target spatial dimension'
-            )
-        result = _build_target_estimator(parameters)
-        if not isinstance(result, EstimatorInterface):
-            raise TypeError('Target estimator must implement EstimatorInterface')
-        return result
-
-    for family, name, defaults, builder, units, layout, adapter in [
-        (
-            'robot_estimator',
-            'robot_ekf',
-            robot_defaults,
-            robot_builder,
-            {
-                'linear_acceleration_noise_std': 'm/s^(3/2)',
-                'angular_acceleration_noise_std': 'rad/s^(3/2)',
-                'joint_acceleration_noise_std': 'rad/s^(3/2)',
-                'planar_slip_noise_std': 'm/s^(1/2)',
-                'yaw_slip_noise_std': 'rad/s^(1/2)',
-                'joint_bounds_numerical_tolerance': 'rad',
-            },
-            'planar_mobile_manipulator',
-            'wheel_imu_joint_pose',
-        ),
-        (
-            'target_estimator',
-            'kalman',
-            target_defaults,
-            target_builder,
-            {'target_acceleration_noise_std': 'm/s^2', 'target_position_variance': 'm^2'},
-            'position_velocity',
-            'position',
-        ),
-    ]:
-        from robot_estimation.parameter_schema import OPTIONAL_PARAMETERS
-        from robot_estimation.parameter_schema import PARAMETERS
-
-        declared = {**PARAMETERS, **OPTIONAL_PARAMETERS}
-        constraints = {}
-        for key in defaults:
-            kind = declared[key]
-            if kind.endswith('_ARRAY'):
-                item = {'type': 'number'}
-                if 'covariance' in key or 'variance' in key:
-                    item['minimum'] = 0.0
-                constraints[key] = {'type': 'array', 'items': item}
-            elif kind == 'BOOL':
-                constraints[key] = {'type': 'boolean'}
-            else:
-                constraints[key] = {
-                    'type': 'integer' if kind == 'INTEGER' else 'number',
-                    'minimum': 0.0,
-                }
-        for key in ['joint_count', 'target_spatial_dimension']:
-            if key in defaults:
-                constraints[key]['minimum'] = 1
-        schema = schema_for(defaults, units=units, constraints=constraints)
-        if family == 'robot_estimator':
+    for role in ('robot', 'target'):
+        binding_name, binding = role_binding(data, role)
+        defaults = binding_parameters(data, binding_name, include_optional=True)
+        if role == 'robot':
+            defaults['max_joint_state_age'] = data['runtime']['robot']['max_joint_state_age']
+        schema = parameter_schema(defaults)
+        if role == 'robot':
             schema['properties']['localization_nis_limit'] = {
                 'type': 'number',
                 'exclusiveMinimum': 0.0,
                 'unit': '1',
             }
-        prefix = family.split('_')[0]
-        registries[family].register(
-            name,
-            builder,
-            description=(
-                'Planar robot EKF'
-                if prefix == 'robot'
-                else 'Constant-velocity target Kalman filter'
-            ),
-            defaults=defaults,
-            schema=schema,
-            dependencies=('physical',) if prefix == 'robot' else (),
-            capabilities={
-                'state_layout': layout,
-                'deployable': True,
-                'state_dimension': '5+2*n' if prefix == 'robot' else '2*d',
-                'measurements': adapter,
-                'runtime_validation': 'conditional',
-                'noise_discretization': (
-                    'continuous white acceleration density'
-                    if prefix == 'robot'
-                    else 'discrete acceleration variance'
-                ),
-            },
-            requirements={
-                prefix + '_state_layout': layout,
-                prefix + '_measurement_adapter': adapter,
-            },
-        )
+        for suffix in ('process_model', 'measurement_model', 'deployment_adapter'):
+            schema['properties'][role + '_' + suffix] = {'type': 'string'}
+        adapter = models['estimation_adapter'].describe(binding['adapter'])['capabilities']
+        process = models['estimation_process'].describe(binding['process_model'])['capabilities']
+        for identifier in algorithms.names():
+            capability = algorithms.describe(identifier)['capabilities']
+            if capability['process_kind'] != adapter['process_kind']:
+                continue  # numerical availability does not imply a compatible ROS adapter
+            builder = _role_builder(role, binding, identifier, algorithms, models)
+            role_defaults = deepcopy(defaults)
+            role_defaults['algorithm_parameters'] = algorithms.describe(identifier)['defaults']
+            role_schema = deepcopy(schema)
+            role_schema['properties']['algorithm_parameters'] = algorithms.describe(identifier)[
+                'schema']
+            role_schema['properties'][role + '_algorithm_parameters'] = {'type': 'string'}
+            names = [identifier] + [
+                name
+                for name, item in LEGACY_ESTIMATORS.items()
+                if item == {'algorithm': identifier, 'binding': binding_name}
+            ]
+            for name in names:
+                registries[role + '_estimator'].register(
+                    name,
+                    builder,
+                    description=f'{identifier} with {binding_name} deployment binding',
+                    defaults=role_defaults,
+                    schema=role_schema,
+                    dependencies=('physical',) if role == 'robot' else (),
+                    capabilities={
+                        'algorithm': identifier,
+                        'alias_of': identifier if name != identifier else None,
+                        'binding': binding_name,
+                        'process_model': binding['process_model'],
+                        'measurement_model': binding['measurement_model'],
+                        'deployment_adapter': binding['adapter'],
+                        'state_layout': adapter['state_layout'],
+                        'deployable': True,
+                        'intrinsic_parameter_transport': 'frozen per-role settings',
+                        'state_dimension': '5+2*n' if role == 'robot' else '2*d',
+                        'measurements': adapter['measurements'],
+                        'runtime_validation': 'conditional',
+                        'noise_discretization': process['noise_discretization'],
+                    },
+                    requirements={
+                        role + '_state_layout': adapter['state_layout'],
+                        role + '_measurement_adapter': adapter['measurements'],
+                    },
+                )
     return registries
 
 
-def _component_parameters(parameters, registry, name):
+def _role_builder(role, binding, algorithm, algorithms, models):
+    """Bind dependencies explicitly; no algorithm switch is hidden in orchestration."""
+    from robot_estimation.factory.model_factory import model_parameters, resolve_binding
+
+    def build(physical=None, **parameters):
+        from robot_estimation.factory.algorithm_parameters import decode_algorithm_parameters
+
+        key = role + '_algorithm_parameters'
+        intrinsic = (
+            decode_algorithm_parameters(parameters[key], algorithm, algorithms)
+            if key in parameters else parameters['algorithm_parameters']
+        )
+        selected = resolve_binding(
+            role, binding, parameters, models, algorithms.describe(algorithm)['capabilities']
+        )
+        process_registry = models['estimation_process']
+        process = process_registry.create(
+            selected['process_model'],
+            model_parameters(process_registry, selected['process_model'], parameters),
+        )
+        measurement_registry = models['estimation_measurement']
+        dependencies = (
+            {'joint_count': process.joint_count}
+            if role == 'robot'
+            else {'spatial_dimension': process.spatial_dimension}
+        )
+        measurements = measurement_registry.create(
+            selected['measurement_model'],
+            model_parameters(measurement_registry, selected['measurement_model'], parameters),
+            **dependencies,
+        )
+
+        def filter_factory(**kwargs):
+            return algorithms.create(algorithm, intrinsic, use_defaults=False, **kwargs)
+
+        def adapter_factory(**kwargs):
+            return models['estimation_adapter'].create(selected['adapter'], **kwargs)
+
+        if role == 'robot':
+            if parameters['joint_bounds_enabled'] and not isinstance(physical, dict):
+                raise ValueError('authoritative physical description required for joint bounds')
+            return _build_robot_estimator(
+                parameters,
+                physical,
+                process_model=process,
+                measurement_models=measurements,
+                filter_factory=filter_factory,
+                adapter_factory=adapter_factory,
+            )
+        return _build_target_estimator(
+            parameters,
+            process_model=process,
+            measurement_model=measurements,
+            filter_factory=filter_factory,
+            adapter_factory=adapter_factory,
+        )
+
+    return build
+
+
+def _component_parameters(parameters, registry, name, *, require_frozen=False):
     """Extract selected numerical leaves from the merged ROS compatibility map."""
     from robot_estimation.parameter_schema import OPTIONAL_PARAMETERS
     from robot_estimation.parameter_schema import PARAMETERS
@@ -286,15 +293,26 @@ def _component_parameters(parameters, registry, name):
     unexpected = set(parameters) - set(PARAMETERS) - set(OPTIONAL_PARAMETERS) - keys
     if unexpected:
         raise ValueError(f'{name}: unknown parameters {sorted(unexpected)}')
+    if require_frozen and info['defaults'].get('algorithm_parameters'):
+        transports = {key for key in keys if key.endswith('_algorithm_parameters')}
+        if not transports.intersection(parameters):
+            raise ValueError(
+                f'{name}: nonempty intrinsic settings require frozen algorithm parameters')
+    if 'algorithm_parameters' in parameters and any(
+        key.endswith('_algorithm_parameters') and key in parameters for key in keys
+    ):
+        raise ValueError(f'{name}: competing intrinsic overrides and frozen algorithm parameters')
     return {key: value for key, value in parameters.items() if key in keys}
 
 
 def create_robot_estimator(
-    parameters, physical=None, estimator_type='robot_ekf', *, registry=None, context=None
+    parameters, physical=None, estimator_type='robot_ekf', *, registry=None, context=None,
+    require_frozen=False,
 ):
     """Adapt merged ROS parameters to the selected registered robot estimator."""
     registry = registry or create_estimation_registries()['robot_estimator']
-    values = _component_parameters(parameters, registry, estimator_type)
+    values = _component_parameters(
+        parameters, registry, estimator_type, require_frozen=require_frozen)
     dependencies = (
         {'physical': physical}
         if 'physical' in registry.describe(estimator_type)['dependencies']
@@ -314,10 +332,13 @@ def create_robot_estimator(
     return result
 
 
-def create_target_estimator(parameters, estimator_type='kalman', *, registry=None, context=None):
+def create_target_estimator(
+    parameters, estimator_type='kalman', *, registry=None, context=None, require_frozen=False,
+):
     """Adapt merged ROS parameters without restricting context-free library dimensions."""
     registry = registry or create_estimation_registries()['target_estimator']
-    values = _component_parameters(parameters, registry, estimator_type)
+    values = _component_parameters(
+        parameters, registry, estimator_type, require_frozen=require_frozen)
     result = registry.create(estimator_type, values, context=context)
     from robot_estimation.interfaces.estimator_interface import EstimatorInterface
 

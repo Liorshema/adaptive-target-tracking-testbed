@@ -91,7 +91,7 @@ def test_explicit_conflicts_and_invalid_owners_fail_closed(tmp_path, mutation, m
     if mutation == 'robot_description':
         data['robot']['description'] = {
             'package': 'robot_description',
-            'path': 'config/robot/robot.yaml'}
+            'path': 'config/robots/mobile_manipulator.yaml'}
     elif mutation == 'robot_deployment':
         sim['robot'] = {'package': 'robot_simulation', 'path': 'config/gazebo/robot.yaml'}
     elif mutation == 'sensor':
@@ -100,7 +100,7 @@ def test_explicit_conflicts_and_invalid_owners_fail_closed(tmp_path, mutation, m
     elif mutation in ['calibration', 'calibration_unknown']:
         cal = load_yaml(share('robot_experiments') / 'config/calibration/manipulation_pose.yaml')
         cal['robot_description_config' if mutation == 'calibration' else 'unknown_key'] = (
-            'config/robot/robot.yaml' if mutation == 'calibration' else 1.)
+            'config/robots/mobile_manipulator.yaml' if mutation == 'calibration' else 1.)
         data['estimation']['calibration'] = str(write(tmp_path, cal, 'calibration.yaml'))
     elif mutation == 'overlap':
         from robot_estimation.configuration import load_estimation_parameters

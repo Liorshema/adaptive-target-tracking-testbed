@@ -112,7 +112,7 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False,cance
               'timeouts':'host monotonic seconds','wall_timestamps':'UTC ISO8601'},
               'environment':{k:os.environ.get(k) for k in ['ROS_DISTRO','RMW_IMPLEMENTATION','WSL_DISTRO_NAME','ROS_VERSION','OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS']},
               'platform':{'system':os.uname().sysname,'release':os.uname().release,'cpu_count':os.cpu_count()},
-              'artifacts':{'metrics':'metrics.json','time_series':'time_series.json','telemetry':'telemetry','log':'launch.log'}}
+              'artifacts':{'metrics':'metrics.json','time_series':'time_series.json','telemetry':'telemetry','log':'launch.log','readiness':'readiness.json'}}
     comparison_contract=None
     comparison=None
     configuration_identity=None
@@ -132,6 +132,14 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False,cance
           'system':plan,'context':context,'owner_snapshot':prepared['snapshot'],
           'comparison_contract':comparison_contract, 'comparison': comparison})
         with DomainLease(log_dir=directory/'ros-log') as lease:
+            if spec['runtime'].get('gui',False):
+                from .simulation import display_capabilities
+                display=display_capabilities()
+                if not display['available']:raise RunFailure('gui_unavailable',display)
+                lease.env['QT_QPA_PLATFORM']='xcb'
+            metadata['presentation']={'gui':spec['runtime'].get('gui',False),
+                **({k:lease.env.get(k) for k in ('DISPLAY','QT_QPA_PLATFORM')}
+                   if spec['runtime'].get('gui',False) else {})}
             metadata['isolation']={'ros_domain_id':lease.domain_id,'gazebo_partition':lease.partition}
             # rclpy owns a private Context, but its domain/log configuration comes from the environment.
             old={k:os.environ.get(k) for k in ['ROS_DOMAIN_ID','GZ_PARTITION','GZ_IP','ROS_LOG_DIR']}
@@ -174,11 +182,18 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False,cance
                                     if argument.startswith('/tmp/robot_simulation_') and candidate.name=='world.sdf' and candidate.is_file():
                                         shutil.copyfile(candidate,world)
                         except (psutil.Error,OSError):continue
-                    performance.append({'clock':recorder.clock,'arrival_monotonic':now,'cpu_percent_sum':percent,'rss_bytes_sum':rss})
+                    performance.append({'clock':recorder.clock,'arrival_monotonic':now,
+                        'cpu_percent_sum':percent,'rss_bytes_sum':rss,
+                        'readiness':recorder.readiness_snapshot(required)})
+                def on_ready(clock):
+                    write_json(directory/'readiness.json', {
+                        'schema_version':1, 'decision':'runner_ready',
+                        'arrival_monotonic':time.monotonic(), 'origin':clock,
+                        **recorder.readiness_snapshot(required)})
                 try:
                     window=run_window(process,recorder,required_streams=required,duration=spec['duration'],settling_time=spec['settling_time'],
                       readiness_timeout=spec['execution']['readiness_timeout'],stall_timeout=spec['execution']['stall_timeout'],
-                      wall_timeout=spec['execution']['wall_timeout'],tick=tick)
+                      wall_timeout=spec['execution']['wall_timeout'],tick=tick,on_ready=on_ready)
                 finally:
                     cleanup=process.stop(spec['execution']['shutdown_timeout'])
                     write_json(directory/'host_performance.json',{'schema_version':1,'cpu_unit':'percent of one logical CPU; sum over owned descendants',
@@ -240,7 +255,8 @@ def run_one(spec,variant,seed,directory,share,*,observer_diagnostics=False,cance
        'metrics':metrics or {},'artifacts':str(Path('runs')/directory.name),'status':status}
 
 
-def run_experiment(spec,share,*,observer_diagnostics=False,cancel_requested=None):
+def run_experiment(spec, share, *, observer_diagnostics=False, cancel_requested=None,
+                   on_study_created=None):
     directory=create_study_directory(spec['output']['directory'],spec['name'])
     if 'source_document' in spec:
         (directory/'experiment.yaml').write_text(yaml.safe_dump(spec['source_document'], sort_keys=False))
@@ -249,6 +265,8 @@ def run_experiment(spec,share,*,observer_diagnostics=False,cancel_requested=None
         shutil.copyfile(spec['source'],directory/'experiment.yaml')
     write_json(directory/'resolved_experiment.json',spec)
     (directory/'runs').mkdir()
+    if on_study_created is not None:
+        on_study_created(directory)
     runs=[]
     for seed in spec['seeds']:
         for variant in spec['variants']:

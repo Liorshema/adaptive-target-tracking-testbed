@@ -61,3 +61,15 @@ POSE_POLICY_PARAMETERS = {'localization_consensus_window': 'INTEGER',
  'localization_recovery_nis_target': 'DOUBLE'}
 LOCALIZATION_PARAMETERS.update(POSE_POLICY_PARAMETERS)
 OPTIONAL_PARAMETERS.update(POSE_POLICY_PARAMETERS)
+
+# Optional explicit model bindings survive the existing flat ROS snapshot boundary.
+BINDING_PARAMETERS = {
+    role + '_' + field: 'STRING'
+    for role in ('robot', 'target')
+    for field in ('process_model', 'measurement_model', 'deployment_adapter')
+}
+OPTIONAL_PARAMETERS.update(BINDING_PARAMETERS)
+
+# Complete role-local intrinsic mappings, encoded as typed JSON objects for ROS.
+ALGORITHM_PARAMETERS = {role + '_algorithm_parameters': 'STRING' for role in ('robot', 'target')}
+OPTIONAL_PARAMETERS.update(ALGORITHM_PARAMETERS)

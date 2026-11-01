@@ -14,7 +14,7 @@ def configuration():
     parameters = {}
     for name in ['robot_ekf', 'kalman']:
         parameters.update(load_estimation_parameters(root/'robot_estimation/config/estimation.yaml', name)['estimation_node']['ros__parameters'])
-    physical = yaml.safe_load((root/'robot_description/config/robot/robot.yaml').read_text())['robot']['manipulator']['joints']
+    physical = yaml.safe_load((root/'robot_description/config/robots/mobile_manipulator.yaml').read_text())['robot']['manipulator']['joints']
     return parameters, physical
 
 

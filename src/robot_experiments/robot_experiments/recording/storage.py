@@ -121,6 +121,16 @@ class TelemetryStore:
                 return False
         return True
 
+    def readiness_snapshot(self, required_streams):
+        """Describe current predicate inputs; signed ages are observer-clock minus source."""
+        stamps = {name: self.streams[name][-1]['source_time']
+                  if self.streams.get(name) else None for name in required_streams}
+        return {'ready': self.ready(required_streams), 'clock': self.clock,
+                'max_skew': self.context.get('readiness_max_age'), 'source_times': stamps,
+                'signed_ages': {name: self.clock - stamp
+                                if self.clock is not None and stamp is not None else None
+                                for name, stamp in stamps.items()}}
+
     def close(self):
         """Flush scientific handles and the optional bounded diagnostic artifact."""
         if self._closed:

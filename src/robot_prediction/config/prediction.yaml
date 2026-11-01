@@ -1,48 +1,56 @@
+# Numerical defaults; component selection belongs to the experiment manifest.
 prediction:
   parameters:
-    dt: 0.1
-    horizon: 20
+    dt: 0.1  # s between forecast samples; first sample is origin + dt
+    horizon: 20  # number of future samples (final time = origin + horizon*dt)
 monitoring:
   parameters:
-    window_duration: 1.0
+    window_duration: 1.0  # s; history capacity = ceil(window_duration/dt) samples
+    # confidence = exp(-0.5*(||componentwise residual RMS||/residual_scale)^2).
+    # Residuals combine position and velocity; this is a numerical scale, not metres.
     residual_scale: 0.5
 predictors:
+  # Deployable with estimator state [px, py, pz, vx, vy, vz].
   constant_velocity:
     parameters: {}
+  # Library only as a direct predictor: requires [position, velocity, acceleration].
   constant_acceleration:
     parameters: {}
+  # Library only directly: [position, velocity, turn_rate]; IMM supplies extra states.
   coordinated_turn:
     parameters:
+      # CT straight-line cutoff |turn_rate| (rad/s); IMM also reuses as speed cutoff.
       turn_rate_epsilon: 1.0e-06
+  # Deployable: internally estimates acceleration/turn rate from observed velocities.
   imm:
     parameters:
-      model_probabilities:
-      - 0.333333
-      - 0.333333
-      - 0.333334
+      # Order: [constant velocity (cv), constant acceleration (ca), coordinated turn (ct)].
+      # Initial nonnegative probabilities are normalized by their sum.
+      model_probabilities: [0.333333, 0.333333, 0.333334]
+      # Rows = current model, columns = next model; rows sum to one.
+      # Prior probabilities = transition_matrix.T @ posterior probabilities.
       transition_matrix:
-      - - 0.9
-        - 0.05
-        - 0.05
-      - - 0.05
-        - 0.9
-        - 0.05
-      - - 0.05
-        - 0.05
-        - 0.9
+        - [0.9, 0.05, 0.05]
+        - [0.05, 0.9, 0.05]
+        - [0.05, 0.05, 0.9]
+      # Isotropic Gaussian variance applied to the full mixed position/velocity residual.
       likelihood_variance: 1.0
+# Adaptations learn corrections; IMM model weighting is separate from this group.
 adaptations:
+  # Deployable with weighted_correction: repeat gain*mean(baseline residual) at each step.
   residual:
     parameters:
-      correction_gain: 1.0
+      correction_gain: 1.0  # dimensionless; residual = observed - baseline forecast
+  # Library only: needs caller-provided feature/target adapters and dimensions.
   rls:
     parameters:
-      forgetting_factor: 0.99
-      initial_covariance: 100.0
+      forgetting_factor: 0.99  # dimensionless, (0, 1]; smaller forgets older samples faster
+      initial_covariance: 100.0  # initial RLS P = value*I; feature-dependent units
 fusions:
+  # Deployable state-bias fusion: forecast + weight*correction.
   weighted_correction:
     parameters: {}
+  # Library only: normalize caller weights and average multiple trajectories.
   baseline:
     parameters:
-      default_weights:
-      - 1.0
+      default_weights: [1.0]  # one per input trajectory; caller passes these to fuse()

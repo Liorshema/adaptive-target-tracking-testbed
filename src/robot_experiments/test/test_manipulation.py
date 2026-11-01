@@ -10,7 +10,8 @@ import yaml
 
 def context():
     """Use the actual authoritative arm and camera mount."""
-    path = Path(__file__).resolve().parents[2] / 'robot_description/config/robot/robot.yaml'
+    path = (Path(__file__).resolve().parents[2] /
+            'robot_description/config/robots/mobile_manipulator.yaml')
     return {'description': yaml.safe_load(path.read_text()),
             'joint_names': ['base_yaw_joint', 'shoulder_joint', 'elbow_joint', 'wrist_joint'],
             'world_frame': 'world',

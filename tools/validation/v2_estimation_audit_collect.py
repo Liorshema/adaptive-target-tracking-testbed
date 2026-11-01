@@ -16,7 +16,8 @@ OUT.mkdir(parents=True,exist_ok=True)
 os.environ.update(ROS_DOMAIN_ID='121',GZ_PARTITION=f'v2-estimation-audit-{os.getpid()}',GZ_IP='127.0.0.1',ROS_LOG_DIR=str(OUT/'ros-log'))
 robot=yaml.safe_load((ROOT/'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
 estcfg=load_estimation_parameters(ROOT/'src/robot_estimation/config/estimation.yaml', 'robot_ekf')['estimation_node']['ros__parameters']
-desc=yaml.safe_load((ROOT/'src/robot_description/config/robot/robot.yaml').read_text())['robot']
+description_path = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
+desc = yaml.safe_load(description_path.read_text())['robot']
 names=[robot['joint_name_template'].format(key=key) for key in desc['manipulator']['joints']]
 streams={'estimate':[],'odom':[],'joint':[]}
 def stamp(message):return message.header.stamp.sec+message.header.stamp.nanosec*1e-9

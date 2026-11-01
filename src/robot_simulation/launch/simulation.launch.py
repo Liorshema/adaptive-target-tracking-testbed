@@ -273,7 +273,10 @@ def configure(context):
     if sensor and sensor['enabled']:
         nodes.append(Node(package='robot_simulation', executable='localization_sensor',
             parameters=[{'use_sim_time': True, 'configuration_file': str(sensor_path)}], output='screen'))
-    essential = [node for node in nodes if isinstance(node, (Node, ExecuteProcess))]
+    # The visible client belongs to this launch: closing or losing it must also
+    # shut down the owned server, bridges and nodes. Headless behavior is unchanged.
+    essential = [node for node in [*nodes, *([gui] if gui is not None else [])]
+                 if isinstance(node, (Node, ExecuteProcess))]
     guards = [RegisterEventHandler(OnProcessExit(target_action=node, on_exit=[
         EmitEvent(event=Shutdown(reason='Essential simulation process exited'))]))
         for node in essential]

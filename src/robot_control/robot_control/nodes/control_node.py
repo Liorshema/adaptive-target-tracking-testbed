@@ -230,9 +230,11 @@ class ControlNode(Node):
         parameters = {name: self.get_parameter(name).value
                       for name in (*self._REQUIRED_PARAMETERS, *self._CONTROL_PARAMETERS)}
         parameters['safety_enabled'] = self.get_parameter('safety_enabled').value
+        from robot_description.model_parameters import default_robot_description_path
+
         configured = self.get_parameter('robot_description_file').value
         description_path = (Path(configured).expanduser() if configured else
-                            Path(get_package_share_directory('robot_description')) / 'config/robot/robot.yaml')
+                            default_robot_description_path())
         description = yaml.safe_load(description_path.read_text())
         strategy_path = self.get_parameter('strategy_config_file').value
         strategy_document = self.get_parameter('strategy_configuration').value

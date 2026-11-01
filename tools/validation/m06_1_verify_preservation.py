@@ -31,7 +31,7 @@ def verify():
     parameters = {}
     for kind in ['robot', 'target']:
         parameters.update(yaml.safe_load((ROOT / f'src/robot_estimation/config/{kind}_estimator.yaml').read_text())['estimation_node']['ros__parameters'])
-    description = ROOT / 'src/robot_description/config/robot/robot.yaml'
+    description = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
     parameters['robot_description_file'] = str(description)
     physical = yaml.safe_load(description.read_text())['robot']['manipulator']['joints']
     module = ModuleType('m06_1_baseline_node')

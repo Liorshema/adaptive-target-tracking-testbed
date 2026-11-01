@@ -186,8 +186,8 @@ class ComponentRegistry:
                 reasons.append(f'{key}: requires {required!r}, got {actual!r}')
         return {'compatible': not reasons, 'reasons': reasons}
 
-    def validate(self, name, parameters=None, context=None):
-        """Validate named parameter overrides without changing registry defaults."""
+    def validate(self, name, parameters=None, context=None, *, use_defaults=True):
+        """Validate overrides, or a resolved mapping with no default merge, without mutation."""
         entry = self._entry(name)
         if parameters is None:
             parameters = {}
@@ -197,6 +197,9 @@ class ComponentRegistry:
             check = self.compatibility(name, context)
             if not check['compatible']:
                 raise ValueError(f"{name}: incompatible: {'; '.join(check['reasons'])}")
+        if not use_defaults:
+            return (validate_schema(parameters, entry['schema'], name)
+                    if entry['schema'] is not None else deepcopy(dict(parameters)))
         if entry['schema'] is None:
             return {**deepcopy(entry['defaults']), **dict(parameters)}
 
@@ -213,12 +216,12 @@ class ComponentRegistry:
         merged = merge(entry['defaults'], parameters)
         return validate_schema(merged, entry['schema'], name)
 
-    def create(self, name, parameters=None, *, context=None, **dependencies):
-        """Construct validated parameters plus separately declared runtime dependencies."""
+    def create(self, name, parameters=None, *, context=None, use_defaults=True, **dependencies):
+        """Construct validated settings/dependencies; use_defaults=False preserves frozen maps."""
         entry = self._entry(name)
         unknown = set(dependencies) - set(entry['dependencies'])
         overlap = set(parameters or {}) & set(dependencies)
         if unknown or overlap:
             raise ValueError(f'{name}: invalid/shadowed dependencies {sorted(unknown | overlap)}')
-        values = self.validate(name, parameters, context)
+        values = self.validate(name, parameters, context, use_defaults=use_defaults)
         return entry['builder'](**values, **dependencies)

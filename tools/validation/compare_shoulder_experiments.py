@@ -19,8 +19,8 @@ def analyze(path):
     snapshot = yaml.safe_load((path / 'configuration_snapshot.yaml').read_text())
     # YAML snapshot serialization sorts mappings; raw vectors retain description order.
     # These captures share the unchanged ordered description; record that order explicitly.
-    description = yaml.safe_load(
-        (ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
+    description_path = ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml'
+    description = yaml.safe_load(description_path.read_text())['robot']
     assert description == snapshot['description'], 'Description differs from captured configuration'
     robot = yaml.safe_load((ROOT / 'src/robot_simulation' /
                            snapshot['simulation']['robot']['config']).read_text())['robot']

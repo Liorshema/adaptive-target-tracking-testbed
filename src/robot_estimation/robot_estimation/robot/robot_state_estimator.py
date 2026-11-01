@@ -51,6 +51,7 @@ class RobotStateEstimator(EstimatorInterface):
         joint_measurement_model: JointEncoderMeasurementModel,
         state_constraint=None,
         pose_acceptance=None,
+        filter_factory=None,
     ) -> None:
         if (
             initial_state.dimension
@@ -104,7 +105,8 @@ class RobotStateEstimator(EstimatorInterface):
             joint_measurement_model
         )
 
-        self._filter = ExtendedKalmanFilter(
+        filter_factory = ExtendedKalmanFilter if filter_factory is None else filter_factory
+        self._filter = filter_factory(
             initial_state=initial_state,
             process_function=self._process_function,
             process_jacobian=self._process_jacobian,

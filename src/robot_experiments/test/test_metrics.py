@@ -12,7 +12,7 @@ import yaml
 
 
 def context():
-    path = Path(__file__).parents[2] / 'robot_description/config/robot/robot.yaml'
+    path = Path(__file__).parents[2] / 'robot_description/config/robots/mobile_manipulator.yaml'
     description = yaml.safe_load(path.read_text())
     return {'description': description, 'joint_names': ['base_yaw', 'shoulder', 'elbow', 'wrist'],
             'robot': {'pose': [0., 0., .25, 0., 0., 0.]},

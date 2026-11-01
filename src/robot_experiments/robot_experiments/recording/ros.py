@@ -1,5 +1,7 @@
 """Own one ROS observer/context; leave domain selection and process lifecycle outside."""
 import sys
+from contextlib import contextmanager
+import math
 from importlib import import_module
 from time import monotonic
 
@@ -95,12 +97,14 @@ class Recorder(TelemetryStore):
                     if primary is None:
                         raise
 
-    def spin_once(self, timeout=.05):
+    def spin_once(self, timeout=.05, *, until=None):
         """Wait once, then drain ready subscriptions for at most 128 callbacks/10 ms.
 
         A lifecycle iteration must consume more than one source callback when
         telemetry arrives faster than its polling rate. Nonblocking drain calls
         stop immediately when the executor has no ready subscription to service.
+        An optional condition returns the current state before a later callback
+        can invalidate it; queued messages remain available for subsequent calls.
         """
         if self._closed:
             raise RuntimeError('recorder is closed')
@@ -109,12 +113,18 @@ class Recorder(TelemetryStore):
             timing.begin_batch(timeout)
         reason = 'exception'
         try:
+            if until is not None and until():
+                reason = 'condition'
+                return
             previous = self._callback_count
             self._spin(timeout)
             deadline = monotonic() + .01
             if timing is not None:
                 timing.start_drain()
             for _ in range(127):
+                if until is not None and until():
+                    reason = 'condition'
+                    break
                 if self._callback_count == previous:
                     reason = 'no_callback'
                     break
@@ -152,3 +162,36 @@ class Recorder(TelemetryStore):
                         self._ros_context.try_shutdown()
         finally:
             super().close()
+
+
+@contextmanager
+def observe_clock(topic):
+    """Observe clock availability only; no scientific recording or scoring occurs."""
+    from rclpy.context import Context
+    from rclpy.executors import SingleThreadedExecutor
+    from rclpy.node import Node
+    from rclpy.qos import qos_profile_sensor_data
+    from rosgraph_msgs.msg import Clock
+
+    context = Context()
+    node = executor = None
+    value = [None]
+    try:
+        context.init(args=[])
+        node = Node('simulation_preview_monitor', context=context)
+        executor = SingleThreadedExecutor(context=context)
+        executor.add_node(node)
+
+        def receive(message):
+            epoch = message.clock.sec + message.clock.nanosec * 1e-9
+            if math.isfinite(epoch) and epoch >= 0:
+                value[0] = epoch
+
+        node.create_subscription(Clock, topic, receive, qos_profile_sensor_data)
+        yield value, lambda: executor.spin_once(timeout_sec=0.1)
+    finally:
+        if executor is not None:
+            executor.shutdown(timeout_sec=1.0)
+        if node is not None:
+            node.destroy_node()
+        context.try_shutdown()

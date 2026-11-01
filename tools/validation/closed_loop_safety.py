@@ -38,7 +38,7 @@ def main():
     os.environ['GZ_PARTITION'] = f'closed-loop-safety-{os.getpid()}'
     os.environ['GZ_IP'] = '127.0.0.1'
     os.environ['ROS_LOG_DIR'] = str(args.output / 'ros-log')
-    limits = yaml.safe_load((ROOT / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']['manipulator']['joints']
+    limits = yaml.safe_load((ROOT / 'src/robot_description/config/robots/mobile_manipulator.yaml').read_text())['robot']['manipulator']['joints']
     robot = yaml.safe_load((ROOT / 'src/robot_simulation/config/gazebo/robot.yaml').read_text())['robot']
     control = load_control_parameters(ROOT / 'src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']
     thresholds = yaml.safe_load(Path(__file__).with_name('closed_loop_thresholds.yaml').read_text())

@@ -59,7 +59,7 @@ def test_real_owner_preflight_and_seed_reaches_measurement_config(tmp_path):
  measured=yaml.safe_load(Path(sim['simulation']['measurement_config']).read_text())
  assert measured['measurements']['target_position']['random_seed']==917
  assert yaml.safe_load((SRC/'robot_simulation/config/measurements.yaml').read_text())['measurements']['target_position']['random_seed']==42
- assert result['context']['description']==yaml.safe_load((SRC/'robot_description/config/robot/robot.yaml').read_text())
+ assert result['context']['description']==yaml.safe_load((SRC/'robot_description/config/robots/mobile_manipulator.yaml').read_text())
  assert result['plan']['runtime']['enable_actuation'] is True
  assert result['snapshot']['seed_consumers']
  assert result['plan']['description_path'].is_relative_to(run)

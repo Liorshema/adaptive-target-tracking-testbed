@@ -347,3 +347,74 @@ def test_readiness_can_require_fresh_source_epochs(tmp_path):
     assert not telemetry.ready(['clock','target_truth'])
     telemetry.record('target_truth',point(2.98),1.2)
     assert telemetry.ready(['clock','target_truth'])
+
+
+def test_ros_drain_returns_current_fresh_state_without_consuming_later_stale_message(tmp_path, monkeypatch):
+    resources = fake_ros(monkeypatch)
+    recorder = recording().Recorder({'topics': {'clock': '/clock', 'target_truth': '/target'},
+                                    'readiness_max_age': .08}, tmp_path)
+    queue = queued_executor(resources, monkeypatch, [
+        ('/clock', NS(clock=NS(sec=3, nanosec=0))), ('/target', point(t=2.98)),
+        ('/clock', NS(clock=NS(sec=4, nanosec=0))),
+    ])
+    try:
+        recorder.spin_once(.02, until=lambda: recorder.ready(['clock', 'target_truth']))
+        assert recorder.ready(['clock', 'target_truth']) and recorder.clock == 3.
+        assert len(queue) == 1
+        recorder.spin_once()
+        assert not queue and recorder.clock == 4.
+        assert not recorder.ready(['clock', 'target_truth'])
+        assert recorder.streams['target_truth'][0]['source_time'] == 2.98
+    finally:
+        recorder.close()
+
+
+def test_real_window_observes_intermediate_readiness_then_completes_duration(tmp_path, monkeypatch):
+    from robot_experiments.execution import run_window
+
+    resources = fake_ros(monkeypatch)
+    recorder = recording().Recorder({'topics': {'clock': '/clock', 'target_truth': '/target'},
+                                    'readiness_max_age': .08}, tmp_path)
+    queued_executor(resources, monkeypatch, [
+        ('/clock', NS(clock=NS(sec=3, nanosec=0))), ('/target', point(t=2.98)),
+        ('/clock', NS(clock=NS(sec=6, nanosec=0))),
+    ])
+    try:
+        decisions = []
+        result = run_window(NS(poll=lambda: None), recorder,
+                            required_streams=['clock', 'target_truth'], duration=2.,
+                            settling_time=1., readiness_timeout=.05, stall_timeout=.05,
+                            wall_timeout=.5, on_ready=lambda clock: decisions.append(
+                                recorder.readiness_snapshot(['clock', 'target_truth'])))
+        assert len(decisions) == 1 and decisions[0]['ready'] is True
+        assert decisions[0]['clock'] == 3. and decisions[0]['max_skew'] == .08
+        assert decisions[0]['source_times'] == {'clock': 3., 'target_truth': 2.98}
+        assert result['origin'] == 3.
+        assert result['window_start'] == 4. and result['window_end'] == 6.
+        assert result['stop_clock'] == 6.
+        # All original messages stay recorded; no timestamps or predicate change.
+        assert [v['source_time'] for v in recorder.streams['clock']] == [3., 6.]
+    finally:
+        recorder.close()
+
+
+def test_zero_clock_freshness_does_not_prevent_readiness_dispatch(tmp_path, monkeypatch):
+    from robot_experiments.execution import run_window
+
+    resources = fake_ros(monkeypatch)
+    recorder = recording().Recorder({'topics': {'clock': '/clock', 'target_truth': '/target'},
+                                    'readiness_max_age': .08}, tmp_path)
+    recorder.record('clock', NS(clock=NS(sec=0, nanosec=0)))
+    recorder.record('target_truth', point(t=0.))
+    queued_executor(resources, monkeypatch, [
+        ('/clock', NS(clock=NS(sec=3, nanosec=0))), ('/target', point(t=2.98)),
+        ('/clock', NS(clock=NS(sec=6, nanosec=0))),
+    ])
+    try:
+        result = run_window(NS(poll=lambda: None), recorder,
+                            required_streams=['clock', 'target_truth'], duration=2.,
+                            settling_time=1., readiness_timeout=.05, stall_timeout=.05,
+                            wall_timeout=.5)
+        assert result['origin'] == 3.
+    finally:
+        recorder.close()

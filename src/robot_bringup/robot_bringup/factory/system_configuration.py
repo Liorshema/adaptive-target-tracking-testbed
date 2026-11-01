@@ -397,6 +397,16 @@ def _assemble(data, source, share, overrides):
         path='estimation.parameters',
     )
     validate_runtime_parameters(params)
+    from robot_estimation.factory.algorithm_parameters import freeze_algorithm_parameters
+
+    params = freeze_algorithm_parameters(
+        params, {role: estimation[role]['type'] for role in ('robot', 'target')})
+    from robot_estimation.configuration import estimation_configuration_path
+
+    for role in ('robot', 'target'):
+        parameter_sources.setdefault(
+            role + '_algorithm_parameters',
+            str(estimation_configuration_path()) + ':estimators')
     for name, parameter in params.items():
         if (
             name.endswith(('_variance', '_noise_std'))

@@ -24,12 +24,9 @@ def generate_launch_description() -> LaunchDescription:
         / 'robot.urdf.xacro'
     )
 
-    config_path = (
-        package_share
-        / 'config'
-        / 'robot'
-        / 'robot.yaml'
-    )
+    from robot_description.model_parameters import default_robot_description_path
+
+    config_path = default_robot_description_path()
 
     rviz_config_path = (
         package_share

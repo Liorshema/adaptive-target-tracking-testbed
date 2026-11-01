@@ -12,8 +12,8 @@ from shoulder_experiment_metrics import experiment_metrics
 @pytest.mark.parametrize('seconds', ['11', 11])
 def test_native_pose_decode_with_optional_tf_and_known_optical_geometry(tmp_path, seconds):
     root = Path(__file__).resolve().parents[2]
-    description = yaml.safe_load(
-        (root / 'src/robot_description/config/robot/robot.yaml').read_text())['robot']
+    description_path = root / 'src/robot_description/config/robots/mobile_manipulator.yaml'
+    description = yaml.safe_load(description_path.read_text())['robot']
     scene = {'header': {'stamp': {'sec': seconds, 'nsec': 0}}, 'pose': [
         {'name': 'robot', 'orientation': {'w': 1.}},
         {'name': 'arm_link_1', 'position': {'z': .18}, 'orientation': {'w': 1.}},

@@ -55,7 +55,8 @@ def test_nominal_family_has_equal_owners_and_actual_implementations(old, new):
         '.ConstantVelocityPredictor' if old == 'cv' else '.IMMPredictor')
     assert b['identities']['controller'].endswith(
         '.JacobianController' if old == 'dls' else '.WeightedLeastSquaresController')
-    assert b['description_path'] == share('robot_description') / 'config/robot/robot.yaml'
+    assert b['description_path'] == (
+        share('robot_description') / 'config/robots/mobile_manipulator.yaml')
     sensor = b['sensor_inventory']['sources']['external_planar_localization']
     assert not sensor['producer']['configured'] and not sensor['fusion']['enabled']
 

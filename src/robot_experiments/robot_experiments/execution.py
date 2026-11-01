@@ -120,7 +120,10 @@ class OwnedLaunch:
             self._monitor = threading.Thread(target=self._watch, daemon=True)
             self._monitor.start()
         except BaseException:
-            self._output.close()
+            if self.process is not None:
+                self.stop()
+            else:
+                self._output.close()
             raise
         return self
 
@@ -189,6 +192,11 @@ class OwnedLaunch:
                     continue
             return alive
 
+    def identities(self):
+        """Snapshot live owned PID/create-time pairs for readiness and evidence."""
+        return [{'pid':process.pid,'created':process.create_time()}
+                for process in self._snapshot()]
+
     def poll(self):
         """Return the launcher exit code without process-table traversal."""
         return None if self.process is None else self.process.poll()
@@ -227,7 +235,7 @@ class OwnedLaunch:
                     break
                 time.sleep(min(.01, max(0, deadline - time.monotonic())))
         self._finished.set()
-        if self._monitor is not None:
+        if self._monitor is not None and self._monitor.is_alive():
             self._monitor.join(timeout=.1)
         survivors = [candidate.pid
                      for candidate in self._snapshot(scan_marker=True, scan_session=True)]
@@ -240,7 +248,7 @@ class OwnedLaunch:
 
 def run_window(process, recorder, *, required_streams: list, duration: float,
                settling_time: float, readiness_timeout: float, stall_timeout: float,
-               wall_timeout: float, tick=None) -> dict:
+               wall_timeout: float, tick=None, on_ready=None) -> dict:
     """Wait for readiness, settle, and measure a complete simulation-time window.
 
     Recorder clocks are seconds. Monotonic deadlines are independent of simulator
@@ -259,7 +267,12 @@ def run_window(process, recorder, *, required_streams: list, duration: float,
         returncode = process.poll()
         if returncode is not None:
             raise RunFailure('process_exited', {'returncode': returncode})
-        recorder.spin_once(.02)
+        if origin is None:
+            recorder.spin_once(.02, until=lambda: (
+                recorder.clock is not None and recorder.clock > 0
+                and recorder.ready(required_streams)))
+        else:
+            recorder.spin_once(.02)
         now = time.monotonic()
         clock = recorder.clock
         details = {'clock': clock, 'monotonic_elapsed': now - started, 'origin': origin}
@@ -283,6 +296,8 @@ def run_window(process, recorder, *, required_streams: list, duration: float,
         if origin is None:
             if clock is not None and clock > 0 and recorder.ready(required_streams):
                 origin = clock
+                if on_ready is not None:
+                    on_ready(clock)
             elif now - started >= readiness_timeout:
                 raise RunFailure('readiness_timeout', details)
         if clock is not None and clock > 0 and now - last_progress >= stall_timeout:

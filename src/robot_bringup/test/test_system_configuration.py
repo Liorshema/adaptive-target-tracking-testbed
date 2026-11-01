@@ -48,7 +48,7 @@ def test_nominal_selects_actual_owner_components_and_safe_defaults():
     assert plan['runtime']['publish_commands'] is False
     assert plan['description_path'] == (
         share('robot_description') /
-        'config/robot/robot.yaml').resolve()
+        'config/robots/mobile_manipulator.yaml').resolve()
 
 
 def test_alternates_change_real_selected_implementations():

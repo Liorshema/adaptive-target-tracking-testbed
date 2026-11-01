@@ -11,6 +11,7 @@ from robot_experiments.configuration import resolve_system_resource
 
 SRC = Path(__file__).resolve().parents[2]
 ALLOWED = {
+    'robot_dashboard': {'robot_experiments'},
     'robot_configuration': set(), 'robot_description': set(), 'robot_interfaces': set(),
     'robot_models': set(), 'robot_estimation': {'robot_description', 'robot_interfaces', 'robot_configuration'},
     'robot_prediction': {'robot_interfaces', 'robot_configuration'},

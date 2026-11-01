@@ -95,7 +95,7 @@ def test_legacy_pid_recovery_offset_can_lift_the_horizontal_loaded_arm():
     """Legacy PID offset rationale only; native velocity servo needs physical tests."""
     root = Path(__file__).resolve().parents[2]
     simulation = root / 'robot_simulation'
-    robot_path = root / 'robot_description/config/robot/robot.yaml'
+    robot_path = root / 'robot_description/config/robots/mobile_manipulator.yaml'
     hold_path = simulation / 'config/gazebo/joint_position_hold.yaml'
     robot = yaml.safe_load(robot_path.read_text())['robot']
     hold = yaml.safe_load(hold_path.read_text())['joint_position_hold']

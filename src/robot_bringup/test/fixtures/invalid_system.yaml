@@ -3,7 +3,7 @@ robot:
   type: mobile_manipulator
   description:
     package: robot_description
-    path: config/robot/robot.yaml
+    path: config/robots/mobile_manipulator.yaml
   model:
     base: differential_drive
     manipulator: serial_arm

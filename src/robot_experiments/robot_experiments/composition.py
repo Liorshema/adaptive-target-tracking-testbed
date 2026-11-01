@@ -56,6 +56,8 @@ def materialize_resource(reference, base, share):
     """
     Resolve a plain reference or materialize an explicit package/path/group.
 
+    A resource may also be an exact ``{document: mapping}`` envelope, transported
+    to the same owner readers without adding another validation path.
     A selected mapping is either an ordinary document or an exact
     ``{base: resource, overrides: mapping, selection?: mapping}`` recipe. Selection
     replaces existing typed component slots atomically before strict existing
@@ -89,6 +91,15 @@ def _append(records, additions):
 
 def _materialize(reference, base, share, ancestors):
     global _temporary
+    if isinstance(reference, dict) and set(reference) == {'document'}:
+        if not isinstance(reference['document'], dict):
+            raise ValueError('Inline resource document must be a mapping')
+        records = []
+        value = _expand(reference['document'], base, share, ancestors, records,
+                        preserve_owners=reference['document'].get('schema_version') == 2)
+        if value.get('schema_version') == 2:
+            value = _system_references(value, Path(base) / '<inline>', share)
+        return _store_document(value, records)
     if isinstance(reference, dict) and 'base' in reference:
         identity = ('inline', id(reference))
         if identity in ancestors:
@@ -356,6 +367,10 @@ def _select(document, selections, label):
 
 def _expand(value, base, share, ancestors, records, *, preserve_owners):
     if isinstance(value, dict):
+        if set(value) == {'document'}:
+            target = _materialize(value, base, share, ancestors)
+            _append(records, resource_sources(target))
+            return str(target)
         if 'base' in value and 'overrides' in value:
             target = _materialize(value, base, share, ancestors)
             _append(records, resource_sources(target))

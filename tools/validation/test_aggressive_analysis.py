@@ -18,7 +18,8 @@ def snapshot():
     def load(path):
         return yaml.safe_load((ROOT / path).read_text())
     return {
-        'description': load('src/robot_description/config/robot/robot.yaml')['robot'],
+        'description': load(
+            'src/robot_description/config/robots/mobile_manipulator.yaml')['robot'],
         'robot': load('src/robot_simulation/config/gazebo/robot.yaml')['robot'],
         'control': load_control_parameters('src/robot_control/config/control.yaml', 'parameters')['control_node']['ros__parameters']}
 

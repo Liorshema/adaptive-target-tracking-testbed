@@ -31,7 +31,7 @@ def share(package):
 def test_wrist_variant_is_complete_description_with_only_position_bounds_changed(degrees):
     """Xacro and every plain YAML consumer must see identical owner parameters."""
     root = share('robot_description') / 'config/robot'
-    nominal = load_yaml(root / 'robot.yaml')
+    nominal = load_yaml(share('robot_description') / 'config/robots/mobile_manipulator.yaml')
     path = resolve_system_resource(root / f'robot_wrist{degrees}.yaml', Path.cwd(), lambda package: Path(__file__).resolve().parents[2] / package)
     actual = yaml.safe_load(path.read_text())
     expected = deepcopy(nominal)

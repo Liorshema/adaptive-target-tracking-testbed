@@ -171,8 +171,8 @@ class ExperimentCatalog:
                 node['system_config'] = str(resolve_system_resource(
                     node['system_config'], self.path.parent, self.share))
         runtime = {} if runtime_overrides is None else runtime_overrides
-        if not isinstance(runtime, dict) or set(runtime)-{'enable_actuation'}:
-            raise ValueError('runtime overrides: supported enable_actuation only')
+        if not isinstance(runtime, dict) or set(runtime)-{'enable_actuation', 'gui'}:
+            raise ValueError('runtime overrides: supported enable_actuation and gui only')
         ex['runtime'] = {**ex.get('runtime', {}), **runtime}
         with tempfile.TemporaryDirectory(prefix='experiment_definition_') as temporary:
             path = Path(temporary)/'experiment.yaml'

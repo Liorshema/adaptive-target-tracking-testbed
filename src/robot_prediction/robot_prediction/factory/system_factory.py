@@ -1,5 +1,7 @@
 """Assemble registered predictor, adaptation and fusion contracts."""
 
+from collections.abc import Mapping
+from copy import deepcopy
 import math
 
 from robot_prediction.evaluation.performance_monitor import PerformanceMonitor
@@ -8,6 +10,17 @@ from robot_prediction.interfaces.correction import CorrectionFusion
 from robot_prediction.interfaces.correction import ResidualCorrection
 from robot_prediction.interfaces.predictor import Predictor
 from robot_prediction.trajectory_prediction import TrajectoryPredictionSystem
+
+
+def _merge_parameters(owner, explicit):
+    result = deepcopy(owner)
+    for key, value in explicit.items():
+        result[key] = (
+            _merge_parameters(result[key], value)
+            if isinstance(result.get(key), Mapping) and isinstance(value, Mapping)
+            else deepcopy(value)
+        )
+    return result
 
 
 class PredictionSystemFactory:
@@ -37,11 +50,21 @@ class PredictionSystemFactory:
             'fusion': fusion_type,
         }
         built = {}
+        owner_families = {'predictor': 'predictors', 'adaptation': 'adaptations',
+                          'fusion': 'fusions'}
+        owner_data = self._config.data
         for family in ['predictor', 'adaptation', 'fusion']:
             registry = self._registries[family]
             name = selections[family]
             try:
-                built[family] = registry.create(name, parameters.get(family), context=context)
+                owner_parameters = owner_data[owner_families[family]].get(name, {}).get(
+                    'parameters', {})
+                registry.validate(name, owner_parameters, context=context)
+                overrides = parameters.get(family)
+                if overrides is not None and not isinstance(overrides, Mapping):
+                    raise TypeError('parameters must be a mapping')
+                selected_parameters = _merge_parameters(owner_parameters, overrides or {})
+                built[family] = registry.create(name, selected_parameters, context=context)
             except (KeyError, TypeError, ValueError) as error:
                 raise ValueError(f'prediction.{family}={name!r}: {error}') from error
             if family == 'adaptation':

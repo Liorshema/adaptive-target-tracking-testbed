@@ -20,6 +20,7 @@ DOMAINS = {
                          'measurements', 'engine', 'gazebo', 'actuation', 'diagnostics'),
     'robot_bringup': ('visualization',),
     'robot_experiments': ('configuration', 'execution', 'recording', 'metrics', 'benchmarking', 'reporting'),
+    'robot_dashboard': ('assets',),
 }
 IGNORED = {'build', 'install', 'log', '__pycache__', '.pytest_cache', '.ruff_cache',
            'results', '.git'}
