@@ -264,6 +264,7 @@ def test_factory_discovers_test_only_declaration_and_uses_owner_yaml(tmp_path, m
         factory_module, 'DYNAMICS_MODEL_NAMESPACE', 'robot_simulation.dynamics.target'
     )
     assert SimulationFactory.with_defaults().dynamics_registry.names() == (
+        'equation_state_space',
         'fight_flight',
         'saturated_fight_flight',
     )

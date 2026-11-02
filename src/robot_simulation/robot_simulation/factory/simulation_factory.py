@@ -171,6 +171,23 @@ class SimulationFactory:
         from robot_configuration.model_registration import discover_models
 
         discover_models(factory.dynamics_registry, DYNAMICS_MODEL_NAMESPACE, data['dynamics'])
+        from robot_simulation.dynamics.equation_model import EquationDynamics, PARAMETER_SCHEMA
+
+        if 'equation_state_space' in data['dynamics']:
+            factory.dynamics_registry.register(
+                'equation_state_space', EquationDynamics,
+                defaults=data['dynamics']['equation_state_space']['parameters'],
+                schema=PARAMETER_SCHEMA, dependencies=('environment_field',),
+                description='Validated named continuous state-space equations',
+                capabilities={
+                    'state_layout': 'explicit ordered named scalars/vectors',
+                    'state_dimension': 'from model (bounded to 1024 scalar entries)',
+                    'deployable': True,
+                    'deployment_requires': 'explicit six-state Cartesian adapter and live bindings',
+                    'runtime_validation': 'equation_schema_units_shapes_domains',
+                    'atomic_parameters': ['model'],
+                    'acceleration_convention': 'Cartesian adapter adds environment exactly once',
+                })
         return factory
 
     def create(
@@ -178,6 +195,7 @@ class SimulationFactory:
         target_config: Mapping[str, Any],
         environment_config: Mapping[str, Any],
         simulation_config: Mapping[str, Any],
+        *, reference_frame: str | None = None,
     ) -> tuple[SimulationEngine, float]:
         """Build the simulation engine and timestep from YAML data."""
         target = target_config['target']
@@ -199,6 +217,9 @@ class SimulationFactory:
             target['dynamics'],
             environment_field=environment_field,
         )
+        validate_deployment = getattr(dynamics, 'validate_deployment', None)
+        if validate_deployment is not None:
+            validate_deployment(reference_frame)
 
         integration_config = simulation['integration']
         integrator = self.integrator_registry.create(

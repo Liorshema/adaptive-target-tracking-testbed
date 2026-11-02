@@ -8,6 +8,26 @@ from robot_configuration.components import ComponentRegistry as RegisteredCompon
 class ComponentRegistry(RegisteredComponents):
     """Preserve the public simulation factory API without another registry engine."""
 
+    def validate(self, name, parameters=None, context=None, *, use_defaults=True):
+        """Delegate coupled/atomic parameter preparation to an optional owner hook."""
+        entry = self._entry(name)
+        prepare = getattr(entry['builder'], 'prepare_parameters', None)
+        if prepare is not None:
+            parameters = prepare(
+                {} if parameters is None else parameters, entry['defaults'],
+                use_defaults=use_defaults)
+            use_defaults = False
+        return super().validate(name, parameters, context, use_defaults=use_defaults)
+
+    def apply_overrides(self, name, parameters, overrides):
+        """Resolve existing owner values with their atomic/domain override semantics."""
+        from robot_configuration.parameter_validation import override_parameters
+
+        prepare = getattr(self._entry(name)['builder'], 'prepare_parameters', None)
+        values = (prepare(overrides, parameters) if prepare is not None
+                  else override_parameters(parameters, overrides))
+        return self.validate(name, values, use_defaults=False)
+
     def create(self, config, **dependencies):
         if not isinstance(config, Mapping) or set(config) - {'type', 'parameters', 'enabled'}:
             raise ValueError('Component specification must contain type and parameters only')

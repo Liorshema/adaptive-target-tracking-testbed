@@ -41,10 +41,10 @@ for a local engineering workspace; authenticated remote hosting is outside this 
 **Experiment Lab** holds selection/create, schema-driven component cards, duration,
 Seeds, revision actions, Simulation Setup and Run/Stop. **Results & History** holds
 the selected recorded Run, four KPIs and four equal panels: radial error, pointing
-error, raw target XY telemetry and current-Session comparison. Computation time is
+error, raw target 2D/3D telemetry and current-Session comparison. Computation time is
 available in Advanced / Diagnostics. Both remain mounted when switching,
 so an unsaved draft or current Job is not destroyed. Current Session selection and
-its + create/refresh menu are shared in the header.
+its ⋯ create/refresh/rename/delete menu are shared in the header.
 
 At 100% browser zoom both tabs fit 1920×1080, 1600×900 and 1650×790 without page scrolling. Parameter bodies,
 long execution evidence and history rows have bounded internal scrolling. Advanced
@@ -57,8 +57,9 @@ screens use normal responsive document scrolling. The dark theme is based on
 1. Select a **Scenario** and condition. **Advanced · revision history** retains
    saved revision selection and the backend's complete explanation. Human labels
    come from Catalog metadata, with immutable recorded names for external Runs.
-2. Choose **Revise selected** or **Create new**. Creating needs a unique ID such
-   as `EXP-MY-STUDY` and a display name. Click **Load configuration**. This explicitly
+2. Choose **Revise selected** or **Create new**. Creating needs a display name;
+   a deterministic available ID is proposed automatically and can be overridden
+   under **Advanced · identifier**. Click **Load configuration**. This explicitly
    replaces any unsaved form edits. Revision editing starts from the latest saved
    revision; use Create new to branch from history.
 3. Expand a component card. Choices come from live registries through the backend.
@@ -229,28 +230,49 @@ availability; missing values remain unavailable. Exactly four KPI cards show:
 The cards and primary charts retain recorded units, including radians. The
 comparison's angular RMSE converts declared radians to degrees for its degree
 column. Unknown units or missing RMSE remain unavailable, with no mean substitute.
-The table's optional rank uses radial RMSE in metres, lower is better; equal
-recorded values share a rank. Ranking requires the backend's explicit scientific
-comparability approval and valid radial RMSE for every Run. Reasons and ranking
-criterion are available through tooltips and Comparison details.
+The table consumes authoritative backend Condition ranks: equal-weight mean across
+matched Seeds of each Run's saved radial RMSE in metres, lower is better. Ties
+share a rank. Sample count, sample standard deviation (unknown for one Seed),
+per-seed values and Run links remain in collapsed Comparison details. Physical
+safety/command gates, complete seed groups, frozen evidence and compatible
+scientific conditions are required. The browser never computes ranks or substitutes
+mean error for RMSE. Historical evidence without a frozen Condition/seed declaration
+remains descriptive. See [comparison policies and verification](validation/scientific_comparability.md).
 
-The 2×2 panels show radial error, pointing angle, independent raw XY trajectories
+In Experiment Lab, **Advanced Comparison Setup** declares one exact registered
+model or mathematical parameter leaf. Load a pinned baseline, declare the allowed
+model choices or parameter values, Validate and Save each configuration as an
+immutable revision with the same declaration and Seeds. Run the saved revisions
+and add their Runs to the same Session. Dynamics studies are labeled separately;
+other settings must remain protected and compatible. Existing sensor/multi-variable
+policies are preserved; the Author/CLI can author multiple exact variables.
+
+The 2×2 panels show radial error, pointing angle, independent raw trajectories
 and Session comparison. Charts use original markers without interpolation,
 smoothing or alignment. Controller computation time, recorded evaluation windows,
 full metric contracts, ownership and safety records remain under Advanced /
 Diagnostics. Failed readiness produces no fake plots.
 
-Advanced paging sets the sample offset, which pages up to 1,000 scored samples per series, plus up to 20
-raw control telemetry records for inspection. The target XY projection reads up
-to 200 normalized records each from `target_truth`, `target_estimate` and
-`prediction`. It plots original XYZ-leading state coordinates as XY markers,
-using one horizon from the final prediction record on that page. It only overlays
-streams with matching recorded frame and metre units; missing/incompatible
-streams remain unavailable. Each stream page can cover a different source-time
-span: these are independent raw trajectories, not time-aligned comparisons or a
-scored evaluation-window view. Hover exposes source/forecast epochs. No frame
-transforms or new scientific metrics are calculated. The advanced performance plot
-uses computation time because base/arm allocation is not scored in these artifacts.
+Advanced paging sets the sample offset: up to 1,000 scored samples per series and
+20 raw control records. Trajectories scan each target stream from that raw offset
+to the end of its recording, in bounded 1,000-message pages. The default offset
+zero covers the whole available recording, including startup/settling samples;
+it is not restricted to the scored window. Streams retain independent source
+spans. Up to 4,000 genuine points per trace are sent to the browser; longer paths
+use disclosed display sampling with the first and last actual samples retained.
+Visible counts report plotted/valid samples and invalid omissions. No interpolation,
+frame transform, resampling or scientific metric is calculated.
+
+The **Forecast** message number selects one recorded origin from the available
+history (latest by default). It displays that message's recorded future states,
+origin and forecast epochs, with a recorded/declared horizon count. Partial or
+unknown horizons are labeled honestly. Separate forecasts are never connected
+into one predicted path. History before/after the actual recording is unknown.
+Normal and expanded 2D/3D views share this reader and selector semantics; changing
+the expanded forecast also updates the normal view. Only matching frames and
+metre units are overlaid. XY uses equal physical scale and 3D uses data aspect.
+Hover exposes original epochs, XYZ and units. The advanced performance plot uses
+computation time because base/arm allocation is not scored in these artifacts.
 The backend's scored-series reader
 uses its existing 32 MiB JSON-file bound before slicing; this is bounded whole-file
 reading, not streaming JSON. Original artifact references and safety/coverage
@@ -262,6 +284,62 @@ metrics alongside the backend's scientific comparability reasons, including
 failed or unavailable Runs. Incomparable Runs are never ranked. The launch Session
 remains fixed even if another Session is selected during execution. Refresh the
 Session list/comparison after edits made by another client.
+
+The Session selector's **⋯** menu opens compact rename or deletion dialogs.
+Deletion previews the actual number of exclusively referenced managed Runs to
+remove and shared Runs to preserve. Confirmed deletion removes that Session and
+its exclusive managed artifacts; other Sessions' references protect shared Runs.
+Historical roots registered only for viewing remain protected. Concurrent scope
+changes invalidate confirmation; active Jobs or unresolved cleanup block deletion.
+New Jobs retain their launch Session before a Run exists. Terminal legacy Jobs
+require reliable cleanup evidence, including retained Run cleanup when available.
+
+The Scenario selector's **⋯** menu provides **Rename Scenario** and **Delete
+Scenario**. Rename persists a mutable Catalog display alias; original names,
+definitions, revision hashes, Run metadata and identities remain unchanged.
+Deletion previews matching immutable Run identities and the number of Sessions
+to update. After explicit confirmation, it removes owned artifacts, prunes only
+their Session references and permanently removes Catalog revisions. Empty or
+mixed Sessions survive. The ID remains retired to prevent reuse. External or
+ambiguous evidence, active previews/Jobs and uncertain cleanup block deletion.
+
+Deletion authority defaults to **DATA_DIR/runs**. `--result-root` grants read
+access only; repeatable **--managed-result-root** explicitly configures writable
+ownership boundaries. Ownership and references are scoped to this backend
+workspace; do not assign another workspace's shared historical roots as managed.
+The backend rechecks impact tokens, all Session references and Job cleanup under
+owner locks. Same-filesystem staging and an undo journal restore precommit
+failures; postcommit cleanup is retried for the original confirmed scope.
+Incomplete cleanup is an error, never success. After browser restart, a pending
+transaction can be resumed through the documented backend recovery call; see
+[D2.8a evidence](validation/dashboard_cleanup.md). Completed receipts retain no
+deleted definitions or Session preimages.
+
+Standard ROS 2 `<Run>/ros-log/latest` aliases are supported only inside verified,
+exclusively selected managed Runs, pointing directly to an existing sibling
+ROS timestamp/host/PID directory. Deletion inventories and unlinks the alias entry;
+it never follows it. Its raw destination is rechecked during confirmation and
+staged recovery. Other links, escapes, chains, dangling aliases and Job artifacts
+remain protected. See [D2.8b evidence](validation/dashboard_reliability.md).
+
+
+When creating a Scenario, enter its display name. The Catalog-facing backend
+proposes an `EXP-…` ID; inspect it or enable a custom ID under **Advanced · identifier**.
+Names are normalized to ASCII uppercase words with punctuation separated by
+dashes. Names without an ASCII suffix use a deterministic SHA-256 prefix;
+overlong suffixes are truncated with a hash suffix. Active, archived and retired
+IDs remain reserved. A collision blocks loading a new draft and never selects
+another Scenario. Revising preserves the saved ID. Preview, Validate and immutable
+Save retain their existing behavior.
+
+The trajectory header's **Expand** icon opens a large 2D/3D viewer; Close retains
+the selected Run and restores the four-panel layout. The viewer follows browser
+resizing. Optional individual panel resizing is deferred to preserve the simple
+fixed grid. The trajectory toolbar provides zoom/reset and 3D rotation/camera reset. Runs
+have separate view revisions, preventing a previous Run's zoom or camera from
+being reused. Missing Z, nonfinite coordinates, incompatible frames or units are
+reported rather than invented. The compact header tooltip retains frame, source
+time and prediction-horizon provenance.
 
 New output roots are recovered from existing job requests after server restart.
 To inspect external historical results, supply the same repeatable
@@ -299,5 +377,7 @@ See [D1 verification](validation/dashboard_builder.md),
 [D2.6 GUI lifecycle verification](validation/dashboard_simulation.md), and
 [D2.6b paused preview / Play verification](validation/dashboard_workflow.md), and
 [D2.6c readiness/completion verification](validation/runner_readiness.md), and
-[D2.7 UI refinement verification](validation/dashboard_refinement.md) for measured checks,
+[D2.7 UI refinement verification](validation/dashboard_refinement.md), and
+[D2.8 usability and safe management](validation/dashboard_management.md), and
+[D2.8a deletion, rename and expanded viewer](validation/dashboard_cleanup.md) for measured checks,
 screenshots, limitations and exact task-relative changed-file lists.

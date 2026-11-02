@@ -176,7 +176,7 @@ def _action(app, state, trigger, value=0.23, *, duration=6.0, seeds='[42]'):
         (k, v) for k, v in app.callback_map.items() if k.startswith('..builder-state.data')
     )
     field = {'role': 'target_dynamics', 'key': 'damping', 'kind': 'number'}
-    inputs = [None] * 5 + [[], [value], [['override']], duration, seeds]
+    inputs = [None] * 5 + [[], [value], [['override']], duration, seeds, '__strict__', [], '']
     states = [[], [field], 'EXP-NOMINAL', 3, 'imm', 'create', 'EXP-HTTP', 'HTTP', state]
     response = app.server.test_client().post(
         '/_dash-update-component',
@@ -394,3 +394,20 @@ def test_revision_and_provenance_are_available_under_advanced(backend):
     }
     assert {'source-revision', 'saved-preview'} <= ids
     assert not getattr(advanced[0], 'open', False)
+
+
+def test_comparison_form_preserves_pinned_variable_identity_and_exact_policy(backend):
+    """Unrelated form edits must not silently rename or truncate a frozen declaration."""
+    from copy import deepcopy
+    from robot_dashboard.forms import apply_comparison
+    declaration = {'schema_version': 2, 'domain': 'component_models', 'variables': [
+        {'name': 'predictor', 'path': 'components.predictor', 'values': ['imm', 'constant_velocity']}]}
+    spec = {'schema_version': 1, 'experiment': {'comparison': declaration}}
+    before = deepcopy(spec)
+    updated = apply_comparison(spec, 'components.predictor', ['imm', 'constant_velocity'], '',
+                               backend.list_comparison_variables())
+    assert updated == before and spec == before
+    assert apply_comparison(spec, '__preserve__', [], '', []) == before
+    assert apply_comparison(spec, '__strict__', [], '', [])['experiment']['comparison'] is None
+    with pytest.raises(ValueError, match='registered'):
+        apply_comparison(spec, 'components.*', [], '', backend.list_comparison_variables())

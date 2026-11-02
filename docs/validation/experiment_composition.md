@@ -442,3 +442,62 @@ bytes from logical staged content rather than claiming bytewise preservation.
 
 The bounded historical alias data remains necessary for immutable revisions; it
 is deliberately not a second active config directory or an arbitrary filename guess.
+
+## Task A — readable YAML and simple authoring (2026-10-27)
+
+**E1/M1 configuration and authoring: PASS. Runtime reliability: CONDITIONAL.**
+The existing M07/M08/Catalog execution path is retained. Four owner YAMLs gained
+verified mathematical/unit/order comments and compact vectors. One authoring module
+provides registry discovery, validation, effective previews and Catalog create/revise;
+its example is outside active configuration. The existing materializer transports
+inline owner documents. Control registry metadata describes the existing DLS
+selection-matrix task binding; no controller equations, gains or limits changed.
+
+Fresh evidence is under `results/experiment_authoring/`:
+
+- Full functional regression: **1,751 passed, 18 style checks deselected, 1 xfailed**.
+  After review fixes: **89 related tests passed**; the last empty-map correction
+  additionally passed **6 targeted tests**. The focused authoring run passed 23
+  cases; the later disabled-component empty-map case is covered by the final six.
+- **75 direct and 21 scientific preparations: zero differences.** All 21 original
+  YAML documents retain values, scalar types and mapping/list order. All 21 Catalog
+  revisions and 13,688 earlier artifacts remain intact; the Catalog is byte-identical.
+- Both normal and copied ten-package builds passed; final Python-package refreshes
+  passed. Copied M06–M09 verification covered 18 module origins, 10 families and 20
+  components. Ten checked source/install modules/resources are byte-identical.
+- Copied CLI discovery/preview/validation/save, immutable revision 1 → 2, and saved
+  preparation in a separate process passed. Parameter reset, inherited partial edits,
+  changed-component cleanup, same-ID scenario preservation, false/zero/empty handling,
+  actual CV/IMM, DLS/WLS and dynamics construction are tested.
+- Five changed implementation/test Python files pass flake8; the authoring module
+  passes pep257; `git diff --check` passes. Full-suite style checks were excluded,
+  rather than claiming unrelated repository style debt was resolved.
+
+Headless smoke evidence (seed 42; unchanged 6 s window after 3 s settling):
+
+| Condition | Execution / acceptance | Distance error mean / max (m) | Pointing error mean / max (deg) | RTF |
+| --- | --- | --- | --- | --- |
+| Existing `EXP-NOMINAL` r3 | completed / accepted | 0.05367 / 0.11973 | 9.076 / 18.271 | 0.7918 |
+| Authored CV/DLS, damping 0.23, r1 | readiness timeout / unknown | unavailable | unavailable | unavailable |
+| Authored unchanged nominal, r1 | completed / accepted | 0.10103 / 0.24055 | 9.683 / 17.072 | 0.7477 |
+
+Both completed windows have complete physical safety coverage and zero measured
+position/speed excess. All three runs cleaned up with no survivors. The changed
+condition recorded 1,668 target-truth, 1,124 robot-estimate, 452 prediction, 547
+control/command and 6,213 joint messages, but never established a readiness origin
+within the existing 45 s gate. Its scored metrics are unavailable, not zero.
+This remains consistent with the earlier readiness limitation; no timing gate was
+relaxed or runtime root-cause claim inferred. These are integration smokes, not a
+matched performance/repeatability result or a stronger tracking-quality certificate.
+
+Reproduce with the commands in `docs/experiment_composition.md` and the installed
+`examples/tracking.yaml`. Exact build/equivalence/install/smoke commands and raw
+results are retained in this evidence directory's scripts and logs; see
+`runtime_summary.json`, `installed_author_workflow.json`, and `change_manifest.json`.
+The exact Task-A-relative file list is `results/experiment_authoring/changed_files.txt`.
+No files were deleted. No commits/pushes, Task B or dashboard work occurred.
+
+Limitations: schema-2 comparative studies retain the canonical interface; arbitrary
+reference numerical edits and newly registered components still require their
+existing owner deployment pathways. Unsupported edits fail explicitly. Saved
+external absolute resources retain their existing installation/path requirements.

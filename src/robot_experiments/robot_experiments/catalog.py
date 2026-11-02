@@ -25,7 +25,7 @@ from .configuration import resolve_system_resource
 
 
 class CatalogConflict(ValueError):
-    """A writer attempted to replace a revision it did not read."""
+    """A writer attempted to change Catalog metadata it did not read."""
 
 
 def definition_hash(definition, overrides):
@@ -68,8 +68,12 @@ class ExperimentCatalog:
             self._identifier(identifier)
         for identifier, entry in state['experiments'].items():
             self._identifier(identifier)
-            if (set(entry) != {'name', 'legacy_entry', 'deleted', 'revisions'}
-                    or not isinstance(entry['name'], str) or not entry['name'].strip()):
+            required_entry = {'name', 'legacy_entry', 'deleted', 'revisions'}
+            if (not required_entry <= set(entry) or set(entry) - required_entry - {'display_name'}
+                    or not isinstance(entry['name'], str) or not entry['name'].strip()
+                    or ('display_name' in entry and (
+                        not isinstance(entry['display_name'], str)
+                        or not entry['display_name'].strip()))):
                 raise ValueError(f'{identifier}: invalid catalog entry')
             if (type(entry['deleted']) is not bool
                     or not isinstance(entry['revisions'], list) or not entry['revisions']):
@@ -131,17 +135,50 @@ class ExperimentCatalog:
         return self.list()
 
     def list(self, *, include_deleted=False):  # noqa: A003 - preserve the public catalog API.
-        return [{'id': key, 'name': value['name'], 'revision': len(value['revisions']),
+        return [{'id': key, 'name': value.get('display_name', value['name']),
+                 'revision': len(value['revisions']),
                  'deleted': value['deleted']} for key, value in self._read()['experiments'].items()
                 if include_deleted or not value['deleted']]
 
     def get(self, identifier, revision=None):
+        """Return original recorded metadata; mutable display aliases belong to list()."""
         self._identifier(identifier)
         entry = self._read()['experiments'][identifier]
         number = len(entry['revisions']) if revision is None else revision
         if type(number) is not int or not 1 <= number <= len(entry['revisions']):
             raise ValueError('revision: expected existing positive integer')
         return deepcopy({'id': identifier, 'name': entry['name'], **entry['revisions'][number-1]})
+
+    def rename_display(self, identifier, name, *, expected_revision, expected_name):
+        """Change only the display alias, comparing the selected revision and alias."""
+        self._identifier(identifier)
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError('name must be nonempty')
+        if type(expected_revision) is not int or expected_revision < 1:
+            raise ValueError('expected_revision must be a positive integer')
+        if not isinstance(expected_name, str) or not expected_name.strip():
+            raise ValueError('expected_name must be nonempty')
+        name = name.strip()
+        with self._locked():
+            state = self._read()
+            entry = state['experiments'].get(identifier)
+            if (entry is None or entry['deleted']
+                    or len(entry['revisions']) != expected_revision
+                    or entry.get('display_name', entry['name']) != expected_name):
+                raise CatalogConflict('experiment changed or was deleted; reload before renaming')
+            # entry.name remains the recorded name used by get(), accepted Jobs
+            # and _prepare(). Never alter definitions, revisions or their hashes.
+            entry['display_name'] = name
+            state['generation'] += 1
+            self._write(state)
+            return {'id': identifier, 'name': name, 'revision': expected_revision,
+                    'deleted': False}
+
+    def is_id_available(self, identifier):
+        """Inspect identity availability; create remains the atomic collision authority."""
+        self._identifier(identifier)
+        state = self._read()
+        return identifier not in state['experiments'] and identifier not in state['retired_ids']
 
     def entry_id(self, name):
         """Explicit migration map for former installed M08 entry filenames."""

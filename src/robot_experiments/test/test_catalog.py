@@ -232,6 +232,162 @@ def test_revision_result_is_the_commit_even_if_a_later_writer_advances(catalog, 
     assert result['revision'] == 2
 
 
+def test_display_rename_persists_without_changing_recorded_revisions_or_preparation(catalog):
+    """Persist only the alias while preserving all prepared scientific metadata."""
+    identifier = 'EXP-NOMINAL'
+    first = catalog.get(identifier)
+    changed = deepcopy(first['definition'])
+    changed['experiment']['seeds'] = [43]
+    catalog.revise(identifier, changed, expected_revision=1)
+    records = [catalog.get(identifier, revision) for revision in (1, 2)]
+    prepared = catalog.prepare(identifier)
+    revisions = json.dumps(
+        load_yaml(catalog.path)['experiments'][identifier]['revisions'], sort_keys=True
+    ).encode()
+    generation = load_yaml(catalog.path)['generation']
+
+    result = catalog.rename_display(
+        identifier,
+        '  Current display title  ',
+        expected_revision=2,
+        expected_name=first['name'],
+    )
+
+    assert result == {
+        'id': identifier,
+        'name': 'Current display title',
+        'revision': 2,
+        'deleted': False,
+    }
+    refreshed = ExperimentCatalog(catalog.path, SHARE)
+    assert next(item for item in refreshed.list() if item['id'] == identifier) == result
+    assert [refreshed.get(identifier, revision) for revision in (1, 2)] == records
+    assert (
+        json.dumps(
+            load_yaml(catalog.path)['experiments'][identifier]['revisions'], sort_keys=True
+        ).encode()
+        == revisions
+    )
+    assert load_yaml(catalog.path)['generation'] == generation + 1
+    actual = refreshed.prepare(identifier)
+    for key in ('experiment_identity', 'experiment_definition', 'source_document', 'name'):
+        assert actual[key] == prepared[key]
+
+
+def test_display_rename_preserves_existing_run_and_session_references(catalog, tmp_path):
+    """Keep retained Run and Session bytes unchanged when their display alias changes."""
+    from robot_experiments.backend import ExperimentBackend
+    from robot_experiments.reporting import write_json
+    from test_backend import recorded_run
+
+    run_id, run = recorded_run(tmp_path / 'results')
+    record = catalog.get('EXP-NOMINAL')
+    identity = {
+        'id': record['id'],
+        'revision': record['revision'],
+        'definition_sha256': record['sha256'],
+    }
+    for filename in ('metadata.json', 'status.json'):
+        value = json.loads((run / filename).read_text())
+        value['experiment_identity'] = identity
+        value['experiment_name'] = record['name']
+        write_json(run / filename, value)
+    write_json(run.parent.parent / 'experiment_identity.json', identity)
+    api = ExperimentBackend(
+        tmp_path / 'backend', catalog=catalog, result_roots=[tmp_path / 'results']
+    )
+    session_id = api.create_session({'title': 'Retained history'})['session_id']
+    session = api.add_run_to_session(session_id, run_id)
+    before = {
+        path: path.read_bytes()
+        for path in tmp_path.rglob('*')
+        if path.is_file()
+        and path != catalog.path
+        and path != catalog.path.with_suffix('.yaml.lock')
+    }
+
+    catalog.rename_display(
+        'EXP-NOMINAL', 'Current title', expected_revision=1, expected_name=record['name']
+    )
+
+    assert api.get_session(session_id)['session'] == session
+    assert (
+        next(row for row in api.list_runs() if row['run_id'] == run_id)['experiment_identity']
+        == identity
+    )
+    assert all(path.read_bytes() == content for path, content in before.items())
+
+
+@pytest.mark.parametrize('change', ['alias', 'revision', 'deleted'])
+def test_display_rename_rejects_stale_selection_without_any_write(catalog, change):
+    """Reject stale name, revision or deleted-entry snapshots without writes."""
+    record = catalog.get('EXP-NOMINAL')
+    if change == 'alias':
+        catalog.rename_display(
+            record['id'], 'Other browser', expected_revision=1, expected_name=record['name']
+        )
+    elif change == 'revision':
+        catalog.revise(record['id'], record['definition'], expected_revision=1)
+    else:
+        catalog.delete(record['id'], expected_revision=1)
+    before = catalog.path.read_bytes()
+
+    with pytest.raises(CatalogConflict):
+        catalog.rename_display(
+            record['id'], 'Stale browser', expected_revision=1, expected_name=record['name']
+        )
+
+    assert catalog.path.read_bytes() == before
+
+
+def test_concurrent_display_renames_allow_only_one_writer(catalog):
+    """Allow exactly one optimistic writer for a shared original display name."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    original_name = catalog.get('EXP-NOMINAL')['name']
+
+    def rename(name):
+        try:
+            return catalog.rename_display(
+                'EXP-NOMINAL', name, expected_revision=1, expected_name=original_name
+            )['name']
+        except CatalogConflict:
+            return 'conflict'
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(rename, ['First browser', 'Second browser']))
+    assert results.count('conflict') == 1
+    winner = next(result for result in results if result != 'conflict')
+    assert (
+        next(item for item in catalog.list() if item['id'] == 'EXP-NOMINAL')['name'] == winner
+    )
+    assert catalog.get('EXP-NOMINAL')['name'] == original_name
+
+
+@pytest.mark.parametrize(
+    'name,revision,expected_name',
+    [
+        ('', 1, 'Original'),
+        ('   ', 1, 'Original'),
+        (None, 1, 'Original'),
+        ('Valid', True, 'Original'),
+        ('Valid', 0, 'Original'),
+        ('Valid', 1, ''),
+        ('Valid', 1, None),
+    ],
+)
+def test_display_rename_rejects_invalid_inputs_without_write(
+    catalog, name, revision, expected_name
+):
+    """Validate alias and concurrency metadata before any persistent mutation."""
+    before = catalog.path.read_bytes()
+    with pytest.raises(ValueError):
+        catalog.rename_display(
+            'EXP-NOMINAL', name, expected_revision=revision, expected_name=expected_name
+        )
+    assert catalog.path.read_bytes() == before
+
+
 def test_historical_system_resource_is_explicitly_migrated_to_experiment_owner():
     from robot_experiments import configuration
     assert hasattr(configuration, 'resolve_system_resource')

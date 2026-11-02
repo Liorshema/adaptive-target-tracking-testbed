@@ -41,6 +41,8 @@ def complete_preparation(spec: dict, prepared: dict, source_sha256: str | None) 
             'physical_coverage': 'existing complete joint observation coverage',
             'definition_sha256': _metric_definition_hash(),
             'source_sha256': source_sha256, 'metric_schema_version': 1}}
+    if (spec.get('comparison') or {}).get('schema_version') == 2:
+        conditions['experiment_setup']['variants'] = [v['name'] for v in spec['variants']]
     prepared['comparison'] = comparison_views(
         plain(prepared['comparison_contract']), spec.get('comparison'), plain(conditions))
     prepared['configuration_identity'] = {

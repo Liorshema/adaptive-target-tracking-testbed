@@ -395,6 +395,22 @@ def materialize_run(variant, seed, directory, share, runtime, record_actuator_tr
             raise ValueError('overrides.control: component selection belongs to composition')
         if value is None and name in overrides:
             raise ValueError(f'overrides.{name}: owner is not selected')
+        if name == 'target' and name in overrides:
+            # Structured mathematical definitions have owner-validated atomic
+            # replacement semantics. Keep ordinary geometry/appearance edits on
+            # the existing strict override path.
+            edits = deepcopy(overrides[name])
+            dynamics_edits = edits.get('target', {}).get('dynamics', {})
+            if 'parameters' in dynamics_edits:
+                from robot_simulation.factory.simulation_factory import SimulationFactory
+
+                parameter_edits = dynamics_edits.pop('parameters')
+                result = override_parameters(value, edits, path='overrides.target')
+                specification = result['target']['dynamics']
+                specification['parameters'] = (
+                    SimulationFactory.with_defaults().dynamics_registry.apply_overrides(
+                        specification['type'], specification['parameters'], parameter_edits))
+                return result
         return (
             override_parameters(value, overrides[name], path=f'overrides.{name}')
             if name in overrides

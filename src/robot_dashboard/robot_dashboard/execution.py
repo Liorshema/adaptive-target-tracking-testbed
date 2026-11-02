@@ -103,6 +103,7 @@ class ExecutionActions:
                 identifier,
                 revision,
                 output=output,
+                session_id=session_id,
                 enable_actuation=enable_actuation,
                 gui=gui,
                 **({'preview_id': preview_id} if preview_id else {}),
@@ -218,7 +219,7 @@ def execution_layout(backend):
                 ),
                 html.Details(
                     [
-                        html.Summary('+'),
+                        html.Summary('⋯'),
                         html.Div(
                             [
                                 dcc.Input(
@@ -234,12 +235,22 @@ def execution_layout(backend):
                                     id='refresh-sessions',
                                     className='button',
                                 ),
+                                html.Hr(),
+                                html.Button(
+                                    'Rename Session', id='rename-session', className='button'
+                                ),
+                                html.Button(
+                                    'Delete Session',
+                                    id='delete-session',
+                                    className='button danger',
+                                ),
+                                html.Div(id='session-management-feedback', role='status'),
                                 html.Div(id='session-feedback', role='status'),
                             ],
                             className='session-popover',
                         ),
                     ],
-                    title='Create or refresh Sessions',
+                    title='Create or manage Sessions',
                 ),
             ],
             className='session-controls',
@@ -447,10 +458,11 @@ def register_execution(app, backend):
         Output('session-feedback', 'children'),
         Input('create-session', 'n_clicks'),
         Input('refresh-sessions', 'n_clicks'),
+        Input('management-events', 'data'),
         State('session-title', 'value'),
         State('current-session', 'value'),
     )
-    def sessions(_create, _refresh, title, selected):
+    def sessions(_create, _refresh, _management, title, selected):
         try:
             if ctx.triggered_id == 'create-session':
                 created = backend.create_session({'title': title or 'Tracking Session'})
@@ -466,7 +478,15 @@ def register_execution(app, backend):
             known = {r['value'] for r in options}
             return (
                 options,
-                selected if selected in known else (options[-1]['value'] if options else None),
+                (
+                    selected
+                    if selected in known
+                    else (
+                        None
+                        if ctx.triggered_id == 'management-events'
+                        else (options[-1]['value'] if options else None)
+                    )
+                ),
                 '',
             )
         except (ValueError, KeyError, OSError) as error:
@@ -586,10 +606,11 @@ def register_execution(app, backend):
         Input('execution-events', 'data'),
         Input('refresh-sessions', 'n_clicks'),
         Input({'type': 'session-run', 'run_id': ALL}, 'n_clicks'),
+        Input('management-events', 'data'),
         State('results-run', 'value'),
         State('execution-state', 'data'),
     )
-    def compare(session_id, _events, _refresh, _rows, selected, state):
+    def compare(session_id, _events, _refresh, _rows, _management, selected, state):
         rows, view = [], html.P(
             'Create or select a persistent Session.', className='empty-state'
         )
@@ -608,13 +629,13 @@ def register_execution(app, backend):
                     comparison, selected_run=selected, names=scenario_names(backend, rows)
                 )
             known = {r['run_id']: r for r in rows}
-            known.update(
-                {
-                    r['run_id']: r
-                    for r in ((state or {}).get('job') or {}).get('runs', [])
-                    if r.get('run_id')
-                }
-            )
+            for row in ((state or {}).get('job') or {}).get('runs', []):
+                if row.get('run_id'):
+                    try:
+                        backend.get_run_status(row['run_id'])
+                    except (KeyError, ValueError, OSError):
+                        continue
+                    known[row['run_id']] = row
             names = scenario_names(backend, known.values())
             options = [
                 {
@@ -626,7 +647,15 @@ def register_execution(app, backend):
             return (
                 view,
                 options,
-                selected if selected in known else (options[-1]['value'] if options else None),
+                (
+                    selected
+                    if selected in known
+                    else (
+                        None
+                        if 'management-events.data' in ctx.triggered_prop_ids
+                        else (options[-1]['value'] if options else None)
+                    )
+                ),
             )
         except (ValueError, TypeError, KeyError, OSError) as error:
             return html.Div(str(error), className='notice error'), no_update, no_update

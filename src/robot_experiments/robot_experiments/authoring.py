@@ -62,6 +62,11 @@ def _owner_parameters(owners, slot, identifier, *, create=True):
 
 def _edit_parameters(owners, slot, identifier, edits):
     parameters = _owner_parameters(owners, slot, identifier)
+    atomic = (
+        describe_component(SLOTS[slot], identifier)['capabilities'].get('atomic_parameters', ())
+        if slot == 'target_dynamics' else ())
+    for key in set(atomic) & set(edits):
+        parameters.pop(key, None)
     parameters.update(_merge_mappings(parameters, edits))
 
 
@@ -140,6 +145,7 @@ class ExperimentAuthor:
                 'execution',
                 'runtime',
                 'advanced',
+                'comparison',
             },
             'experiment',
             {'id', 'name', 'base_case'},
@@ -182,6 +188,12 @@ class ExperimentAuthor:
                 'schema-2 comparisons remain available through canonical CLI'
             )
         study = canonical['experiment']
+        if 'comparison' in ex:
+            from .comparison import validate_policy
+            if ex['comparison'] is None:
+                study.pop('comparison', None)
+            else:
+                study['comparison'] = validate_policy(ex['comparison'])
         raw_variant = next(v for v in study['variants'] if v['name'] == variant['name'])
         reference = deepcopy(raw_variant['system_config'])
         if 'scenario' in ex:

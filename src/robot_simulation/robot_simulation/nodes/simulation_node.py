@@ -105,6 +105,7 @@ class SimulationNode(Node):
             target_config,
             environment_config,
             simulation_config,
+            reference_frame=required_string(self, 'reference_frame'),
         )
         self.get_logger().info(
             f'Simulation components: dynamics={type(engine.dynamics).__name__}, '

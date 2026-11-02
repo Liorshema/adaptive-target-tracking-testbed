@@ -87,7 +87,9 @@ def configure(context):
     integration_data = load_yaml(resolve_path(cfg['simulation']['config']))
     validate_deployment_configuration(cfg, target_data, environment_data, integration_data,
                                      load_yaml(resolve_path(cfg['simulation']['measurement_config'])))
-    _, integration_dt = SimulationFactory.with_defaults().create(target_data, environment_data, integration_data)
+    _, integration_dt = SimulationFactory.with_defaults().create(
+        target_data, environment_data, integration_data,
+        reference_frame=tracking_cfg['reference_frame'])
 
     sensor_path = None
     sensor = None

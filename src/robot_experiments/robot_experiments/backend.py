@@ -1,10 +1,11 @@
 """Headless experiment client API; scientific ownership remains with existing services."""
 
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from pathlib import Path
 
 from .authoring import ExperimentAuthor, SLOTS
-from .catalog import ExperimentCatalog
+from .catalog import CatalogConflict, ExperimentCatalog
 from .components import component_registries
 from .jobs import ExperimentJobs
 from .reporting import plain
@@ -19,13 +20,27 @@ class ExperimentBackend:
     No ROS node, GUI, process or file is created merely by constructing this API.
     """
 
-    def __init__(self, directory, *, catalog=None, result_roots=()):
+    def __init__(self, directory, *, catalog=None, result_roots=(), managed_result_roots=None):
+        """Separate registered read access from explicitly managed deletion boundaries."""
         self.directory = Path(directory).expanduser().resolve()
         self.catalog = catalog if catalog is not None else ExperimentCatalog()
         self.author = ExperimentAuthor(self.catalog)
         self.jobs = ExperimentJobs(self.directory / 'jobs')
         self.result_roots = tuple(dict.fromkeys(
             [self.directory, *(Path(p).expanduser().resolve() for p in result_roots)]))
+        if (isinstance(managed_result_roots, (str, bytes))
+                or hasattr(managed_result_roots, '__fspath__')):
+            raise ValueError('managed_result_roots must be a sequence of root paths')
+        try:
+            self.managed_result_roots = tuple(dict.fromkeys(
+                Path(p).expanduser().absolute() for p in (
+                    (self.directory / 'runs',) if managed_result_roots is None
+                    else managed_result_roots)))
+        except (TypeError, ValueError) as error:
+            raise ValueError('managed_result_roots must be a sequence of root paths') from error
+        if any(root == root.parent for root in self.managed_result_roots):
+            raise ValueError('A filesystem root cannot be a managed deletion root')
+        self.result_roots = tuple(dict.fromkeys([*self.result_roots, *self.managed_result_roots]))
 
     def list_experiments(self, *, include_deleted=False):
         """Return detached Catalog summaries, retaining immutable historical IDs."""
@@ -86,9 +101,176 @@ class ExperimentBackend:
         draft = {'schema_version': 1, 'experiment': {
             'id': experiment_id, 'name': name, 'base_case': base['id'],
             'base_revision': base['revision']}}
+        if base['definition']['experiment'].get('comparison'):
+            draft['experiment']['comparison'] = deepcopy(base['definition']['experiment']['comparison'])
         if base_variant is not None:
             draft['experiment']['base_variant'] = base_variant
         return draft
+
+    def list_comparison_variables(self):
+        """Discover exact declaration paths from registered component owner schemas."""
+        from .comparison_variables import comparison_options
+        return comparison_options()
+
+    def validate_experiment_id(self, identifier):
+        """Reject malformed and reserved identities; saving rechecks atomically."""
+        if not self.catalog.is_id_available(identifier):
+            raise CatalogConflict('experiment ID already exists or was permanently retired')
+        return identifier
+
+    def propose_experiment_id(self, display_name):
+        """Use a Latin slug, or a stable UTF-8 hash when no ASCII identifier remains."""
+        import hashlib
+        import re
+        import unicodedata
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise ValueError('name: expected a nonempty display name')
+        name = unicodedata.normalize('NFKC', display_name.strip())
+        ascii_name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode()
+        slug = re.sub(r'[^A-Z0-9]+', '-', ascii_name.upper()).strip('-')
+        fingerprint = hashlib.sha256(name.encode('utf-8')).hexdigest()[:12].upper()
+        if not slug:
+            slug = fingerprint
+        elif len(slug) > 71:
+            slug = slug[:58].rstrip('-') + '-' + fingerprint
+        return self.validate_experiment_id('EXP-' + slug)
+
+    @staticmethod
+    @contextmanager
+    def _metadata_lock(path):
+        """Never follow a substituted metadata lock into another owner's files."""
+        import fcntl
+        import os
+        import stat
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        except OSError as error:
+            raise ValueError(
+                'owned metadata lock unavailable; symlinks are unsupported') from error
+        with os.fdopen(descriptor, 'a') as lock:
+            if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+                raise ValueError('owned metadata lock must be a regular file')
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+
+    @contextmanager
+    def _management_lock(self, *, allow_pending=False):
+        # Serialize dashboard metadata mutations with accepted Job creation.
+        # Execution still belongs entirely to ExperimentJobs and the Runner.
+        self.directory.mkdir(parents=True, exist_ok=True)
+        with self._metadata_lock(self.directory / '.management.lock'):
+            if not allow_pending:
+                for path in (self.directory / '.deletions').glob('*.json'):
+                    if self._read(path).get('phase') not in {'completed', 'rolled_back'}:
+                        raise ValueError('An incomplete deletion needs recovery; see Diagnostics')
+            yield
+
+    def preview_deletion(self, kind, identifier):
+        """Calculate the exact owned cascade; read access never grants delete authority."""
+        from .deletion import ResourceDeletion
+        return ResourceDeletion(self).preview(kind, identifier)
+
+    def delete_resources(self, kind, identifier, *, expected_token):
+        """Commit only a confirmed revalidated scope, or resume that same transaction."""
+        from .deletion import ResourceDeletion
+        return ResourceDeletion(self).execute(kind, identifier, expected_token)
+
+    def rename_experiment(self, experiment_id, name, *, expected_revision, expected_name):
+        """Change Catalog-owned display metadata, preserving recorded scientific identity."""
+        with self._management_lock():
+            return self.catalog.rename_display(
+                experiment_id, name, expected_revision=expected_revision,
+                expected_name=expected_name)
+
+    def _job_cleanup_verified(self, status):
+        """Read authoritative cleanup evidence for legacy terminal workers."""
+        if status.get('state') not in {'completed', 'cancelled', 'failed', 'closed', 'error'}:
+            return False
+        if status.get('cleanup_complete') is False:
+            return False
+        study = status.get('study')
+        if study is None:
+            return status.get('cleanup_complete') is True
+        # A completed deletion can remove the original cleanup artifacts. Its
+        # small receipt proves only the exact unchanged terminal Job documents.
+        directory = status.get('artifacts')
+        if directory and isinstance(study, str) and not Path(study).exists():
+            directory = Path(directory)
+            if directory.parent == self.jobs.directory:
+                request = self._read(directory / 'request.json')
+                proof = {'status': self._session_token(status),
+                         'request': self._session_token(request)}
+                for path in (self.directory / '.deletions').glob('*.json'):
+                    receipt = self._read(path)
+                    if (receipt.get('phase') == 'completed'
+                            and receipt.get('verified_jobs', {}).get(directory.name) == proof):
+                        return True
+        if not isinstance(study, str):
+            return False
+        from .deletion import _plain_path
+        try:
+            study = _plain_path(study)
+            if not any(study.is_relative_to(root) for root in self._roots()):
+                return False
+            children = list((study / 'runs').iterdir())
+            if not children:
+                return False
+            for child in children:
+                _plain_path(child / 'status.json')
+                run = self._read(child / 'status.json')
+                if (not isinstance(run, dict)
+                        or run.get('execution_status') not in {'completed', 'failed', 'cancelled'}
+                        or not isinstance(run.get('cleanup'), dict)
+                        or run['cleanup'].get('survivors') != []):
+                    return False
+            return True
+        except (ValueError, TypeError, OSError):
+            return False
+
+    def _assert_no_associated_job(self, *, session=None, experiment_id=None):
+        studies = ({str(Path(r['directory']).parent.parent.resolve())
+                    for r in session['runs']} if session else set())
+        directories = {p.parent for pattern in ('*/request.json', '*/status.json')
+                       for p in self.jobs.directory.glob(pattern)}
+        for directory in sorted(directories):
+            try:
+                request = self._read(directory / 'request.json')
+                if (not isinstance(request, dict)
+                        or not isinstance(request.get('record'), dict)):
+                    raise ValueError('Job request association unavailable')
+                self.catalog._identifier(request['record']['id'])
+                if request.get('session_id') is not None:
+                    self._identifier(request['session_id'])
+                associated = (request.get('record', {}).get('id') == experiment_id
+                              if experiment_id else
+                              request.get('session_id') == session['session_id'])
+                status = self.jobs.status(directory.name)
+                if session and status.get('study'):
+                    associated = associated or str(Path(status['study']).resolve()) in studies
+            except (ValueError, KeyError, TypeError, OSError) as error:
+                # Corrupt owner records cannot establish that cleanup is complete.
+                raise ValueError(
+                    'Job association or cleanup is unknown; inspect Diagnostics') from error
+            safe = self._job_cleanup_verified(status)
+            if session and not request.get('session_id') and not safe:
+                raise ValueError('Legacy Job Session association is unknown; '
+                                 'wait for completion/cleanup')
+            if not associated:
+                continue
+            if not safe:
+                raise ValueError('Associated Job is active or cleanup is unresolved')
+
+    def archive_experiment(self, experiment_id, *, expected_revision):
+        """Soft-delete through the Catalog; every immutable revision remains readable."""
+        self.catalog._identifier(experiment_id)
+        if type(expected_revision) is not int or expected_revision < 1:
+            raise ValueError('expected_revision must be a positive integer')
+        with self._management_lock(), self.jobs._preview_lock():
+            self._assert_no_associated_job(experiment_id=experiment_id)
+            self.catalog.delete(experiment_id, expected_revision=expected_revision)
 
     def reset_draft(self, specification):
         """
@@ -167,7 +349,8 @@ class ExperimentBackend:
     def save_experiment(self, specification, *, expected_revision=None):
         """Delegate create/revise and optimistic concurrency to the Catalog owner."""
         try:
-            return plain(self.author.save(specification, expected_revision=expected_revision))
+            with self._management_lock():
+                return plain(self.author.save(specification, expected_revision=expected_revision))
         except ValueError as error:
             raise type(error)(self._public_error(error)) from error
 
@@ -245,8 +428,10 @@ class ExperimentBackend:
         return tuple(dict.fromkeys(roots))
 
     def _run_paths(self):
+        from .deletion import _staged_path
         return sorted({p.parent.resolve() for root in self._roots()
-                       for p in root.rglob('runs/*/status.json')})
+                       for p in root.rglob('runs/*/status.json')
+                       if not _staged_path(p)})
 
     def _find_run(self, run_id):
         self._identifier(run_id)
@@ -337,22 +522,47 @@ class ExperimentBackend:
         run_id = self._read(directory / 'status.json', {}).get('run_id')
         return self._results(directory, run_id)
 
-    def read_telemetry(self, run_id, stream, *, offset=0, limit=100):
-        """Read a bounded page of existing JSONL records; no alignment or resampling."""
-        import itertools
-        import json
+    def _telemetry_path(self, run_id, stream):
+        """Resolve an existing recorded stream within the registered Run boundary."""
         import re
-        self._page(offset, limit)
         if not isinstance(stream, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}', stream):
             raise ValueError('stream must be a recorded telemetry name')
         directory = self._find_run(run_id) / 'telemetry'
         path = (directory / (stream + '.jsonl')).resolve()
         if not path.is_relative_to(directory.resolve()):
             raise ValueError('telemetry reference escapes Run directory')
+        return path
+
+    def iter_telemetry(self, run_id, stream, *, offset=0, limit=1000):
+        """Scan original JSONL once in bounded pages, preserving order and provenance."""
+        import itertools
+        import json
+        self._page(offset, limit)
+        if limit == 0:
+            raise ValueError('telemetry iteration requires a positive page limit')
+        path = self._telemetry_path(run_id, stream)
         with path.open() as source:
-            records = [json.loads(line)
-                       for line in itertools.islice(source, offset, offset + limit)]
-        return {'run_id': run_id, 'stream': stream, 'offset': offset, 'records': records,
+            lines = itertools.islice(source, offset, None)
+            while True:
+                records = [json.loads(line) for line in itertools.islice(lines, limit)]
+                if not records:
+                    return
+                yield {'run_id': run_id, 'stream': stream, 'offset': offset,
+                       'records': records, 'source': str(path)}
+                offset += len(records)
+
+    def read_telemetry(self, run_id, stream, *, offset=0, limit=100):
+        """Read a bounded page of existing JSONL records; no alignment or resampling."""
+        self._page(offset, limit)
+        if limit:
+            page = next(self.iter_telemetry(run_id, stream, offset=offset, limit=limit), None)
+            if page is not None:
+                return page
+        path = self._telemetry_path(run_id, stream)
+        # Preserve missing-stream errors and the established empty-page contract.
+        with path.open():
+            pass
+        return {'run_id': run_id, 'stream': stream, 'offset': offset, 'records': [],
                 'source': str(path)}
 
     def read_time_series(self, run_id, *, offset=0, limit=100):
@@ -376,7 +586,7 @@ class ExperimentBackend:
                 'series': series, 'source': str(path)}
 
     def start_run(self, experiment_id, revision, *, output, enable_actuation=False, gui=False,
-                  preview_id=None):
+                  preview_id=None, session_id=None):
         """
         Start existing jobs, explicitly opting into physical commands for this call.
 
@@ -388,9 +598,18 @@ class ExperimentBackend:
             raise ValueError(
                 'an explicit positive revision and boolean actuation opt-in are required')
         try:
-            job = self.jobs.start(self.catalog, experiment_id, revision, output=output,
-                                  runtime_overrides={'enable_actuation': enable_actuation, 'gui': gui},
-                                  **({'preview_id': preview_id} if preview_id is not None else {}))
+            with self._management_lock():
+                path = self._session_path(session_id) if session_id is not None else None
+                if path is not None and not path.is_file():
+                    raise KeyError(f'unknown Session ID: {session_id}')
+                with self._metadata_lock(path.with_suffix('.lock')) if path else nullcontext():
+                    if session_id is not None:
+                        self._session(session_id)
+                    job = self.jobs.start(
+                        self.catalog, experiment_id, revision, output=output,
+                        runtime_overrides={'enable_actuation': enable_actuation, 'gui': gui},
+                        **({'preview_id': preview_id} if preview_id is not None else {}),
+                        **({'session_id': session_id} if session_id is not None else {}))
         except ValueError as error:
             raise type(error)(self._public_error(error)) from error
         return self.get_job_status(job['job_id'])
@@ -422,7 +641,58 @@ class ExperimentBackend:
         return self.cancel_job(owners[0], timeout=timeout)
 
     def _session_path(self, session_id):
-        return self.directory / 'sessions' / (self._identifier(session_id) + '.json')
+        path = self.directory / 'sessions' / (self._identifier(session_id) + '.json')
+        if path.parent.is_symlink() or path.is_symlink():
+            raise ValueError('Session metadata must be an owned regular document, not a symlink')
+        if path.exists() and not path.is_file():
+            raise ValueError('Session metadata must be an owned regular document')
+        return path
+
+    @staticmethod
+    def _session_token(session):
+        import hashlib
+        import json
+        return hashlib.sha256(json.dumps(
+            session, sort_keys=True, allow_nan=False, separators=(',', ':')).encode()).hexdigest()
+
+    def get_session(self, session_id):
+        """Return detached metadata and a token covering title, notes and Run references."""
+        session = self._session(session_id)
+        return {'session': session, 'token': self._session_token(session)}
+
+    def _check_session_token(self, session, expected_token):
+        if not isinstance(expected_token, str) or self._session_token(session) != expected_token:
+            raise CatalogConflict('Session changed; reload before managing it')
+
+    def rename_session(self, session_id, title, *, expected_token):
+        """Change only the display title, with compare-and-swap protection."""
+        from .reporting import write_json
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError('Session title must be nonempty')
+        path = self._session_path(session_id)
+        if not path.is_file():
+            raise KeyError(f'unknown Session ID: {session_id}')
+        with self._management_lock(), self._metadata_lock(path.with_suffix('.lock')):
+            session = self._session(session_id)
+            self._check_session_token(session, expected_token)
+            session['metadata']['title'] = title.strip()
+            write_json(path, session)
+            return {'session': session, 'token': self._session_token(session)}
+
+    def delete_session(self, session_id, *, expected_token):
+        """Unlink only the selected Session document; never recurse into Run evidence."""
+        with self._management_lock():
+            path = self._session_path(session_id)
+            if not path.is_file():
+                return False
+            with self._metadata_lock(path.with_suffix('.lock')):
+                if not self._session_path(session_id).is_file():
+                    return False
+                session = self._session(session_id)
+                self._check_session_token(session, expected_token)
+                self._assert_no_associated_job(session=session)
+                path.unlink()
+                return True
 
     def _session(self, session_id):
         session = self._read(self._session_path(session_id))
@@ -465,33 +735,34 @@ class ExperimentBackend:
                    'metadata': metadata, 'runs': []}
         path = self._session_path(session['session_id'])
         path.parent.mkdir(parents=True, exist_ok=True)
-        write_json(path, session)
+        with self._management_lock():
+            write_json(path, session)
         return session
 
     def add_run_to_session(self, session_id, run_id):
         """Append a proven reference under a lock; retries are idempotent."""
-        import fcntl
         from .reporting import write_json
-        directory = self._find_run(run_id)
         path = self._session_path(session_id)
         if not path.is_file():
             raise KeyError(f'unknown Session ID: {session_id}')
-        with path.with_suffix('.lock').open('a') as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            try:
-                session = self._session(session_id)
-                if not any(r['run_id'] == run_id for r in session['runs']):
-                    session['runs'].append({'run_id': run_id, 'directory': str(directory)})
-                    write_json(path, session)
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
+        with self._management_lock(), self._metadata_lock(path.with_suffix('.lock')):
+            directory = self._find_run(run_id)
+            session = self._session(session_id)
+            if not any(r['run_id'] == run_id for r in session['runs']):
+                session['runs'].append({'run_id': run_id, 'directory': str(directory)})
+                write_json(path, session)
         return session
 
     def list_sessions(self, *, title=None, offset=0, limit=100):
         """Page Session summaries in stable creation order; no duplicate results store."""
         self._page(offset, limit)
-        sessions = [self._session(path.stem)
-                    for path in (self.directory / 'sessions').glob('*.json')]
+        sessions = []
+        for path in (self.directory / 'sessions').glob('*.json'):
+            try:
+                sessions.append(self._session(path.stem))
+            except (KeyError, FileNotFoundError):
+                # A concurrent metadata deletion may follow the directory snapshot.
+                continue
         summaries = [{k: value for k, value in session.items() if k != 'runs'} |
                      {'run_count': len(session['runs'])} for session in sessions
                      if title is None or session['metadata'].get('title') == title]
@@ -499,69 +770,120 @@ class ExperimentBackend:
         return ordered[offset:offset + limit]
 
     def get_session_comparison(self, session_id):
-        """Present real stored metrics with existing scientific guards; never rank."""
+        """Verify frozen evidence, pair authoritative Conditions and return backend ranks."""
+        from .benchmarking import rank_conditions
         from .comparison import (
-            comparison_reasons, comparison_views, different_paths, metric_comparison_reasons,
-            _metric_evidence,
+            comparison_reasons, comparison_views, contract_hash, different_paths,
+            metric_comparison_reasons, _metric_evidence,
         )
         session = self._session(session_id)
-        rows, checks, reasons, differences = [], [], [], []
+        rows, checks, reasons, differences, labels = [], [], [], [], {}
+        expected_seeds, expected_variants, observed_variants = set(), set(), set()
+        modern = True
         for reference in session['runs']:
             try:
                 result = self._results(Path(reference['directory']), reference['run_id'])
             except (KeyError, ValueError, OSError) as error:
                 result = {**reference, 'available': False, 'metrics': None, 'error': str(error)}
                 reasons.append(f"{reference['run_id']}: evidence unavailable: {error}")
-            # Compact table keeps original metric objects/availability, never synthesized scores.
             columns = ('run_id', 'available', 'experiment_id', 'revision', 'seed', 'variant',
                        'execution_status', 'acceptance', 'status', 'metrics', 'artifacts', 'error')
-            rows.append({k: result[k] for k in columns if k in result})
+            row = {k: result[k] for k in columns if k in result}
+            rows.append(row)
             if not result['available']:
                 continue
             view = result['comparison']
-            if not view:
-                reasons.append(f"{result['run_id']}: comparison evidence unavailable")
-                continue
-            check = {'variant': result['run_id'], 'seed': result['seed'],
-                     'execution_status': result['status'].get('execution_status'),
-                     'comparison_contract': view.get('original_hash'),
-                     'comparison': view, 'metrics': result['metrics']}
             try:
+                if not view:
+                    raise ValueError('comparison evidence unavailable')
                 expected = comparison_views(view['original_contract'], view.get('policy'),
                                             view['protected_conditions'])
                 if view != expected:
                     raise ValueError('comparison hash/metadata differs from original evidence')
+                metadata = result['metadata']
+                setup = view['protected_conditions'].get('experiment_setup', {})
+                identity = metadata.get('experiment_identity', {})
+                declared = bool(identity.get('id') and result.get('variant') and setup.get('seeds'))
+                modern = modern and declared
+                if view['schema_version'] == 2:
+                    if not declared:
+                        raise ValueError('frozen Experiment/Variant/seed declaration unavailable')
+                    frozen = result['configuration']
+                    if (frozen.get('comparison') != view
+                            or frozen.get('comparison_contract') != view['original_contract']):
+                        raise ValueError('comparison differs from independent frozen metadata/hash evidence')
+                    consumers = view['protected_conditions'].get('seed_consumers')
+                    if (not isinstance(consumers, dict)
+                            or consumers != metadata.get('seed_consumers')
+                            or consumers != frozen.get('owner_snapshot', {}).get('seed_consumers')
+                            or consumers.get('measurements.target_position.random_seed') != result['seed']):
+                        raise ValueError('Run seed does not match frozen owner seed-consumer evidence')
+                    if (view['protected_conditions'].get('component_selection')
+                            != frozen.get('system', {}).get('selection')):
+                        raise ValueError('component identities differ from frozen resolved system')
+                    if (metadata.get('experiment_identity') != result['status'].get('experiment_identity')
+                            or not identity.get('definition_sha256')):
+                        raise ValueError('frozen Experiment identity mismatch')
+                variables = view['variables'] if view.get('policy') else {'revision': result.get('revision')}
+                condition = contract_hash({'experiment': identity.get('id'),
+                                           'variant': result.get('variant'), 'variables': variables})
+                # Undeclared historical evidence retains its existing strict comparison;
+                # it cannot establish modern matched Condition identity for ranking.
+                if not declared:
+                    condition = result['run_id']
+                row['condition_id'] = condition
+                labels[condition] = {'experiment_id': result.get('experiment_id'),
+                                     'variant': result.get('variant'), 'variables': view['variables']}
+                expected_seeds.update(setup.get('seeds', [result['seed']]))
+                expected_variants.update(setup.get('variants', []))
+                observed_variants.add(result.get('variant'))
+                check = {'variant': condition, 'run_id': result['run_id'], 'seed': result['seed'],
+                         'execution_status': result['status'].get('execution_status'),
+                         'comparison_contract': view['original_hash'], 'comparison': view,
+                         'metrics': result['metrics'], 'acceptance': result.get('acceptance'),
+                         'status': result['status']}
                 checks.append(check)
                 reasons.extend(f"{result['run_id']}: {reason}"
                                for reason in _metric_evidence(check, view))
             except (ValueError, KeyError, TypeError) as error:
                 reasons.append(f"{result['run_id']}: invalid comparison evidence: {error}")
+        variants = list(dict.fromkeys(c['variant'] for c in checks))
         if len(checks) < 2:
             reasons.append('at least two Runs with comparison evidence are required')
+        if expected_variants - observed_variants:
+            reasons.append('missing declared Variants: ' + ', '.join(sorted(expected_variants - observed_variants)))
+        policy = checks[0]['comparison'].get('policy') if checks else None
+        if any(c['comparison'].get('policy') != policy for c in checks):
+            reasons.append('comparison policies differ')
+            policy = None
+        seeds = sorted(expected_seeds)
+        reasons.extend(comparison_reasons(checks, variants, seeds, policy))
         if checks:
-            first = checks[0]['comparison']
-            policy = first.get('policy')
-            if any(c['comparison'].get('policy') != policy for c in checks):
-                reasons.append('comparison policies differ')
-                policy = None
-            reasons.extend(comparison_reasons(
-                checks, [c['variant'] for c in checks],
-                sorted({c['seed'] for c in checks}, key=str),
-                policy))
             for check in checks[1:]:
-                reasons.extend(f"{check['variant']}: {reason}"
-                               for reason in metric_comparison_reasons(checks[0], check))
-                paths = {field: different_paths(first[field], check['comparison'][field])
+                first = next((c for c in checks if c['seed'] == check['seed']), checks[0])
+                reasons.extend(f"{check['run_id']}: {reason}"
+                               for reason in metric_comparison_reasons(first, check))
+                paths = {field: different_paths(first['comparison'][field], check['comparison'][field])
                          for field in ('original_contract', 'protected_conditions')}
-                differences.append({'first_run': checks[0]['variant'],
-                                    'second_run': check['variant'], **paths})
-                if paths['protected_conditions']:
-                    reasons.append(f"{check['variant']}: protected condition differences: "
-                                   + ', '.join(paths['protected_conditions']))
-        return {'session': session, 'runs': rows, 'ranking': None,
-                'comparability': {'comparable': not reasons,
-                                  'reasons': list(dict.fromkeys(reasons)),
+                differences.append({'first_run': first['run_id'], 'second_run': check['run_id'], **paths})
+                field = 'invariant_conditions' if check['comparison']['schema_version'] == 2 else 'protected_conditions'
+                # New declarations project exact mirrors; raw differences remain visible above.
+                protected = different_paths(first['comparison'].get(field), check['comparison'].get(field))
+                if protected:
+                    reasons.append(f"{check['run_id']}: protected condition differences: " + ', '.join(protected))
+        reasons = list(dict.fromkeys(reasons))
+        ranking_reasons = list(reasons)
+        if not modern:
+            ranking_reasons.append('authoritative frozen Condition/seed declaration unavailable for historical Runs')
+        if policy and policy.get('schema_version') == 2 and len({
+                contract_hash(c['comparison']['variables']) for c in checks}) < 2:
+            ranking_reasons.append('at least two distinct declared experimental variable values are required')
+        ranking = rank_conditions(checks, variants, seeds, policy, reasons=ranking_reasons)
+        for condition in ranking['conditions']:
+            condition.update(labels[condition['condition_id']])
+        return {'session': session, 'runs': rows,
+                'ranking': ranking if ranking['eligible'] else None,
+                'ranking_diagnostics': ranking,
+                'comparability': {'comparable': not reasons, 'reasons': reasons,
                                   'differences': differences,
-                                  'scope': 'existing recorded comparison policies, metric/window/'
-                                           'coverage evidence and protected conditions; '
-                                           'no automatic ranking'}}
+                                  'scope': 'Frozen protected conditions and matched Seeds; execution, quality and physical safety are separate. Matched Seeds do not imply identical physical trajectories.'}}

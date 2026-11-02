@@ -20,7 +20,9 @@ def main(argv=None):
         help='Writable metadata directory; never a package share directory',
     )
     parser.add_argument(
-        '--catalog', type=Path, help='Existing writable Catalog; default: DATA_DIR/catalog.yaml'
+        '--catalog',
+        type=Path,
+        help='Existing writable Catalog; default: DATA_DIR/catalog.yaml',
     )
     parser.add_argument(
         '--result-root',
@@ -28,6 +30,14 @@ def main(argv=None):
         action='append',
         default=[],
         help='Register existing Run evidence (repeatable); new Job outputs register automatically',
+    )
+    parser.add_argument(
+        '--managed-result-root',
+        type=Path,
+        action='append',
+        default=None,
+        help='Explicit writable deletion boundary (repeatable); default: DATA_DIR/runs. '
+        'Historical --result-root paths remain read-only for deletion.',
     )
     args = parser.parse_args(argv)
     if not args.host or not 1 <= args.port <= 65535:
@@ -48,7 +58,12 @@ def main(argv=None):
                 raise
     from .app import create_app
 
-    backend = ExperimentBackend(args.data_dir, catalog=catalog, result_roots=args.result_root)
+    backend = ExperimentBackend(
+        args.data_dir,
+        catalog=catalog,
+        result_roots=args.result_root,
+        managed_result_roots=args.managed_result_root,
+    )
     app = create_app(backend)
     print(f'Catalog: {catalog.path}', flush=True)
     app.run(host=args.host, port=args.port, debug=False, use_reloader=False)

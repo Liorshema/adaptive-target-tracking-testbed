@@ -48,6 +48,10 @@ class RK4Integrator:
         k3 = derivative(state + 0.5 * dt * k2, time + 0.5 * dt)
         k4 = derivative(state + dt * k3, time + dt)
 
-        return state + (dt / 6.0) * (
-            k1 + 2.0 * k2 + 2.0 * k3 + k4
-        )
+        with np.errstate(over='ignore', invalid='ignore'):
+            result = state + (dt / 6.0) * (
+                k1 + 2.0 * k2 + 2.0 * k3 + k4
+            )
+        if not np.all(np.isfinite(result)):
+            raise ValueError('RK4 returned a non-finite final state.')
+        return result

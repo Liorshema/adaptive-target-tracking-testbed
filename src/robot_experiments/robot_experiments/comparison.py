@@ -28,6 +28,9 @@ def contract_hash(value: Any) -> str:
 
 def validate_policy(value: Any) -> dict:
     """Reject unsupported declarations before materialization or process startup."""
+    if isinstance(value, dict) and type(value.get('schema_version')) is int and value['schema_version'] == 2:
+        from .comparison_variables import validate_component_policy
+        return validate_component_policy(value)
     if not isinstance(value, dict) or set(value) != {'schema_version', 'domain', 'variables'}:
         raise ValueError('comparison requires schema_version, domain and variables only')
     if type(value['schema_version']) is not int or value['schema_version'] != 1:
@@ -70,6 +73,14 @@ def comparison_views(original: dict, policy: dict | None, conditions: dict) -> d
     if not isinstance(original, dict) or not isinstance(conditions, dict):
         raise ValueError('comparison requires resolved contract and condition mappings')
     declaration = validate_policy(policy) if policy is not None else None
+    if declaration and declaration['schema_version'] == 2:
+        from .comparison_variables import project_components
+        invariant, projected, variables = project_components(original, conditions, declaration)
+        return {'schema_version': 2, 'policy': declaration,
+                'original_contract': deepcopy(original), 'original_hash': contract_hash(original),
+                'protected_conditions': deepcopy(conditions), 'variables': variables,
+                'invariant_contract': invariant, 'invariant_conditions': projected,
+                'invariant_hash': contract_hash({'contract': invariant, 'conditions': projected})}
     invariant, variables = deepcopy(original), {}
     for variable in declaration['variables'] if declaration else []:
         parent = invariant
@@ -114,24 +125,34 @@ def different_paths(first: Any, second: Any, prefix: str = '') -> list[str]:
     return [] if contract_hash(first) == contract_hash(second) else [prefix]
 
 
+def metric_document(run: dict) -> dict:
+    """Unavailable/malformed documents carry no valid observations."""
+    value = run.get('metrics')
+    return value if isinstance(value, dict) else {}
+
+
 def _metric_evidence(run: dict, view: dict) -> list[str]:
     """Require available observations, not a favorable tracking outcome."""
     reasons = []
-    metrics = run.get('metrics', {})
+    metrics = metric_document(run)
     if (type(metrics.get('schema_version')) is not int or metrics['schema_version'] != 1
             or not metrics.get('contract')):
         reasons.append('metric definitions unavailable or unsupported')
     required = view['protected_conditions'].get('evaluation', {}).get('required_metrics', [])
     for name in required:
-        metric = metrics.get('metrics', {}).get(name, {})
+        observations = metrics.get('metrics')
+        metric = observations.get(name, {}) if isinstance(observations, dict) else {}
+        metric = metric if isinstance(metric, dict) else {}
         statistic = metric.get('rmse' if name == 'prediction_rmse' else 'mean')
-        if (not metric.get('available') or metric.get('sample_count', 0) <= 0
+        if (not metric.get('available') or type(metric.get('sample_count')) is not int or metric['sample_count'] <= 0
                 or not metric.get('unit') or type(statistic) not in (float, int)
                 or not math.isfinite(statistic)):
             reasons.append(f'required metric {name}: missing valid observations')
-    if metrics.get('safety', {}).get('coverage_complete') is not True:
+    safety = metrics.get('safety')
+    if not isinstance(safety, dict) or safety.get('coverage_complete') is not True:
         reasons.append('required physical joint observation coverage incomplete')
-    window = metrics.get('evaluation_window', {})
+    window = metrics.get('evaluation_window')
+    window = window if isinstance(window, dict) else {}
     duration = view['original_contract'].get('duration')
     if (window.get('unit') != 's' or type(window.get('start')) not in (int, float)
             or type(window.get('end')) not in (int, float) or duration is None
@@ -144,11 +165,16 @@ def _metric_evidence(run: dict, view: dict) -> list[str]:
 def metric_comparison_reasons(first: dict, second: dict) -> list[str]:
     """Share the existing recorded metric-definition/unit guards with session clients."""
     reasons = []
-    if first.get('metrics', {}).get('contract') != second.get('metrics', {}).get('contract'):
+    if metric_document(first).get('contract') != metric_document(second).get('contract'):
         reasons.append('metric definitions mismatch')
-    first_metrics = first.get('metrics', {}).get('metrics', {})
-    for name, metric in second.get('metrics', {}).get('metrics', {}).items():
-        if name in first_metrics and metric.get('unit') != first_metrics[name].get('unit'):
+    first_metrics = metric_document(first).get('metrics') or {}
+    second_metrics = metric_document(second).get('metrics') or {}
+    if not isinstance(first_metrics, dict) or not isinstance(second_metrics, dict):
+        return reasons + ['metric observations malformed']
+    for name, metric in second_metrics.items():
+        if not isinstance(metric, dict) or not isinstance(first_metrics.get(name, {}), dict):
+            reasons.append(f'metric {name} observations malformed')
+        elif name in first_metrics and metric.get('unit') != first_metrics[name].get('unit'):
             reasons.append(f'metric {name} units mismatch')
     return reasons
 
@@ -173,7 +199,8 @@ def scientific_reasons(runs: list[dict], variants: list[str], seeds: list[int],
                     or saved['original_hash'] != view['original_hash']
                     or saved['invariant_hash'] != view['invariant_hash']
                     or saved['invariant_contract'] != view['invariant_contract']
-                    or saved['variables'] != view['variables']):
+                    or saved['variables'] != view['variables']
+                    or (declaration['schema_version'] == 2 and saved != view)):
                 raise ValueError('comparison metadata/hash does not match original evidence')
             if not configuration_only and not isinstance(run.get('metrics'), dict):
                 raise ValueError('metric evidence missing')
@@ -191,7 +218,8 @@ def scientific_reasons(runs: list[dict], variants: list[str], seeds: list[int],
             a, b = views.get((first['variant'], seed)), views.get((run['variant'], seed))
             if a is None or b is None:
                 continue
-            for field in ['invariant_contract', 'protected_conditions']:
+            for field in ['invariant_contract', 'invariant_conditions'
+                          if declaration['schema_version'] == 2 else 'protected_conditions']:
                 paths = different_paths(a[field], b[field])
                 if paths:
                     reasons.append(f'seed {seed}: {field} mismatch: ' + ', '.join(paths))

@@ -61,7 +61,7 @@ class ExperimentJobs:
             or not status.get('cleanup_complete',False)))
 
     def start(self, catalog, identifier, revision=None, *, output=None, runtime_overrides=None,
-              preview_id=None):
+              preview_id=None, session_id=None):
         # The preview shares this existing owner, not a competing process engine.
         with self._preview_lock():
             # Preflight before closing anything: an invalid Play must preserve preview.
@@ -72,6 +72,10 @@ class ExperimentJobs:
                 display=display_capabilities()
                 if not display['available']: raise ValueError(display['reason'])
             extra={}
+            if session_id is not None:
+                if not isinstance(session_id, str) or str(uuid.UUID(session_id)) != session_id:
+                    raise ValueError('session ID must be a canonical UUID')
+                extra['session_id'] = session_id
             if preview_id is not None:
                 current=self.preview_status()
                 if (current.get('job_id') != preview_id or current['state'] != 'paused'

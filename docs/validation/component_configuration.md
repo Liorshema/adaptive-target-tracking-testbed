@@ -279,3 +279,134 @@ A src/robot_simulation/test/test_component_architecture.py
 
 Deleted source files in Task 1: **none**. Earlier ownership-migration deletions
 remain unchanged in the pre-existing Git diff. No commit or push was made.
+
+
+## Task B — mathematical APIs and owner-local registration (2026-10-28)
+
+**Scoped API/registration/authoring acceptance: PASS. Runtime deployment: CONDITIONAL.**
+Task A's working tree was preserved. The optional APIs and their exact signatures
+are documented in [component configuration](../component_configuration.md#optional-mathematical-apis-task-b).
+Only four existing owner factory modules changed; no runner, authoring, bringup,
+ROS node, estimator algorithm, controller algorithm, physics or safety source was
+changed by Task B. No production model IDs or numerical defaults were added.
+
+A compatible extension consists of one mathematical Python file with an explicit
+`COMPONENTS` declaration and one authoritative parameter group in its existing
+owner YAML. Sorted trusted package-local discovery feeds the existing
+`ComponentRegistry`; experiment YAML supplies IDs and parameters, never imports.
+The three examples remain test-only under `robot_experiments/test/model_fixtures`.
+Their owner defaults are declared once in that fixture's `owner_parameters.yaml`.
+
+| Verification | Actual result / evidence under `results/mathematical_models/` |
+| --- | --- |
+| Final focused mathematics, validation, registration and public authoring | **131 passed**, `scoped_final.log` |
+| Full functional regression | **1,879 passed, 18 deselected, 1 existing xfailed**, 966.24 s, `regression.log`; deselection excludes package style/copyright wrappers |
+| Final review regressions | Malformed enum schemas reject; genuine predictor uncertainty can be returned without external timestamp state; `review_red.log`, `adapters_review_final.log`, `review_disposition.md` |
+| Direct / scientific configuration preservation | **75 / 21 equivalent**, zero differences, `direct_equivalence.json`, `preparation_equivalence.json` |
+| Normal and copied builds | Both **10 packages passed**, `build.log`, `copied_build.log`; four affected packages refreshed successfully in each prefix after final review (`build_final.log`, `copied_build_final.log`) |
+| Copied-install verification | **22 module origins, 10 families, 20 production components**, existing M06–M09 checks passed; `installed_verification.json` |
+| Copied bytes | **8 changed/added production modules and 20 owner YAML resources** identical to source, `installed_byte_identity.json` |
+| Scoped style / whitespace | **17 changed Python files** flake8 clean; **4 new production modules** pep257 clean; `style_review_final.log`, `docstyle_final.log`; `git diff --check` clean |
+| Preservation | All **29 original YAML files** byte/value/type/order identical; **21 immutable revisions**, **14,031 previous artifacts**, HEAD and staged logical diff unchanged; `change_manifest.json` |
+
+The full suite was collected during review; the final 131-case scoped rerun also
+covers review cases added afterward. These are overlapping suites, not additive
+counts. No functional failures were waived or numerical tolerances weakened.
+
+Source and copied-install fixtures traverse discovery → public one-file
+`ExperimentAuthor` preview/validation/save → Catalog preparation → M07 preflight
+and actual owner construction. They verify revised immutable history, reset,
+frozen source provenance, effective overrides and restoration of production
+inventory. `installed_mathematical_verification.json` records concrete identities:
+`AccelerationDynamics`, `StatelessPredictor`, `_VelocityFeedbackController`, with
+existing `robot_ekf` / `kalman`, explicit Cartesian task and independent safety.
+The initial copied mathematical probe used the wrong positional simulation
+registry API; only the probe was corrected to use the established mapping API
+and explicit environment dependency. Its failed log/catalog remain preserved;
+`installed_mathematical.log` records the successful corrected probe.
+
+Numerical examples exercise more than metadata. For state `[1,2,3,.4,.5,.6]`,
+spring stiffness `.4`, damping `.3` and no environment, copied dynamics produce
+`[.4,.5,.6,-.52,-.95,-1.38]`. For `[1,2,3,4,5,6]`, origin `10`, step `.5` and
+acceleration `.2`, prediction uses timestamps `[10.5,11]` and final state
+`[5.1,7.1,9.1,4.2,5.2,6.2]`, with uncertainty absent. Independent feedback tests
+expect `[2.1,1.3,2.1,-3.8]`, then `[.2,.2,.2,-.2]` after the test owner's normal
+acceleration projection. Fixtures also test environment-once integration,
+malformed/nonfinite/complex outputs, unsafe commands and incompatible contracts.
+
+### Retained live result and limitations
+
+Exactly one headless copied-install **EXP-NOMINAL revision 3**, seed 42, was
+attempted after builds/tests exited. It failed the original **45 s readiness
+gate** at simulation clock **23.916 s**, without establishing an evaluation
+origin. Exit code **1**, acceptance **unknown**; distance, pointing, scored RTF,
+controller timing and physical-safety metrics are **unavailable**, not zero.
+No retry, threshold change or runtime remediation was performed.
+
+Actual streams included 4,265 joint messages, 924 robot estimates, 373 predictions
+and 476 control/command messages (`runtime_stream_counts.json`). Stream presence
+does not establish synchronized readiness or successful tracking. All nine launch
+children exited cleanly; cleanup reported no survivors, and the final process
+scan found none. Raw launch/telemetry/status remain under
+`runtime/nominal_20261028T011336_419488Z_6n8b1vrx/`; `runtime_summary.json` preserves
+the failure and unavailable metrics. This is consistent with the pre-existing
+readiness limitation; this task does not establish its cause.
+
+Test-only equations are verified mathematically, through real factories and
+composition, **not through Gazebo deployment**. Controller convenience is limited
+to the exact declared Cartesian velocity task/frame/selection and model-sized
+bounded generalized velocities. Predictor frames cannot be checked because the
+existing input/output contracts do not carry frame IDs; the same fixed frame is
+required. No implicit covariance propagation, transforms, history or latent-state
+projection is added. Registration metadata is not a scientific or hardware safety
+certificate. Existing runtime, localization and IMM limitations remain open.
+Estimator role-neutrality and Dashboard work remain deferred.
+
+### Reproduction and exact Task-B-relative file list
+
+From `/home/user/ros2_ws`:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install --executor sequential
+source install/setup.bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -m pytest -p no:launch_testing -p no:launch_ros --import-mode=importlib -q src tools/validation -k 'not flake8 and not pep257 and not copyright'
+ros2 run robot_experiments run --experiment EXP-NOMINAL --revision 3 --output /tmp/mathematical_api_smoke
+```
+
+The final command is a reproduction attempt, not a promise of readiness success.
+Exact targeted, normal/copy build, isolated-install, equivalence and smoke commands
+are retained in `results/mathematical_models/verification_commands.txt` and the
+corresponding `verify_*.sh` / `run_smoke.sh`. Use a fresh isolated catalog/output
+when repeating checks; retain previous attempts. Original baseline hashes and
+`before.tar.gz` accompany the final manifest and source snapshot in that directory.
+Generated evidence is ignored and not installed as production code.
+
+Changes below are relative to the captured **Task A state**, not Git HEAD:
+
+```text
+M docs/component_configuration.md
+M docs/validation/component_configuration.md
+M src/robot_control/robot_control/factory/project_components.py
+M src/robot_prediction/robot_prediction/factory/component_registry.py
+M src/robot_prediction/robot_prediction/factory/system_factory.py
+M src/robot_simulation/robot_simulation/factory/simulation_factory.py
+A src/robot_configuration/robot_configuration/model_registration.py
+A src/robot_configuration/test/test_model_registration.py
+A src/robot_control/robot_control/controllers/feedback_model.py
+A src/robot_control/test/test_feedback_model.py
+A src/robot_experiments/test/model_fixtures/context.py
+A src/robot_experiments/test/model_fixtures/control/mathematical_example.py
+A src/robot_experiments/test/model_fixtures/dynamics/mathematical_example.py
+A src/robot_experiments/test/model_fixtures/owner_parameters.yaml
+A src/robot_experiments/test/model_fixtures/prediction/mathematical_example.py
+A src/robot_experiments/test/test_mathematical_authoring.py
+A src/robot_prediction/robot_prediction/baseline/stateless_model.py
+A src/robot_prediction/test/test_stateless_model.py
+A src/robot_simulation/robot_simulation/dynamics/acceleration_model.py
+A src/robot_simulation/test/test_acceleration_model.py
+```
+
+**6 modified, 14 added, 0 deleted.** Prior Task A edits remain untouched. No commit
+or push was performed. Task B is complete; overall research runtime remains
+CONDITIONAL because the representative deployment did not pass readiness.

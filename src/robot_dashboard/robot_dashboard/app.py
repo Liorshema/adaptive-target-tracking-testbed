@@ -20,11 +20,15 @@ from dash.exceptions import PreventUpdate
 from .execution import execution_layout
 from .execution import register_execution
 from .forms import INHERIT
-from .forms import apply_execution
+from .forms import apply_comparison, apply_execution
 from .forms import assemble_draft
 from .forms import begin_draft
 from .forms import fingerprint
 from .forms import parameter_rows
+from .management import management_state
+from .management import register_management
+from .management import scenario_menu
+from .results import register_trajectory
 from .simulation import register_simulation
 from .simulation import simulation_layout
 
@@ -346,9 +350,14 @@ def setup_view(effective, capabilities, *, fresh, identity):
     ]
 
 
-def execution_fields(state=None):
+def execution_fields(state=None, backend=None):
     """Render execution controls from the Author-resolved study, with no new defaults."""
     study = ((state or {}).get('preview') or {}).get('effective', {}).get('experiment', {})
+    policy = (state or {}).get('spec', {}).get('experiment', {}).get('comparison', study.get('comparison'))
+    options = backend.list_comparison_variables() if backend else []
+    variable = (policy or {}).get('variables', [{}])[0]
+    selected = (variable.get('path') if policy and policy.get('schema_version') == 2 and len(policy['variables']) == 1
+                else '__preserve__' if policy else '__strict__')
     return [
         html.Label(
             [
@@ -375,6 +384,24 @@ def execution_fields(state=None):
                 ),
             ]
         ),
+        html.Details([
+            html.Summary('Advanced Comparison Setup'),
+            html.Div([
+            html.P('Save each configuration as an immutable revision with the same declaration and Seeds. Run each saved revision and add its Runs to the same Session. Comparability is checked from frozen evidence.', className='hint'),
+            dcc.Dropdown(id='comparison-variable', clearable=False, value=selected,
+                         options=[{'label': 'Strict comparison (no declared differences)', 'value': '__strict__'},
+                                  *([{'label': 'Preserve pinned comparison declaration', 'value': '__preserve__'}] if selected == '__preserve__' else []),
+                                  *[{'label': o['path'], 'value': o['path']} for o in options]],
+                         disabled=not state),
+            dcc.Dropdown(id='comparison-models', multi=True,
+                         value=variable.get('values', []) if selected.startswith('components.') else [],
+                         placeholder='Permitted registered models'),
+            dcc.Input(id='comparison-values', type='text',
+                      value=json.dumps(variable['values']) if selected.startswith('parameters.') and 'values' in variable else '',
+                      placeholder='Optional permitted parameter values (JSON array)'),
+            html.P('Only declared fields may differ. Dynamics studies are labeled separately. Incompatible tasks, physics, timing, sensing and safety remain protected.', className='hint'),
+            ], className='comparison-setup-popover'),
+        ], className='advanced-comparison'),
     ]
 
 
@@ -397,6 +424,7 @@ def create_app(backend):
                 dcc.Store(id='builder-state'),
                 dcc.Store(id='selected-snapshot'),
                 *execution['state'],
+                *management_state(),
                 html.Header(
                     [
                         html.Div(
@@ -438,11 +466,21 @@ def create_app(backend):
                                         html.Label(
                                             'Saved scenario', htmlFor='source-experiment'
                                         ),
-                                        dcc.Dropdown(
-                                            id='source-experiment',
-                                            options=options,
-                                            value=options[0]['value'] if options else None,
-                                            clearable=False,
+                                        html.Div(
+                                            [
+                                                dcc.Dropdown(
+                                                    id='source-experiment',
+                                                    options=options,
+                                                    value=(
+                                                        options[0]['value']
+                                                        if options
+                                                        else None
+                                                    ),
+                                                    clearable=False,
+                                                ),
+                                                scenario_menu(),
+                                            ],
+                                            className='scenario-selector',
                                         ),
                                         html.Label('Condition', htmlFor='source-variant'),
                                         dcc.Dropdown(id='source-variant', clearable=False),
@@ -461,21 +499,42 @@ def create_app(backend):
                                         ),
                                         html.Div(
                                             [
-                                                html.Label(
-                                                    'New experiment ID', htmlFor='new-id'
-                                                ),
-                                                dcc.Input(
-                                                    id='new-id',
-                                                    className='identity-input',
-                                                    placeholder='EXP-MY-STUDY',
-                                                    type='text',
-                                                ),
                                                 html.Label('Display name', htmlFor='new-name'),
                                                 dcc.Input(
                                                     id='new-name',
                                                     className='identity-input',
                                                     placeholder='My tracking study',
                                                     type='text',
+                                                ),
+                                                html.Div(
+                                                    id='identity-feedback',
+                                                    className='hint',
+                                                    role='status',
+                                                ),
+                                                html.Details(
+                                                    [
+                                                        html.Summary('Advanced · identifier'),
+                                                        dcc.Checklist(
+                                                            id='custom-id',
+                                                            options=[
+                                                                {
+                                                                    'label': 'Custom identifier',
+                                                                    'value': 'custom',
+                                                                }
+                                                            ],
+                                                            value=[],
+                                                        ),
+                                                        dcc.Input(
+                                                            id='new-id',
+                                                            className='identity-input',
+                                                            type='text',
+                                                            disabled=True,
+                                                        ),
+                                                        html.Small(
+                                                            'Applied when loading a new draft.'
+                                                        ),
+                                                    ],
+                                                    className='identity-advanced',
                                                 ),
                                             ],
                                             id='create-fields',
@@ -544,7 +603,7 @@ def create_app(backend):
                                             children='Choose a scenario, then load it.',
                                             className='notice neutral',
                                         ),
-                                        html.Div(execution_fields(), id='execution-fields'),
+                                        html.Div(execution_fields(backend=backend), id='execution-fields'),
                                         dcc.Loading(
                                             html.Div(id='component-cards'),
                                             type='circle',
@@ -698,7 +757,7 @@ def create_app(backend):
     )
     def inspect_saved(identifier, revision):
         if not identifier or revision is None:
-            raise PreventUpdate
+            return [], None, '', '', None
         try:
             effective = backend.explain_experiment(identifier, revision)
             variants = list(dict.fromkeys(r['variant'] for r in effective['runs']))
@@ -735,6 +794,18 @@ def create_app(backend):
     )
 
     @app.callback(
+        Output('comparison-models', 'options'),
+        Output('comparison-models', 'disabled'),
+        Output('comparison-values', 'disabled'),
+        Input('comparison-variable', 'value'),
+    )
+    def comparison_choices(path):
+        option = next((o for o in backend.list_comparison_variables() if o['path'] == path), {})
+        is_model = option.get('kind') == 'model'
+        return ([{'label': name, 'value': name} for name in option.get('model_values', [])],
+                not is_model, option.get('kind') != 'parameter')
+
+    @app.callback(
         Output('builder-state', 'data'),
         Output('component-cards', 'children'),
         Output('source-experiment', 'options'),
@@ -749,6 +820,9 @@ def create_app(backend):
         Input({'type': 'override', 'role': ALL, 'key': ALL, 'kind': ALL}, 'value'),
         Input('execution-duration', 'value'),
         Input('execution-seeds', 'value'),
+        Input('comparison-variable', 'value'),
+        Input('comparison-models', 'value'),
+        Input('comparison-values', 'value'),
         State({'type': 'component', 'role': ALL}, 'id'),
         State({'type': 'param', 'role': ALL, 'key': ALL, 'kind': ALL}, 'id'),
         State('source-experiment', 'value'),
@@ -771,6 +845,9 @@ def create_app(backend):
         switches,
         duration,
         seeds,
+        comparison_path,
+        comparison_models,
+        comparison_values,
         component_ids,
         fields,
         source,
@@ -792,7 +869,7 @@ def create_app(backend):
                     state,
                     component_cards(backend, state),
                     no_update,
-                    execution_fields(state),
+                    execution_fields(state, backend),
                 )
             if not state or 'spec' not in state:
                 raise PreventUpdate
@@ -810,16 +887,18 @@ def create_app(backend):
                     state,
                     component_cards(backend, state),
                     no_update,
-                    execution_fields(state),
+                    execution_fields(state, backend),
                 )
             spec = assemble_draft(
                 state['spec'], selections, component_ids, values, fields, switches
             )
             spec = apply_execution(spec, duration, seeds)
+            spec = apply_comparison(spec, comparison_path, comparison_models, comparison_values, backend.list_comparison_variables())
             digest = fingerprint(spec)
             if isinstance(trigger, dict) or trigger in (
                 'execution-duration',
                 'execution-seeds',
+                'comparison-variable', 'comparison-models', 'comparison-values',
             ):
                 if digest == state['form_digest']:
                     raise PreventUpdate
@@ -993,4 +1072,6 @@ def create_app(backend):
 
     register_execution(app, backend)
     register_simulation(app, backend)
+    register_management(app, backend)
+    register_trajectory(app, backend)
     return app

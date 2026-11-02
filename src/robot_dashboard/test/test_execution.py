@@ -20,6 +20,7 @@ class ControlledBackend:
         self.cancels = []
         self.timeout = False
         self.gui_requests = []
+        self.session_requests = []
 
     def get_simulation_status(self):
         """Return no preview unless a handoff test explicitly supplies one."""
@@ -29,10 +30,20 @@ class ControlledBackend:
         """Return controlled Session identities."""
         return [{'session_id': s} for s in self.associations]
 
-    def start_run(self, identifier, revision, *, output, enable_actuation=False, gui=False):
+    def start_run(
+        self,
+        identifier,
+        revision,
+        *,
+        output,
+        enable_actuation=False,
+        gui=False,
+        session_id=None,
+    ):
         """Record the requested immutable identity and explicit actuation flag."""
         self.starts.append((identifier, revision, output, enable_actuation))
         self.gui_requests.append(gui)
+        self.session_requests.append(session_id)
         job = {
             'job_id': f'job-{len(self.starts)}',
             'state': 'queued',
@@ -96,13 +107,18 @@ def test_start_is_explicit_pinned_default_off_and_duplicate_safe():
     with ThreadPoolExecutor(max_workers=2) as pool:
         replies = list(
             pool.map(
-                lambda _: actions.start(initial, 'EXP-EXISTING', 3, 'session-a', '/tmp/output'),
+                lambda _: actions.start(
+                    initial, 'EXP-EXISTING', 3, 'session-a', '/tmp/output'
+                ),
                 range(2),
             )
         )
     assert backend.starts == [('EXP-EXISTING', 3, '/tmp/output', False)]
+    assert backend.session_requests == ['session-a']
     assert all(r['job_id'] == 'job-1' for r in replies)
-    actions.start(replies[-1], 'EXP-OTHER', 2, 'session-b', '/tmp/other', enable_actuation=True)
+    actions.start(
+        replies[-1], 'EXP-OTHER', 2, 'session-b', '/tmp/other', enable_actuation=True
+    )
     assert len(backend.starts) == 1
     backend.jobs['job-1']['state'] = 'completed'
     # A replayed original nonce remains a replay even after that job is terminal.
@@ -342,6 +358,7 @@ def test_play_hands_paused_preview_to_backend_and_preserves_opt_in():
         )
         assert received[-1] == {
             'output': '/tmp/output',
+            'session_id': 'session-a',
             'enable_actuation': actuate,
             'gui': True,
             'preview_id': 'preview-owner',

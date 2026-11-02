@@ -592,7 +592,9 @@ def _assemble(data, source, share, overrides):
     )
     integration = load_yaml(resolve_resource(sim['simulation']['config'], resource, share))
     try:
-        engine, _ = SimulationFactory.with_defaults().create(target, environment, integration)
+        engine, _ = SimulationFactory.with_defaults().create(
+            target, environment, integration,
+            reference_frame=sim['tracking']['reference_frame'])
     except (ValueError, TypeError, KeyError) as error:
         raise ValueError(f'simulation dynamics/integration: {error}') from error
     for key in ['initial_position', 'initial_velocity']:

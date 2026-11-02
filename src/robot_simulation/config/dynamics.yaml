@@ -5,6 +5,23 @@
 # p_dot = v; v_dot = radial(d)*direction - damping*v + external acceleration.
 # Positive radial(d) points away from the tracker; negative points toward it.
 dynamics:
+  # Generic owner type. Supply a complete parameters.model to replace this
+  # reusable constant-velocity definition; no Python registration is needed.
+  equation_state_space:
+    parameters:
+      model:
+        id: constant_velocity
+        type: equation_state_space
+        schema_version: 1
+        frame: world
+        state:
+          - {name: p, shape: [3], unit: m, initial: [0.0, 0.0, 1.0]}
+          - {name: v, shape: [3], unit: m/s, initial: [0.0, 0.0, 0.0]}
+        parameters: {}
+        equations:
+          p: v
+          v: "[0, 0, 0]"
+        deployment: {adapter: cartesian_target, position: p, velocity: v}
   fight_flight:
     parameters:
       # radial(d) = alpha*(d - preferred_distance).

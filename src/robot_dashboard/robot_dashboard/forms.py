@@ -26,7 +26,9 @@ def begin_draft(backend, source, revision, variant, mode, identifier=None, name=
             )
         row = next(r for r in backend.list_experiments() if r['id'] == source)
         identifier, name = source, row['name']
-    elif mode != 'create':
+    elif mode == 'create':
+        identifier = backend.validate_experiment_id(identifier)
+    else:
         raise ValueError('Choose Create new or Revise selected')
     spec = backend.new_draft(
         identifier, name, source, base_revision=revision, base_variant=variant
@@ -142,4 +144,28 @@ def apply_execution(specification, duration, seeds):
         raise ValueError('experiment.execution.seeds: enter a JSON integer array')
     spec = deepcopy(specification)
     spec['experiment'].setdefault('execution', {}).update(duration=duration, seeds=parsed)
+    return spec
+
+
+def apply_comparison(specification, path, models, values, options):
+    """Declare exact variables; full resolved validation remains in the Author."""
+    from robot_experiments.comparison import validate_policy
+    spec = deepcopy(specification)
+    if path in ('__legacy__', '__preserve__'):
+        return spec
+    if path in (None, '__strict__'):
+        spec['experiment']['comparison'] = None
+        return spec
+    detail = next((option for option in options if option['path'] == path), None)
+    if detail is None:
+        raise ValueError('comparison variable: select a registered exact path')
+    existing = (spec['experiment'].get('comparison') or {}).get('variables', [])
+    name = existing[0]['name'] if len(existing) == 1 and existing[0]['path'] == path else path.replace('.', '_')
+    variable = {'name': name, 'path': path}
+    if detail['kind'] == 'model':
+        variable['values'] = models
+    elif values and values.strip():
+        variable['values'] = _value(values, 'array', 'comparison permitted values')
+    spec['experiment']['comparison'] = validate_policy({
+        'schema_version': 2, 'domain': detail['domain'], 'variables': [variable]})
     return spec

@@ -429,3 +429,18 @@ def test_canonical_comparison_study_explanation_uses_existing_owner_preflight(tm
     assert all(run['configuration_validation']['passed'] for run in value['runs'])
     assert all(run['seed_consumers']['localization_sensor.random_seed'] == 3872720740
                for run in value['runs'])
+
+
+def test_telemetry_iterator_covers_tail_with_bounded_pages_and_original_epochs(tmp_path):
+    """Keep bounded pages, original order and the final partial page."""
+    identifier, path = recorded_run(tmp_path / 'results')
+    api = backend(tmp_path, roots=[tmp_path / 'results'])
+    pages = list(api.iter_telemetry(identifier, 'clock', offset=1, limit=4))
+    assert [p['offset'] for p in pages] == [1, 5, 9]
+    assert [len(p['records']) for p in pages] == [4, 4, 1]
+    assert [r for p in pages for r in p['records']] == [{'time': x} for x in range(1, 10)]
+    assert all(p['source'] == str(path / 'telemetry' / 'clock.jsonl') for p in pages)
+    assert list(api.iter_telemetry(identifier, 'clock', offset=10, limit=4)) == []
+    for stream, limit in [('../status', 4), ('clock', 0), ('clock', 1001)]:
+        with pytest.raises(ValueError):
+            list(api.iter_telemetry(identifier, stream, limit=limit))

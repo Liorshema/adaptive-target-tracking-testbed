@@ -182,7 +182,7 @@ def test_current_session_row_selects_original_run_through_callback(recorded):
             ],
             'inputs': [
                 {**meta, 'value': v}
-                for meta, v in zip(callback['inputs'], [session, 0, None, [0, 1]])
+                for meta, v in zip(callback['inputs'], [session, 0, None, [0, 1], 0])
             ],
             'state': [{**meta, 'value': v} for meta, v in zip(callback['state'], [good, None])],
             'changedPropIds': [trigger],
@@ -296,8 +296,7 @@ def test_comparison_ranking_is_guarded_by_backend_and_explicit_radial_criterion(
         headers, rows = _table_rows(view)
         assert 'recorded radial' in headers[-1].title.lower()
         assert 'lower' in headers[-1].title.lower()
-        assert [row.children[-1].children for row in rows] == (
-            ['2', '1'] if comparable is True else ['Unavailable', 'Unavailable'])
+        assert [row.children[-1].children for row in rows] == ['Unavailable', 'Unavailable']
     runs[1]['metrics']['metrics']['tracking_distance']['unit'] = 'cm'
     _, rows = _table_rows(comparison_view({
         'runs': runs, 'comparability': {'comparable': True}}))
@@ -339,11 +338,18 @@ def test_result_panels_are_grid_siblings_and_compute_is_advanced():
         def read_telemetry(self, *args, **kwargs):
             raise FileNotFoundError
 
+        def iter_telemetry(self, *args, **kwargs):
+            """Model a recorded Run without any target telemetry stream."""
+            raise FileNotFoundError
+
     view = results_view(RecordedBackend(), 'run-a', result=_presentation_result())
     assert [child.className for child in view.children] == [
         'kpi-grid', 'panel position-panel', 'panel orientation-panel',
-        'panel trajectory-panel', 'result-statusbar']
-    assert [panel.children[0].children for panel in view.children[1:4]] == [
+        'panel trajectory-panel', 'trajectory-overlay', 'result-statusbar']
+    assert view.children[4].hidden is True
+    headings = [view.children[1].children[0], view.children[2].children[0],
+                view.children[3].children[0].children[0]]
+    assert [heading.children for heading in headings] == [
         'Position Error', 'Orientation Error', 'Truth vs Estimate vs Prediction']
     assert 'Control computation time' not in str(view.children[:-1])
     assert 'Control computation time' in str(view.children[-1])
@@ -401,3 +407,20 @@ def test_historical_scenario_names_keep_catalog_authority_and_skip_unreadable_ev
     ])
     assert names == {'EXP-KNOWN': 'Catalog display name',
                      'EXP-HISTORICAL': 'recorded historical name'}
+
+
+def test_comparison_uses_backend_condition_ranks_and_seed_aggregates():
+    """The UI consumes the authorized result, without locally ranking Run UUIDs."""
+    from robot_dashboard.results import comparison_view
+    runs = [_presentation_result('run-a', .9), _presentation_result('run-b', .1)]
+    # Deliberately different Run and Condition statistics: the backend owns aggregation.
+    conditions = [{'condition_id': name, 'run_ids': [run['run_id']], 'rank': rank,
+                   'seed_count': 1, 'variables': {}, 'variant': name,
+                   'metrics': {'tracking_distance': {'mean': value, 'std': None, 'unit': 'm'}},
+                   'per_seed': [{'seed': 42, 'run_id': run['run_id'], 'rmse': value, 'unit': 'm'}]}
+                  for run, name, rank, value in zip(runs, ['A', 'B'], [1, 2], [.2, .4])]
+    _, rows = _table_rows(comparison_view({'runs': runs, 'comparability': {'comparable': True},
+                                          'ranking': {'eligible': True, 'conditions': conditions}}))
+    assert [r.children[-1].children for r in rows] == ['1', '2']
+    assert [r.children[1].children for r in rows] == ['0.200', '0.400']
+    assert 'n=1' in rows[0].children[-1].title
