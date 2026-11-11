@@ -147,12 +147,12 @@ def test_dash_page_and_capability_are_real(backend):
     layout = client.get('/_dash-layout')
     assert layout.status_code == 200
     text = layout.get_data(as_text=True)
-    assert 'Experiment Lab' in text and 'Simulation Setup' in text
-    assert 'EXP-NOMINAL' in text and 'Open Simulation' in text
-    assert 'Unscored preview' in text and 'close-simulation' in text
+    assert 'Experiment Lab' in text and 'Simulation Setup' not in text
+    assert 'EXP-NOMINAL' in text and 'Open Simulation' not in text
+    assert 'Unscored preview' not in text and 'close-simulation' not in text
     assert client.get('/assets/dashboard.css').status_code == 200
     # Interactive preview and scored execution keep distinct authoritative owners.
-    assert any('simulation-state.data' in key for key in app.callback_map)
+    assert not any('simulation-state.data' in key for key in app.callback_map)
 
 
 def test_headless_backend_does_not_import_dashboard_dependency():
@@ -176,8 +176,8 @@ def _action(app, state, trigger, value=0.23, *, duration=6.0, seeds='[42]'):
         (k, v) for k, v in app.callback_map.items() if k.startswith('..builder-state.data')
     )
     field = {'role': 'target_dynamics', 'key': 'damping', 'kind': 'number'}
-    inputs = [None] * 5 + [[], [value], [['override']], duration, seeds, '__strict__', [], '']
-    states = [[], [field], 'EXP-NOMINAL', 3, 'imm', 'create', 'EXP-HTTP', 'HTTP', state]
+    inputs = [None] * 5 + [[], [value], [['override']], duration, seeds, [], None, []]
+    states = [[], [field], 'EXP-NOMINAL', 3, 'create', 'EXP-HTTP', 'HTTP', state]
     response = app.server.test_client().post(
         '/_dash-update-component',
         json={
@@ -195,6 +195,42 @@ def _action(app, state, trigger, value=0.23, *, duration=6.0, seeds='[42]'):
     )
     assert response.status_code == 200, response.get_data(as_text=True)
     return response.get_json()['response']['builder-state']['data']
+
+
+def test_load_uses_selected_revision_schema_instead_of_latest(backend, monkeypatch):
+    from robot_dashboard.app import create_app
+
+    # A later revision may have a different authoring schema; the selected
+    # immutable schema-1 revision must still load through the real Author.
+    monkeypatch.setattr(backend, 'ensure_scenario', lambda source:
+                        {'definition': {'schema_version': 2}})
+    state = _action(create_app(backend), None, 'load-draft')
+    assert state['stage'] == 'Draft', state
+    assert state['spec']['experiment']['base_revision'] == 3
+
+
+def test_primary_model_selectors_are_outside_parameter_accordions(backend):
+    from robot_dashboard.app import component_cards
+    from robot_dashboard.forms import begin_draft
+
+    state = begin_draft(backend, 'EXP-NOMINAL', 3, 'imm', 'create', 'EXP-SELECT', 'select')
+    state['inherited_components'] = deepcopy(state['components'])
+
+    def controls(node, hidden=False):
+        if isinstance(node, (list, tuple)):
+            return [item for child in node for item in controls(child, hidden)]
+        if not hasattr(node, 'to_plotly_json'):
+            return []
+        data = node.to_plotly_json()
+        hidden = hidden or data['type'] == 'Details'
+        identifier = data['props'].get('id')
+        here = [(identifier['role'], hidden)] if isinstance(identifier, dict) and identifier.get('type') == 'component' else []
+        return here + controls(data['props'].get('children'), hidden)
+
+    found = dict(controls(component_cards(backend, state)))
+    for role in ('robot_estimator', 'target_estimator', 'predictor', 'adaptation',
+                 'fusion', 'controller', 'target_dynamics'):
+        assert found[role] is False
 
 
 def test_http_save_rejects_edits_after_validation_and_preserves_draft(backend):
@@ -219,7 +255,7 @@ def test_http_save_rejects_edits_after_validation_and_preserves_draft(backend):
     checked = _action(app, saved, 'validate-draft', value=0.34)
     backend.save_experiment(saved['spec'], expected_revision=1)
     conflicted = _action(app, checked, 'save-draft', value=0.34)
-    assert conflicted['stage'] == 'Invalid'
+    assert conflicted['stage'] == 'Save failed'
     assert 'reload' in conflicted['message']
     assert conflicted['spec']['experiment']['parameters']['target_dynamics']['damping'] == 0.34
     assert backend.catalog.get('EXP-HTTP', 1) == original
@@ -234,6 +270,20 @@ def _tree(component):
     elif hasattr(component, 'to_plotly_json'):
         yield component
         yield from _tree(getattr(component, 'children', None))
+
+
+def test_validation_cannot_save_previous_scenario_during_a_pending_new_load(backend):
+    """A fast click after Duplicate must never validate the previous saved identity."""
+    from robot_dashboard.app import create_app
+    from robot_dashboard.forms import begin_draft
+    app = create_app(backend)
+    state = begin_draft(backend, 'EXP-NOMINAL', 3, 'imm', 'revise')
+    state['inherited_components'] = deepcopy(state['components'])
+    original = backend.catalog.get('EXP-NOMINAL')
+    # _action supplies the new unsaved EXP-HTTP intent with the old loaded state.
+    rejected = _action(app, state, 'validate-draft')
+    assert rejected['stage'] == 'Invalid' and 'Load' in rejected['message']
+    assert backend.catalog.get('EXP-NOMINAL') == original
 
 
 def test_component_redraw_retains_unpreviewed_parameters_and_switches(backend):
@@ -326,7 +376,7 @@ def test_duration_seeds_use_author_revision_and_preserve_history(backend):
     assert not backend.validate_experiment(apply_execution(spec, 0, '[42]'))['valid']
 
 
-def test_two_primary_tabs_keep_all_workflow_controls_mounted(backend):
+def test_three_primary_tabs_keep_all_workflow_controls_mounted(backend):
     """Switching workspaces must not destroy draft, job or Session controls."""
     from robot_dashboard.app import create_app
 
@@ -349,7 +399,7 @@ def test_two_primary_tabs_keep_all_workflow_controls_mounted(backend):
     ]:
         assert ids.count(name) == 1, name
     tabs = next(c for c in controls if getattr(c, 'id', None) == 'workspace-tab')
-    assert [o['label'] for o in tabs.options] == ['Experiment Lab', 'Results & History']
+    assert [o['label'] for o in tabs.options] == ['Experiment Lab', 'Dynamics Studio', 'Results & History']
 
 
 def test_duration_edit_invalidates_validation_and_saves_exact_revision(backend):
@@ -377,7 +427,7 @@ def test_scenario_labels_use_catalog_names_without_internal_ids(backend):
     from robot_dashboard.app import experiment_options
 
     options = experiment_options(backend)
-    original = {r['id']: r['name'] for r in backend.list_experiments()}
+    original = {r['id']: r['name'] for r in backend.list_scenarios()}
     assert all(o['label'] == original[o['value']] for o in options)
 
 
@@ -411,3 +461,30 @@ def test_comparison_form_preserves_pinned_variable_identity_and_exact_policy(bac
     assert apply_comparison(spec, '__strict__', [], '', [])['experiment']['comparison'] is None
     with pytest.raises(ValueError, match='registered'):
         apply_comparison(spec, 'components.*', [], '', backend.list_comparison_variables())
+
+
+def test_primary_selection_labels_are_unique_without_inheritance_jargon(backend):
+    from robot_dashboard.app import component_cards
+    from robot_dashboard.forms import begin_draft
+    state=begin_draft(backend,'EXP-NOMINAL',3,'imm','create','EXP-CLEAR','Clear')
+    state['inherited_components']=deepcopy(state['components'])
+    state['spec']['experiment'].setdefault('components',{})['controller']=state['components']['controller']['id']
+    before=deepcopy(state['spec'])
+    def walk(node):
+        if isinstance(node,(list,tuple)):
+            for child in node:yield from walk(child)
+        elif hasattr(node,'to_plotly_json'):
+            yield node
+            yield from walk(getattr(node,'children',None))
+    nodes=list(walk(component_cards(backend,state)))
+    selectors=[n for n in nodes if isinstance(getattr(n,'id',None),dict) and n.id.get('type')=='component']
+    primary={'robot_estimator','target_estimator','predictor','adaptation','fusion','controller','target_dynamics'}
+    assert sum(s.id['role'] in primary for s in selectors)==7
+    for selector in selectors:
+        labels=[str(o['label']) for o in selector.options]
+        assert len(labels)==len(set(labels))
+        assert not any('inherited' in t.lower() or 'preflight' in t.lower() for t in labels)
+        assert sum(o['value']==selector.value for o in selector.options)==1
+    assert not any(getattr(n,'className',None) in ['component-id','selection-origin'] for n in nodes)
+    assert not any(getattr(n,'children',None)=='Model selection' for n in nodes)
+    assert state['spec']==before

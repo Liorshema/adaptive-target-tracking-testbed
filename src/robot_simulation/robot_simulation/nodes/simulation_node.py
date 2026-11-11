@@ -2,6 +2,7 @@
 """ROS 2 node for Gazebo-clock-driven target simulation."""
 
 from dataclasses import replace
+import json
 from typing import Any
 
 import numpy as np
@@ -85,6 +86,10 @@ class SimulationNode(Node):
         super().__init__("simulation_node")
 
         self._declare_parameters()
+        self.declare_parameter("context_diagnostics", False)
+        self._context_diagnostics = self.get_parameter("context_diagnostics").value
+        self._last_context_diagnostic = None
+        self.add_post_set_parameters_callback(self._update_context_diagnostics)
         self.declare_parameter("physical_base_max_age", .2)
         self.declare_parameter('context_history_capacity', Parameter.Type.INTEGER)
 
@@ -115,6 +120,7 @@ class SimulationNode(Node):
             "integration"
         ]
 
+        self._engine = engine
         self._stepper = TimeStepper(
             engine=engine,
             dt=dt,
@@ -137,6 +143,10 @@ class SimulationNode(Node):
         self._tracking_source = required_string(
             self, "tracking_source"
         ).lower()
+        self._requires_tracking_history = bool(
+            getattr(engine.dynamics, 'requires_tracking_context', False))
+        if self._requires_tracking_history and self._tracking_source != 'tf':
+            raise ValueError('Derivative influence requires live tracking TF')
 
         if self._tracking_source not in ("static", "tf"):
             raise ValueError(
@@ -161,7 +171,9 @@ class SimulationNode(Node):
                 future_tolerance=self.get_parameter('tracking_future_tolerance').value,
                 history_duration=(self._context_history_duration
                     + self.get_parameter('physical_base_max_age').value
-                    if engine.dynamics.environment_field.context_requirements else None),
+                    if engine.dynamics.environment_field.context_requirements
+                    else self._context_history_duration + self.get_parameter('tracking_max_age').value
+                    if self._requires_tracking_history else None),
                 history_capacity=self.get_parameter('context_history_capacity').value,
             )
 
@@ -323,14 +335,15 @@ class SimulationNode(Node):
         tracking_position: np.ndarray,
     ) -> SimulationState:
         """Construct the initial simulation state."""
-        return SimulationState(
-            target=TargetState(
-                position=self._initial_position.copy(),
-                velocity=self._initial_velocity.copy(),
-            ),
-            tracking_position_world=tracking_position,
-            time=time,
-        )
+        state = self._engine.initialize(
+            TargetState(position=self._initial_position.copy(), velocity=self._initial_velocity.copy()),
+            tracking_position, time)
+        if state.internal_state is not None:
+            self.get_logger().info(
+                f'Mapped target initialized: origin={time:.17g} s, '
+                f'internal_dimension={state.internal_state.size}, '
+                f'position={state.target.position.tolist()}, velocity={state.target.velocity.tolist()}')
+        return state
 
     def _publish_ground_truth(
         self,
@@ -392,17 +405,41 @@ class SimulationNode(Node):
 
     def _refresh_physical_context(self, current):
         """Select only source samples preceding each integration substep."""
-        base = self._physical_history.at(current.time)
+        base = (self._physical_history.at(current.time)
+                if self._physical_history is not None else None)
         camera = self._tracking_provider.position_at(
             current.time, refresh=False, valid_until=current.time+self._dt)
-        if base is None or camera is None:
+        if (self._physical_history is not None and base is None) or camera is None:
             raise ContextUnavailable(f'Physical context unavailable at t={current.time:.6f}')
-        base.position_at(current.time+self._dt, self._reference_frame)
+        if base is not None:
+            base.position_at(current.time+self._dt, self._reference_frame)
         return replace(current, physical_base=base, tracking_position_world=camera)
+
+    def _update_context_diagnostics(self, parameters):
+        for parameter in parameters:
+            if parameter.name == 'context_diagnostics':
+                self._context_diagnostics = parameter.value
+
+    def _emit_context_diagnostics(self, now, force=False):
+        """Optional one-per-simulation-second metadata, plus wait transitions."""
+        if not getattr(self, '_context_diagnostics', False) or self._tracking_provider is None:
+            return
+        previous = self._last_context_diagnostic
+        if not force and previous is not None and 0 <= now-previous < 1.:
+            return
+        detail = self._tracking_provider.diagnostics()
+        detail.update(clock=now, epoch=self._epoch,
+                      committed_time=None if self._state is None else self._state.time,
+                      pose_ack_pending=self._pending,
+                      position=None if self._state is None else self._state.target.position.tolist(),
+                      velocity=None if self._state is None else self._state.target.velocity.tolist())
+        self.get_logger().info('Target context diagnostics: ' + json.dumps(detail, allow_nan=False))
+        self._last_context_diagnostic = now
 
     def _report_context_wait(self, waiting, now):
         """Log context transitions without rebroadcasting an old target state."""
         if waiting != getattr(self, '_context_waiting', False):
+            self._emit_context_diagnostics(now, force=True)
             self.get_logger().info(f'Target context {"waiting" if waiting else "available"}: '
                 f'epoch={self._epoch}, state_time={None if self._state is None else self._state.time}, '
                 f'clock={now:.6f}')
@@ -422,6 +459,7 @@ class SimulationNode(Node):
         if self._last_clock is not None and now < self._last_clock:
             if self._physical_history is not None:
                 self._physical_history.clear()
+            if self._physical_history is not None or getattr(self, '_requires_tracking_history', False):
                 self._tracking_provider.clear_history()
             self._state = None
             self._epoch += 1
@@ -430,6 +468,7 @@ class SimulationNode(Node):
             if self._pending:
                 self._pending_since = now
         self._last_clock = now
+        self._emit_context_diagnostics(now)
         time_tolerance = 16 * np.spacing(max(abs(now), 1.))
         if self._pending:
             if now - self._pending_since > self._context_history_duration + time_tolerance:
@@ -451,6 +490,9 @@ class SimulationNode(Node):
                 if physical_base is None:
                     self._report_context_wait(True, now)
                     return
+            elif getattr(self, '_requires_tracking_history', False):
+                tracking_position = self._tracking_provider.position_at(
+                    sample_time, valid_until=sample_time+self._dt)
             else:
                 tracking_position = self._read_tracking_position()
         except ValueError as error:
@@ -499,7 +541,8 @@ class SimulationNode(Node):
                 state=current,
                 target_time=now,
                 refresh_context=(self._refresh_physical_context
-                                 if self._physical_history is not None else None),
+                                 if self._physical_history is not None
+                                 or getattr(self, '_requires_tracking_history', False) else None),
                 allow_partial=True,
             )
         except ValueError as error:

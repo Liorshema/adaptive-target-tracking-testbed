@@ -183,9 +183,9 @@ class SimulationFactory:
                     'state_layout': 'explicit ordered named scalars/vectors',
                     'state_dimension': 'from model (bounded to 1024 scalar entries)',
                     'deployable': True,
-                    'deployment_requires': 'explicit six-state Cartesian adapter and live bindings',
+                    'deployment_requires': 'validated physical mapping with no fields, or Cartesian adapter; live bindings required',
                     'runtime_validation': 'equation_schema_units_shapes_domains',
-                    'atomic_parameters': ['model'],
+                    'atomic_parameters': ['model', 'influences'],
                     'acceleration_convention': 'Cartesian adapter adds environment exactly once',
                 })
         return factory

@@ -33,6 +33,7 @@ MODEL_SCHEMA = {
             'context': 'object',
             'intermediates': 'object',
             'deployment': 'object',
+            'outputs': 'object',
         }.items()
     },
 }
@@ -40,7 +41,8 @@ PARAMETER_SCHEMA = {
     'type': 'object',
     'additionalProperties': False,
     'required': ['model'],
-    'properties': {'model': MODEL_SCHEMA},
+    'properties': {'model': MODEL_SCHEMA, 'influences': {'type': 'array', 'maxItems': 4,
+                                                     'items': {'type': 'object'}}},
 }
 
 
@@ -85,17 +87,27 @@ class EquationDynamics(Dynamics):
     def prepare_parameters(parameters, defaults, *, use_defaults=True):
         """Treat a supplied full model as atomic; never merge equations from another model."""
         _mapping(
-            parameters, {'model'}, set() if use_defaults else {'model'}, 'equation parameters'
+            parameters, {'model', 'influences'}, set() if use_defaults else {'model'}, 'equation parameters'
         )
         values = deepcopy(dict(parameters) if 'model' in parameters else defaults)
+        if 'influences' in parameters:
+            values['influences'] = deepcopy(parameters['influences'])
         EquationDynamics(**values)
         return values
 
-    def __init__(self, *, model, environment_field=None):
+    def __init__(self, *, model, environment_field=None, influences=None):
         """Validate and compile a detached, complete versioned mathematical definition."""
         from robot_configuration.components import validate_schema
 
         validate_schema(model, MODEL_SCHEMA, 'model')
+        self._base_definition = deepcopy(dict(model))
+        self.influences = deepcopy([] if influences is None else influences)
+        if self.influences:
+            from .derivative_influences import compose_influences
+            model = compose_influences(model, self.influences)
+        elif not isinstance(self.influences, list):
+            raise ValueError('influences must be a list')
+        self.requires_tracking_context = any(p['enabled'] for p in self.influences)
         self._definition = deepcopy(dict(model))
         m = self._definition
         if (
@@ -240,10 +252,40 @@ class EquationDynamics(Dynamics):
         self._deployment = m.get('deployment')
         if self._deployment is not None:
             self._validate_cartesian()
-        elif environment_field is not None:
+        self._position_output = None
+        if 'outputs' in m:
+            from .position_output import PositionOutput
+            self._position_output = PositionOutput(self, m['outputs'])
+            self.expression_cost += self._position_output.cost
+            if self.expression_cost > 4096:
+                raise ValueError('Model and outputs exceed total expression cost limit')
+        self._validate_environment()
+
+    @property
+    def base_definition(self):
+        """The original immutable Library model, before experiment influences."""
+        return deepcopy(self._base_definition)
+
+    @property
+    def uses_mapped_output(self):
+        """Declare prescribed physical output without imposing a Cartesian state layout."""
+        return self._deployment is None and self._position_output is not None
+
+    def _validate_environment(self):
+        if self._deployment is not None or self.environment_field is None:
+            return
+        from robot_simulation.disturbances.composite_field import CompositeAccelerationField
+        if (self.uses_mapped_output
+                and isinstance(self.environment_field, CompositeAccelerationField)
+                and not self.environment_field.fields):
+            return
+        if self.uses_mapped_output:
             raise ValueError(
-                'Environment acceleration requires explicit Cartesian deployment adapter'
-            )
+                'Prescribed mapped dynamics do not support active environment acceleration. '
+                'Select an explicit no-field experiment.resources.environment '
+                '(environment.acceleration_fields: []). Inherited fields are not ignored.')
+        raise ValueError('Environment acceleration requires explicit Cartesian deployment adapter '
+                         'or a prescribed physical output mapping with an empty environment')
 
     @property
     def definition(self):
@@ -270,7 +312,30 @@ class EquationDynamics(Dynamics):
             'numerical_contract': 'Dynamics/RK4; finite domains checked at each stage',
             'deployable': not reasons,
             'deployment_reasons': reasons,
+            'output_mapping': self.output_mapping,
+            'target_output': 'prescribed_mapping' if self.uses_mapped_output else 'cartesian',
+            'environment_coupling': ('none; empty field list required' if self.uses_mapped_output
+                                     else 'Cartesian acceleration once'),
+            'initial_state_source': ('model declaration' if self.uses_mapped_output
+                                     else 'deployment position/velocity'),
+            'unused_parameters': self.unused_parameters,
         }
+
+    @property
+    def unused_parameters(self):
+        """Find actual equation/output dependencies, without implied parameter meaning."""
+        m=self._definition
+        texts=list(m['equations'].values())
+        if 'outputs' in m:
+            texts.append(m['outputs']['position'])
+        used=set()
+        while texts:
+            names={n.id for n in ast.walk(parse_expression(texts.pop())) if isinstance(n,ast.Name)}
+            for name in names-used:
+                if name in m.get('intermediates',{}):
+                    texts.append(m['intermediates'][name])
+            used.update(names)
+        return sorted(set(m['parameters'])-used)
 
     def _validate_cartesian(self):
         d = _mapping(
@@ -296,10 +361,18 @@ class EquationDynamics(Dynamics):
             raise ValueError('Cartesian deployment requires position derivative exactly velocity')
 
     def validate_deployment(self, reference_frame=None):
-        """Distinguish mathematical validity from existing six-state live bindings."""
-        if self._deployment is None:
-            raise ValueError('Model is not deployable without an explicit Cartesian adapter')
-        self._validate_cartesian()
+        """Validate mapped or legacy Cartesian output against actual live bindings."""
+        self._validate_environment()
+        if not self.uses_mapped_output:
+            if self._deployment is None:
+                raise ValueError(
+                    'Model requires a validated physical output mapping '
+                    'or Cartesian adapter for deployment')
+            self._validate_cartesian()
+            if self._position_output is not None:
+                position = parse_expression(self._position_output.metadata['position'])
+                if not isinstance(position, ast.Name) or position.id != self._deployment['position']:
+                    raise ValueError('Explicit output must match the existing Cartesian adapter position')
         if reference_frame is not None and reference_frame != self.frame_id:
             raise ValueError('Deployment and model frames differ')
         if self.control_dimension:
@@ -309,8 +382,8 @@ class EquationDynamics(Dynamics):
             if supported.get(name) != kind:
                 raise ValueError(f'Unsupported live deployment context: {name}')
 
-    def derivative(self, state, control, time, context):
-        """Evaluate at the exact caller stage time; external acceleration added once."""
+    def _values(self, state, control, time, context):
+        """Bind validated numerical inputs and existing intermediate expressions."""
         state = _numeric(state, (self.state_dimension,), 'state')
         control = _numeric(control, (self.control_dimension,), 'control')
         if isinstance(time, bool) or not isinstance(time, Real) or not np.isfinite(time):
@@ -330,8 +403,24 @@ class EquationDynamics(Dynamics):
             values[name] = _numeric(context[name], kind.shape, 'context ' + name)
         for name, node in self._intermediates:
             values[name] = node(values)
+        return values
+
+    @property
+    def output_mapping(self):
+        """Return explicit validated mapping diagnostics, without implied state semantics."""
+        return deepcopy(self._position_output.metadata) if self._position_output else None
+
+    def physical_output(self, state, control, time, context):
+        """Evaluate explicit mathematical position and verified total velocity."""
+        if self._position_output is None:
+            raise ValueError('No explicit physical output mapping')
+        return self._position_output.evaluate(self._values(state, control, time, context))
+
+    def derivative(self, state, control, time, context):
+        """Evaluate the same full-state D3 derivative; external acceleration added once."""
+        values = self._values(state, control, time, context)
         result = np.concatenate([node(values).reshape(-1) for _, node in self._equations])
-        if self.environment_field is not None:
+        if self.environment_field is not None and self._deployment is not None:
             field = self.environment_field
             external = (
                 field.acceleration_with_context(state[:3], time, context.get('physical_base'))

@@ -59,3 +59,13 @@ def test_contextual_deployment_rejects_bad_physical_context(change):
                                           load_yaml(root/d['simulation']['environment_config']),
                                           load_yaml(root/d['simulation']['config']),
                                           load_yaml(root/d['simulation']['measurement_config']))
+
+
+def test_robot_response_requires_physical_world_tracking_tf():
+    from robot_simulation.factory.deployment_configuration import validate_deployment_configuration
+    from test_derivative_influences import model,profile
+    data=configurations()
+    data[1]['target']['dynamics']={'type':'equation_state_space','parameters':{'model':model(),'influences':[profile()]}}
+    data[0]['tracking']['source']='static'
+    with pytest.raises(ValueError,match='influence|response'):
+        validate_deployment_configuration(*data)

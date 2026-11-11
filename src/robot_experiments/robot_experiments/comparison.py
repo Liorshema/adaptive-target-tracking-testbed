@@ -131,7 +131,7 @@ def metric_document(run: dict) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def _metric_evidence(run: dict, view: dict) -> list[str]:
+def _metric_evidence(run: dict, view: dict, *, require_physical_coverage=True) -> list[str]:
     """Require available observations, not a favorable tracking outcome."""
     reasons = []
     metrics = metric_document(run)
@@ -149,7 +149,7 @@ def _metric_evidence(run: dict, view: dict) -> list[str]:
                 or not math.isfinite(statistic)):
             reasons.append(f'required metric {name}: missing valid observations')
     safety = metrics.get('safety')
-    if not isinstance(safety, dict) or safety.get('coverage_complete') is not True:
+    if require_physical_coverage and (not isinstance(safety, dict) or safety.get('coverage_complete') is not True):
         reasons.append('required physical joint observation coverage incomplete')
     window = metrics.get('evaluation_window')
     window = window if isinstance(window, dict) else {}

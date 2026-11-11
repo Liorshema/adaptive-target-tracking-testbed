@@ -15,16 +15,22 @@ class ExperimentBackend:
     """
     Compose authoring, execution and immutable result access for Python clients.
 
-    ``directory`` owns only jobs and session metadata. ``result_roots`` registers
-    existing result authorities; telemetry and scientific scores stay in Runs.
+    ``directory`` owns jobs, session metadata and the user Dynamics Library.
+    ``result_roots`` registers existing result authorities; telemetry and scores stay in Runs.
     No ROS node, GUI, process or file is created merely by constructing this API.
     """
 
-    def __init__(self, directory, *, catalog=None, result_roots=(), managed_result_roots=None):
+    def __init__(self, directory, *, catalog=None, result_roots=(), managed_result_roots=None,
+                 dynamics_library_path=None):
         """Separate registered read access from explicitly managed deletion boundaries."""
         self.directory = Path(directory).expanduser().resolve()
         self.catalog = catalog if catalog is not None else ExperimentCatalog()
         self.author = ExperimentAuthor(self.catalog)
+        from .dynamics_library import DynamicsLibrary
+        self.dynamics = DynamicsLibrary(
+            dynamics_library_path or self.directory / 'dynamics_library.yaml')
+        if self.dynamics.path == self.catalog.path:
+            raise ValueError('Dynamics Library and Experiment Catalog must have distinct paths')
         self.jobs = ExperimentJobs(self.directory / 'jobs')
         self.result_roots = tuple(dict.fromkeys(
             [self.directory, *(Path(p).expanduser().resolve() for p in result_roots)]))
@@ -58,6 +64,85 @@ class ExperimentBackend:
         return [{key: record[key] for key in ('id', 'revision', 'created_utc', 'sha256')}
                 for record in (self.catalog.get(experiment_id, number)
                                for number in range(1, latest['revision'] + 1))]
+
+    def list_scenarios(self, *, include_deleted=False):
+        """Project legacy variants as independent Scenarios without rewriting history."""
+        import hashlib
+        state = self.catalog._read()
+        result = []
+        for row in self.list_experiments(include_deleted=include_deleted):
+            entry = state['experiments'][row['id']]
+            if len(row['base_variants']) == 1:
+                result.append({**row, 'variant': row['base_variants'][0],
+                               'origin': deepcopy(entry.get('scenario_origin'))})
+                continue
+            for variant in row['base_variants']:
+                digest = hashlib.sha256((row['id'] + '\0' + variant).encode()).hexdigest()[:24]
+                identifier = 'EXP-SCENARIO-' + digest.upper()
+                expected = {'id': row['id'], 'variant': variant}
+                if identifier in state['experiments']:
+                    origin = state['experiments'][identifier].get('scenario_origin') or {}
+                    if any(origin.get(k) != v for k, v in expected.items()):
+                        raise CatalogConflict('Scenario projection ID conflicts with an existing record')
+                    continue  # Actual child appears independently, or remains explicitly deleted.
+                if identifier in state['retired_ids']:
+                    continue
+                suffix = variant.upper() if len(variant) <= 4 else variant.replace('_', ' ')
+                result.append({**row, 'id': identifier, 'name': row['name'] + ' · ' + suffix,
+                               'source_id': row['id'], 'variant': variant, 'origin': None})
+        return result
+
+    def ensure_scenario(self, scenario_id):
+        """Lazily freeze one selected legacy variant through real Catalog preflight."""
+        choice = next((r for r in self.list_scenarios() if r['id'] == scenario_id), None)
+        if choice is None:
+            raise ValueError('Select an available saved Scenario')
+        if 'source_id' not in choice:
+            return self.catalog.get(scenario_id)
+        source = self.catalog.get(choice['source_id'], choice['revision'])
+        definition = deepcopy(source['definition'])
+        definition['experiment']['variants'] = [
+            v for v in definition['experiment']['variants'] if v['name'] == choice['variant']]
+        origin = {'id': source['id'], 'revision': source['revision'],
+                  'sha256': source['sha256'], 'variant': choice['variant']}
+        try:
+            with self._management_lock():
+                return self.catalog.create(scenario_id, choice['name'], definition,
+                                           source['overrides'], scenario_origin=origin)
+        except CatalogConflict:
+            # Another client may have frozen the identical source while preflight ran.
+            existing = self.catalog._read()['experiments'].get(scenario_id, {})
+            if existing.get('scenario_origin') != origin or existing.get('deleted'):
+                raise
+            return self.catalog.get(scenario_id)
+
+    @staticmethod
+    def unique_display_name(name, existing):
+        """Generate short collision-safe labels independently of immutable technical IDs."""
+        name = name.strip()
+        if not name:
+            raise ValueError('A nonempty display name is required')
+        candidate, number = name, 2
+        while candidate in existing:
+            candidate = f'{name} {number}'
+            number += 1
+        return candidate
+
+    def list_environment_options(self):
+        """Discover named environment resources from their resolved owner documents."""
+        from .composition import load_resource
+        result = []
+        for identifier in self.author.discover()['resources']:
+            document = load_resource(self.author._resource(identifier),
+                                     base=self.catalog.builtin.parent, share=self.catalog.share)
+            if 'environment' not in document:
+                continue
+            fields = document['environment'].get('acceleration_fields', [])
+            active = [f['type'] for f in fields if f.get('enabled', True)]
+            result.append({'id': identifier, 'active_fields': active,
+                           'label': identifier.replace('_', ' ').capitalize()
+                           if active else 'No external acceleration'})
+        return result
 
     def list_component_options(self, role, *, context=None):
         """
@@ -111,6 +196,54 @@ class ExperimentBackend:
         """Discover exact declaration paths from registered component owner schemas."""
         from .comparison_variables import comparison_options
         return comparison_options()
+
+    def draft_with_dynamics(self, specification, library_id, *, revision):
+        """Pin a library revision into a detached ordinary Author draft; never launch."""
+        experiment, _ = self.author._read(specification)
+        experiment = deepcopy(experiment)
+        resolved = self.dynamics.resolve(library_id, revision)
+        experiment.setdefault('components', {})['target_dynamics'] = 'equation_state_space'
+        experiment.setdefault('parameters', {})['target_dynamics'] = {'model': resolved['model']}
+        experiment['dynamics_source'] = resolved['source']
+        return {'schema_version': 1, 'experiment': experiment}
+
+    @staticmethod
+    def describe_robot_response(model, influences=None):
+        """Expose owner-validated capability and detached frozen data to clients."""
+        from robot_simulation.dynamics.derivative_influences import prepare_robot_response
+        from .dynamics_library import content_hash
+        try:
+            profiles = prepare_robot_response(model, influences)
+            return {'available': True, 'enabled': profiles[0]['enabled'],
+                    'influences': profiles, 'sha256': content_hash(profiles), 'reason': ''}
+        except (ValueError, TypeError, KeyError) as error:
+            return {'available': False, 'enabled': False, 'reason': str(error)}
+
+    def draft_with_robot_response(self, specification, enabled):
+        """Freeze an experiment-only influence through existing Author parameters."""
+        if type(enabled) is not bool:
+            raise ValueError('Robot Response requires explicit boolean opt-in')
+        from robot_simulation.dynamics.derivative_influences import prepare_robot_response
+        experiment, _ = self.author._read(specification)
+        experiment = deepcopy(experiment)
+        local = experiment.get('parameters', {}).get('target_dynamics', {})
+        if not enabled and 'model' in local and local.get('influences'):
+            # Allow a rejected ON draft to recover without bypassing OFF preflight.
+            local['influences'] = prepare_robot_response(
+                local['model'], local['influences'], enabled=False)
+        preview = self.preview_experiment({'schema_version': 1, 'experiment': experiment})
+        effective = preview['components']['target_dynamics']
+        if effective['id'] != 'equation_state_space':
+            raise ValueError('Robot Response requires explicitly bound equation dynamics')
+        values = effective['effective']
+        profiles = prepare_robot_response(values['model'], values.get('influences'), enabled=enabled)
+        experiment = deepcopy(experiment)
+        experiment.setdefault('parameters', {})['target_dynamics'] = {
+            'model': deepcopy(values['model']), 'influences': profiles}
+        source = preview.get('provenance', {}).get('dynamics_library')
+        if source is not None:
+            experiment['dynamics_source'] = deepcopy(source)
+        return {'schema_version': 1, 'experiment': experiment}
 
     def validate_experiment_id(self, identifier):
         """Reject malformed and reserved identities; saving rechecks atomically."""
@@ -726,6 +859,7 @@ class ExperimentBackend:
         from datetime import datetime, timezone
         import uuid
         from .reporting import write_json
+        automatic_title = metadata is None
         metadata = {} if metadata is None else deepcopy(metadata)
         if (not isinstance(metadata, dict) or set(metadata) - {'title', 'notes'}
                 or any(not isinstance(v, str) for v in metadata.values())):
@@ -736,6 +870,9 @@ class ExperimentBackend:
         path = self._session_path(session['session_id'])
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._management_lock():
+            if automatic_title:
+                session['metadata']['title'] = self.unique_display_name(
+                    'session', [s['metadata'].get('title') for s in self.list_sessions(limit=1000)])
             write_json(path, session)
         return session
 
@@ -769,7 +906,7 @@ class ExperimentBackend:
         ordered = sorted(summaries, key=lambda x: (x['created_utc'], x['session_id']))
         return ordered[offset:offset + limit]
 
-    def get_session_comparison(self, session_id):
+    def get_session_comparison(self, session_id, *, descriptive_metric=None, scope=None):
         """Verify frozen evidence, pair authoritative Conditions and return backend ranks."""
         from .benchmarking import rank_conditions
         from .comparison import (
@@ -842,6 +979,10 @@ class ExperimentBackend:
                          'comparison_contract': view['original_hash'], 'comparison': view,
                          'metrics': result['metrics'], 'acceptance': result.get('acceptance'),
                          'status': result['status']}
+                frozen = result['configuration']
+                check['frozen_consistent'] = (
+                    frozen.get('comparison') == view
+                    and frozen.get('comparison_contract') == view['original_contract'])
                 checks.append(check)
                 reasons.extend(f"{result['run_id']}: {reason}"
                                for reason in _metric_evidence(check, view))
@@ -881,9 +1022,17 @@ class ExperimentBackend:
         ranking = rank_conditions(checks, variants, seeds, policy, reasons=ranking_reasons)
         for condition in ranking['conditions']:
             condition.update(labels[condition['condition_id']])
-        return {'session': session, 'runs': rows,
+        result = {'session': session, 'runs': rows,
                 'ranking': ranking if ranking['eligible'] else None,
                 'ranking_diagnostics': ranking,
                 'comparability': {'comparable': not reasons, 'reasons': reasons,
                                   'differences': differences,
                                   'scope': 'Frozen protected conditions and matched Seeds; execution, quality and physical safety are separate. Matched Seeds do not imply identical physical trajectories.'}}
+        if descriptive_metric is not None:
+            from .benchmarking import rank_descriptive_runs
+            result['descriptive_ranking'] = rank_descriptive_runs(checks, descriptive_metric, scope=scope)
+            for row in rows:
+                if row['run_id'] not in {c['run_id'] for c in checks}:
+                    result['descriptive_ranking']['excluded'][row['run_id']] = [
+                        'verified frozen comparison evidence unavailable']
+        return result

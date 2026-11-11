@@ -1677,6 +1677,13 @@ resources:
         type: fight_flight
         parameters: {}
     overrides: {}
+  environment_none:
+    base:
+      package: robot_simulation
+      path: config/environment.yaml
+    overrides:
+      environment:
+        acceleration_fields: []
   environment_reactive:
     base:
       package: robot_simulation

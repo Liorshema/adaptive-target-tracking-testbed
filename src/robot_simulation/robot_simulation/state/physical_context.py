@@ -60,7 +60,7 @@ class PhysicalPositionHistory:
     def add(self, position, timestamp, reference_frame, receipt_time=None):
         """Insert delayed samples within retained history; caller clears on reset."""
         if reference_frame != self.reference_frame:
-            return
+            return 'frame_mismatch'
         sample = PhysicalBaseContext(position, timestamp, reference_frame,
                                      self.provenance, self.max_age)
         # DDS callbacks from independent topics need not follow /clock callback
@@ -68,20 +68,21 @@ class PhysicalPositionHistory:
         # selects a future sample. Anchor eviction to clock, not a future stamp.
         if receipt_time is not None:
             if not np.isfinite(receipt_time) or timestamp > receipt_time + self.max_age:
-                return
+                return 'ahead_of_clock'
         index = bisect_left([s.timestamp for s in self._samples], timestamp)
         if index < len(self._samples) and self._samples[index].timestamp == timestamp:
-            return
+            return 'duplicate'
         newest = max(timestamp, self._samples[-1].timestamp) if self._samples else timestamp
         if receipt_time is not None:
             newest = receipt_time
         if newest - timestamp > self.history_duration:
-            return
+            return 'outside_history'
         self._samples.insert(index, sample)
         self._samples = [s for s in self._samples
                          if newest - s.timestamp <= self.history_duration]
         if self.capacity is not None:
             self._samples = self._samples[-self.capacity:]
+        return 'accepted'
 
     def at(self, time):
         """Return causal fresh context or absence; never fabricate/extrapolate a pose."""

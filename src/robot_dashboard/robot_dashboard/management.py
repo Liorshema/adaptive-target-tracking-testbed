@@ -59,21 +59,22 @@ class ManagementActions:
 
 def scenario_menu():
     """Keep management secondary to the existing Scenario selector."""
-    return html.Details(
+    return html.Div(
         [
-            html.Summary('⋯'),
+            html.Button('New', id='new-scenario', className='button'),
+            html.Button('Duplicate', id='duplicate-scenario', className='button'),
             html.Div(
                 [
-                    html.Button('Rename Scenario', id='rename-scenario', className='button'),
+                    html.Button('Rename', id='rename-scenario', className='button'),
                     html.Button(
-                        'Delete Scenario', id='delete-scenario', className='button danger'
+                        'Delete', id='delete-scenario', className='button danger'
                     ),
                     html.Div(id='scenario-management-feedback', role='status'),
                 ],
-                className='management-popover',
+                className='scenario-management-actions',
             ),
         ],
-        className='management-menu',
+        className='scenario-management',
         title='Manage selected Scenario',
     )
 
@@ -180,6 +181,33 @@ def register_management(app, backend):
     actions = ManagementActions(backend)
 
     @app.callback(
+        Output('draft-mode', 'value'),
+        Output('new-name', 'value'),
+        Output('source-experiment', 'value', allow_duplicate=True),
+        Output('new-id', 'value', allow_duplicate=True),
+        Input('new-scenario', 'n_clicks'),
+        Input('duplicate-scenario', 'n_clicks'),
+        State('source-experiment', 'value'),
+        prevent_initial_call=True,
+    )
+    def new_scenario(_new, _duplicate, selected):
+        rows = backend.list_scenarios()
+        source = selected or (rows[0]['id'] if rows else None)
+        row = next((r for r in rows if r['id'] == source), None)
+        if row is None:
+            return no_update, no_update, no_update, no_update
+        base = row['name'] if ctx.triggered_id == 'duplicate-scenario' else 'scenario'
+        existing = [r['name'] for r in backend.list_scenarios(include_deleted=True)]
+        while True:
+            name = backend.unique_display_name(base, existing)
+            try:
+                identifier = backend.propose_experiment_id(name)
+                break
+            except ValueError:
+                existing.append(name)
+        return 'create', name, source, identifier
+
+    @app.callback(
         Output('new-id', 'value'),
         Output('new-id', 'disabled'),
         Output('identity-feedback', 'children'),
@@ -188,9 +216,11 @@ def register_management(app, backend):
         Input('new-name', 'value'),
         Input('custom-id', 'value'),
         Input('new-id', 'value'),
+        Input('editor-busy', 'data'),
     )
-    def identity(mode, name, flags, current):
-        return draft_identity(backend, mode, name, flags, current)
+    def identity(mode, name, flags, current, busy):
+        identifier, disabled, error, invalid = draft_identity(backend, mode, name, flags, current)
+        return identifier, disabled, error, invalid or bool(busy)
 
     @app.callback(
         Output('session-management-target', 'data'),
@@ -410,9 +440,13 @@ def register_management(app, backend):
                     no_update,
                     'Scenario renamed.',
                 )
-            row = next((r for r in backend.list_experiments() if r['id'] == selected), None)
-            if row is None or revision is None:
+            row = next((r for r in backend.list_scenarios() if r['id'] == selected), None)
+            if row is None:
                 raise ValueError('Select a saved Scenario before managing it.')
+            # Resolve actual selected identity independently of the revision callback.
+            # The dialog freezes fresh authoritative revision/name for confirmation.
+            backend.ensure_scenario(selected)
+            row = next(r for r in backend.list_scenarios() if r['id'] == selected)
             if trigger == 'delete-scenario' and _delete:
                 pending, message = actions.confirmation('scenario', {'id': selected})
                 result[:7] = ['', pending, False, message, None, True, no_update]

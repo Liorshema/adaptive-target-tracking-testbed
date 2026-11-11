@@ -17,8 +17,16 @@ class SimulationState:
     tracking_position_world: np.ndarray
     time: float
     physical_base: PhysicalBaseContext | None = None
+    internal_state: np.ndarray | None = None
 
     def __post_init__(self) -> None:
+        if self.internal_state is not None:
+            internal = np.asarray(self.internal_state, dtype=float)
+            if internal.ndim != 1 or not internal.size or not np.isfinite(internal).all():
+                raise ValueError('internal_state must be a nonempty finite vector')
+            internal = internal.copy()
+            internal.flags.writeable = False
+            object.__setattr__(self, 'internal_state', internal)
         if not isinstance(self.target, TargetState):
             raise TypeError("target must be a TargetState.")
 

@@ -47,6 +47,11 @@ def validate_deployment_configuration(deployment, target, environment, simulatio
         raise ValueError('tracking.source: supported tf, static')
     _positive(deployment['tracking']['max_age'], 'tracking.max_age')
     pose_source = deployment['tracking'].get('pose_source', 'wheel_odometry')
+    influences = target.get('target', {}).get('dynamics', {}).get('parameters', {}).get('influences', [])
+    if any(p.get('enabled') is True for p in influences):
+        if (deployment['tracking']['source'] != 'tf' or pose_source != 'physical'
+                or deployment['tracking']['reference_frame'] != 'world'):
+            raise ValueError('Derivative influence response requires physical world tracking TF')
     if pose_source not in {'wheel_odometry', 'physical'}:
         raise ValueError('tracking.pose_source: supported wheel_odometry, physical')
     needs_context = any(f.get('enabled', True) and f.get('type') == 'base_relative_guidance'

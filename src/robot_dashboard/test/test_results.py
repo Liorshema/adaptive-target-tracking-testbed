@@ -253,8 +253,8 @@ def test_estimator_kpi_fallback_is_mean_and_never_comparison_rmse():
 
 
 @pytest.mark.parametrize('value', [None, float('nan'), float('inf'), -0.5, True])
-def test_invalid_rmse_is_unavailable_and_disables_ranking(value):
-    """Missing, nonfinite, negative and boolean scores cannot become ranked errors."""
+def test_invalid_rmse_is_unavailable_without_hiding_other_recorded_errors(value):
+    """Invalid RMSE remains explicit while each other recorded error stays readable."""
     from robot_dashboard.results import comparison_view
 
     view = comparison_view({
@@ -263,7 +263,7 @@ def test_invalid_rmse_is_unavailable_and_disables_ranking(value):
     })
     _, rows = _table_rows(view)
     assert rows[0].children[1].children == 'Unavailable'
-    assert all(row.children[-1].children == 'Unavailable' for row in rows)
+    assert [cell.children for cell in rows[0].children[2:]] == ['30.000', '0.556', '0.778']
 
 
 def test_comparison_uses_recorded_rmse_converts_angles_and_preserves_selection():
@@ -275,10 +275,10 @@ def test_comparison_uses_recorded_rmse_converts_angles_and_preserves_selection()
                            selected_run='run-a', names={'EXP-A': 'Authoritative title'})
     headers, rows = _table_rows(view)
     assert [head.children for head in headers] == [
-        'Scenario', 'R RMSE (m)', 'Angle RMSE (°)', 'Estimator RMSE (m)',
-        'Predictor RMSE (m)', 'Rank']
+        'Scenario', 'R (m)', 'Angle (°)', 'Estimator (m)',
+        'Predictor (m)']
     assert [cell.children for cell in rows[0].children[1:]] == [
-        '0.250', '30.000', '0.556', '0.778', 'Unavailable']
+        '0.250', '30.000', '0.556', '0.778']
     button = rows[0].children[0].children
     assert button.children == 'Authoritative title'
     assert button.id == {'type': 'session-run', 'run_id': 'run-a'}
@@ -286,21 +286,35 @@ def test_comparison_uses_recorded_rmse_converts_angles_and_preserves_selection()
     assert rows[0].to_plotly_json()['props']['data-run-id'] == 'run-a'
 
 
-def test_comparison_ranking_is_guarded_by_backend_and_explicit_radial_criterion():
-    """Only an explicit positive backend contract permits the stated ranking metric."""
+def test_comparison_keeps_recorded_rows_without_ranking_ui_or_instructions():
+    """Backend ranking metadata cannot reorder, label or qualify recorded table rows."""
     from robot_dashboard.results import comparison_view
 
-    runs = [_presentation_result(radial_rmse=0.4), _presentation_result('run-b', 0.2)]
-    for comparable in (False, None, 'true', True):
-        view = comparison_view({'runs': runs, 'comparability': {'comparable': comparable}})
-        headers, rows = _table_rows(view)
-        assert 'recorded radial' in headers[-1].title.lower()
-        assert 'lower' in headers[-1].title.lower()
-        assert [row.children[-1].children for row in rows] == ['Unavailable', 'Unavailable']
-    runs[1]['metrics']['metrics']['tracking_distance']['unit'] = 'cm'
-    _, rows = _table_rows(comparison_view({
-        'runs': runs, 'comparability': {'comparable': True}}))
-    assert all(row.children[-1].children == 'Unavailable' for row in rows)
+    runs = [_presentation_result('run-a', .9), _presentation_result('run-b', .1)]
+    comparison = {
+        'runs': runs,
+        'comparability': {'comparable': False, 'reasons': ['Choose one compatible comparison scope']},
+        'ranking_diagnostics': {'reasons': ['At least two eligible comparable Runs are required']},
+        'descriptive_ranking': {
+            'eligible': True,
+            'criterion': 'Range RMSE; lower is better. Exact ties share rank.',
+            'reasons': ['one result is not a winner'],
+            'runs': [{'run_id': 'run-b', 'rank': 1}, {'run_id': 'run-a', 'rank': 2}],
+            'excluded': {}, 'scope_differences': {},
+            'definition': 'Recorded radial RMSE', 'limitations': 'Ranking limitations',
+        },
+    }
+    view = comparison_view(comparison, selected_run='run-a')
+    headers, rows = _table_rows(view)
+    assert [header.children for header in headers] == [
+        'Scenario', 'R (m)', 'Angle (°)', 'Estimator (m)', 'Predictor (m)']
+    assert [row.to_plotly_json()['props']['data-run-id'] for row in rows] == ['run-a', 'run-b']
+    assert [row.children[1].children for row in rows] == ['0.900', '0.100']
+    assert all(len(row.children) == 5 for row in rows)
+    assert [row.className for row in rows] == ['selected-run', '']
+    for text in ('Rank', 'rank', 'lower is better', 'compatible comparison scope', 'winner',
+                 'eligible comparable Runs', 'Comparison details'):
+        assert text not in str(view)
 
 
 def test_comparison_missing_rmse_and_incompatible_units_stay_unavailable():
@@ -360,6 +374,9 @@ def test_header_and_scenario_names_use_authoritative_metadata_without_ids():
     from robot_dashboard.results import header_view, scenario_label, scenario_names
 
     class CatalogBackend:
+        def list_scenarios(self, *, include_deleted=False):
+            return []
+
         def list_experiments(self, *, include_deleted=False):
             assert include_deleted is True
             return [{'id': 'EXP-A', 'name': 'Nominal IMM tracking'}]
@@ -391,6 +408,9 @@ def test_historical_scenario_names_keep_catalog_authority_and_skip_unreadable_ev
     from robot_dashboard.results import scenario_names
 
     class CatalogBackend:
+        def list_scenarios(self, *, include_deleted=False):
+            return []
+
         def list_experiments(self, *, include_deleted=False):
             return [{'id': 'EXP-KNOWN', 'name': 'Catalog display name'}]
 
@@ -409,18 +429,24 @@ def test_historical_scenario_names_keep_catalog_authority_and_skip_unreadable_ev
                      'EXP-HISTORICAL': 'recorded historical name'}
 
 
-def test_comparison_uses_backend_condition_ranks_and_seed_aggregates():
-    """The UI consumes the authorized result, without locally ranking Run UUIDs."""
+def test_comparison_shows_each_recorded_run_instead_of_condition_seed_aggregates():
+    """Scientific ranking aggregates do not replace any Run's recorded RMSE."""
     from robot_dashboard.results import comparison_view
-    runs = [_presentation_result('run-a', .9), _presentation_result('run-b', .1)]
-    # Deliberately different Run and Condition statistics: the backend owns aggregation.
-    conditions = [{'condition_id': name, 'run_ids': [run['run_id']], 'rank': rank,
-                   'seed_count': 1, 'variables': {}, 'variant': name,
-                   'metrics': {'tracking_distance': {'mean': value, 'std': None, 'unit': 'm'}},
-                   'per_seed': [{'seed': 42, 'run_id': run['run_id'], 'rmse': value, 'unit': 'm'}]}
-                  for run, name, rank, value in zip(runs, ['A', 'B'], [1, 2], [.2, .4])]
-    _, rows = _table_rows(comparison_view({'runs': runs, 'comparability': {'comparable': True},
-                                          'ranking': {'eligible': True, 'conditions': conditions}}))
-    assert [r.children[-1].children for r in rows] == ['1', '2']
-    assert [r.children[1].children for r in rows] == ['0.200', '0.400']
-    assert 'n=1' in rows[0].children[-1].title
+
+    runs = [_presentation_result('run-a', .9), _presentation_result('run-b', 0)]
+    condition = {
+        'condition_id': 'A', 'run_ids': ['run-a', 'run-b'], 'rank': 1,
+        'seed_count': 2, 'variables': {}, 'variant': 'A',
+        'metrics': {'tracking_distance': {'mean': .45, 'std': .636, 'unit': 'm'}},
+        'per_seed': [{'seed': 42, 'run_id': 'run-a', 'rmse': .9, 'unit': 'm'},
+                     {'seed': 43, 'run_id': 'run-b', 'rmse': 0, 'unit': 'm'}],
+    }
+    _, rows = _table_rows(comparison_view({
+        'runs': runs, 'comparability': {'comparable': True},
+        'ranking': {'eligible': True, 'conditions': [condition]},
+    }, selected_run='run-b'))
+    assert len(rows) == 2
+    assert [row.children[1].children for row in rows] == ['0.900', '0.000']
+    assert [row.to_plotly_json()['props']['data-run-id'] for row in rows] == ['run-a', 'run-b']
+    assert rows[1].className == 'selected-run'
+    assert all(len(row.children) == 5 for row in rows)

@@ -1,0 +1,137 @@
+# Authoring starting points only. Runtime defaults stay in dynamics.yaml.
+schema_version: 1
+templates:
+  constant_velocity:
+    name: Constant Velocity
+    source: {file: dynamics.yaml, group: dynamics.equation_state_space.parameters.model}
+  spring_damper:
+    name: Spring-Damper
+    definition: &cartesian
+      id: spring_damper
+      type: cartesian_composition
+      schema_version: 1
+      frame: world
+      state: &state
+        - {name: p, shape: [3], unit: m, initial: [1.0, 0.0, 1.0]}
+        - {name: v, shape: [3], unit: m/s, initial: [0.0, 0.2, 0.0]}
+      base:
+        id: spring
+        frame: world
+        output: &acceleration {shape: [3], unit: m/s^2}
+        parameters: &spring_parameters
+          stiffness: {value: 0.2, shape: [], unit: 1/s^2, minimum: 0.0}
+          damping: {value: 0.1, shape: [], unit: 1/s, minimum: 0.0}
+        expression: "-stiffness*p - damping*v"
+      interactions: []
+  turning:
+    name: Circular / Turning
+    definition:
+      <<: *cartesian
+      id: turning
+      base:
+        id: turning
+        frame: world
+        output: *acceleration
+        parameters: &turn_parameters
+          rate: {value: 0.4, shape: [], unit: 1/s}
+          axis: {value: [0.0, 0.0, 1.0], shape: [3], unit: '1'}
+        expression: "rate*cross(axis,v)"
+  spiral:
+    name: Spiral
+    definition:
+      <<: *cartesian
+      id: spiral
+      base:
+        id: spiral
+        frame: world
+        output: *acceleration
+        parameters:
+          <<: [*spring_parameters, *turn_parameters]
+        expression: "-stiffness*p - damping*v + rate*cross(axis,v)"
+  saturated_fight_flight:
+    name: Saturated Fight/Flight
+    definition: &saturated
+      <<: *cartesian
+      id: saturated_fight_flight
+      base: &saturated_radial
+        id: radial
+        frame: world
+        output: *acceleration
+        parameters: &saturated_parameters
+          a_max: {value: 0.15, shape: [], unit: m/s^2, exclusiveMinimum: 0.0}
+          transition_length: {value: 0.15, shape: [], unit: m, exclusiveMinimum: 0.0}
+          preferred_distance: {value: 1.0, shape: [], unit: m, exclusiveMinimum: 0.0}
+          damping: {value: 0.5, shape: [], unit: 1/s, minimum: 0.0}
+          epsilon: &epsilon {value: 1.0e-6, shape: [], unit: m, exclusiveMinimum: 0.0}
+        context: &tracking
+          tracking_position_world: {shape: [3], unit: m, frame: world}
+        intermediates: &radial_geometry
+          delta: "p-tracking_position_world"
+          distance: "norm(delta)"
+          direction: "delta/sqrt(dot(delta,delta)+epsilon**2)"
+        expression: "a_max*tanh((distance-preferred_distance)/transition_length)*direction-damping*v"
+      # Optional legacy circulation. Axis normalization preserves Python semantics.
+      interactions:
+        - id: tangential
+          enabled: false
+          frame: world
+          output: *acceleration
+          parameters:
+            acceleration: {value: 0.05, shape: [], unit: m/s^2, minimum: 0.0}
+            axis: {value: [0.0, 0.0, 2.0], shape: [3], unit: '1'}
+            epsilon: *epsilon
+          context: *tracking
+          intermediates:
+            axis_unit: "axis/norm(axis)"
+            tangent: "cross(axis_unit,p-tracking_position_world)"
+          expression: "acceleration*tangent/sqrt(dot(tangent,tangent)+epsilon**2)"
+  fight_flight:
+    name: Linear Fight/Flight
+    definition:
+      <<: *saturated
+      id: fight_flight
+      base:
+        <<: *saturated_radial
+        parameters:
+          alpha: {value: 1.0, shape: [], unit: 1/s^2, minimum: 0.0}
+          preferred_distance: {value: 1.0, shape: [], unit: m, exclusiveMinimum: 0.0}
+          damping: {value: 0.5, shape: [], unit: 1/s, minimum: 0.0}
+          epsilon: *epsilon
+        expression: "alpha*(distance-preferred_distance)*direction-damping*v"
+  blank_state_space:
+    name: Blank State-Space
+    definition:
+      id: custom_state_space
+      type: equation_state_space
+      schema_version: 1
+      frame: world
+      state: [{name: q, shape: [], unit: '1', initial: 0.0}]
+      parameters:
+        rate: {value: 0.0, shape: [], unit: 1/s}
+      equations: {q: rate}
+  attractor:
+    name: 3D Attractor Dynamics
+    definition:
+      id: attractor_3d
+      type: equation_state_space
+      schema_version: 1
+      frame: world
+      state:
+        - {name: x, shape: [], unit: m, initial: 1.0}
+        - {name: y, shape: [], unit: m, initial: 0.0}
+        - {name: z, shape: [], unit: m, initial: 1.0}
+        - {name: vx, shape: [], unit: m/s, initial: 0.0}
+        - {name: vy, shape: [], unit: m/s, initial: 0.2}
+        - {name: vz, shape: [], unit: m/s, initial: 0.0}
+      parameters:
+        m: {value: 1.0, shape: [], unit: kg, exclusiveMinimum: 0.0}
+        k: {value: 0.2, shape: [], unit: kg/s^2, exclusiveMinimum: 0.0}
+        c: {value: 0.1, shape: [], unit: kg/s, exclusiveMinimum: 0.0}
+        g: {value: [0.0, 0.0, 1.0], shape: [3], unit: m}
+        omega: {value: [0.0, 0.0, 0.4], shape: [3], unit: 1/s}
+      intermediates:
+        position: '[x,y,z]'
+        velocity: '[vx,vy,vz]'
+        acceleration: '-(k/m)*(position-g)-(c/m)*velocity+cross(omega,velocity)'
+      equations: {x: vx, y: vy, z: vz, vx: 'acceleration[0]', vy: 'acceleration[1]', vz: 'acceleration[2]'}
+      outputs: {schema_version: 1, frame: world, position: '[x,y,z]'}

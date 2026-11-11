@@ -38,55 +38,128 @@ for a local engineering workspace; authenticated remote hosting is outside this 
 
 ## Workspaces
 
-**Experiment Lab** holds selection/create, schema-driven component cards, duration,
-Seeds, revision actions, Simulation Setup and Run/Stop. **Results & History** holds
+**Dynamics Studio** holds the motion library, structured mathematical editor and
+bounded model-only numerical preview. **Experiment Lab** holds selection/create, schema-driven component cards, duration,
+Seeds, immutable revision actions and a compact Play/Stop panel. **Results & History** holds
 the selected recorded Run, four KPIs and four equal panels: radial error, pointing
 error, raw target 2D/3D telemetry and current-Session comparison. Computation time is
-available in Advanced / Diagnostics. Both remain mounted when switching,
+available in Advanced / Diagnostics. All three workspaces remain mounted when switching,
 so an unsaved draft or current Job is not destroyed. Current Session selection and
 its ⋯ create/refresh/rename/delete menu are shared in the header.
 
-At 100% browser zoom both tabs fit 1920×1080, 1600×900 and 1650×790 without page scrolling. Parameter bodies,
-long execution evidence and history rows have bounded internal scrolling. Advanced
-Configuration and evidence popovers keep full JSON available on demand. Smaller
+At 100% browser zoom the dashboard fits 1920×1080, 1600×900 and 1650×790 without page scrolling. The Models & Parameters editor has one main scroll region; open component bodies
+grow naturally. Execution evidence and history rows have bounded internal scrolling.
+Backend/CLI inspection retains full configuration JSON; Results diagnostics remain available. Smaller
 screens use normal responsive document scrolling. The dark theme is based on
 `docs/reference image Dashboard.png`; its example values and rankings are not data.
 
+## Dynamics Studio
+
+The mounted Studio uses a compact two-column editor inspired by
+`docs/Studio_reference_screenshot.png`. It authors general D3 equations through
+`backend.dynamics`; model preview never creates a scientific Run.
+
+1. Click **New Model**, or open **Saved Models**. Technical identities are generated
+   automatically. Unsaved drafts survive tab changes; replacing a dirty draft asks
+   for explicit discard confirmation.
+2. Edit the State / Initial Value / Derivative and Symbol / Value / Unit tables.
+   Add or delete scalar/vector rows. Under **Advanced**, expose state units and
+   shapes, parameter bounds, intermediates and declared context/control inputs.
+   Names carry no physical meaning. Units are required, never inferred.
+3. Optionally define **World Position (x, y, z)** as an expression such as
+   `[a,b,c]`. The owner validates world frame, metres and vector shape, then
+   derives velocity by the total derivative of that expression. The typeset
+   mathematical panel reflects the actual draft; an unvalidated draft has no
+   mathematical-validity claim. Unused parameters are identified after validation.
+4. Click **Preview** for bounded D3/RK4 numerical integration. Spatial mappings use
+   true-aspect 3D or XY; other systems show state versus time. **Preview Settings**
+   holds duration, integration step and explicit fixed input assumptions. External
+   fields are excluded. No context is inferred from its name or supplied by a fake
+   moving robot.
+5. Enter a display name and click **Validate & Save**. The existing library performs
+   validation and an atomic immutable revision append with stale-write protection.
+   A label-only change preserves mathematical history and hashes. **Saved Models**
+   opens the latest available version; exact historical versions and optional
+   templates remain under the compact library Advanced section. Existing composed
+   models keep their original source contributions, edited in Advanced; they are
+   never silently flattened.
+6. In **Experiment Lab → Target Dynamics → Model selection**, choose the saved
+   model once. It is available immediately, with no registration, refresh, source
+   radio or Apply step. That option contains an actual immutable revision; selecting
+   it freezes the full canonical definition, mapping, source-symbol provenance and
+   hashes in the detached experiment draft. Validate and Save the complete experiment
+   separately. Registered-model overrides survive a switch to a library model and
+   back. Advanced historical selection is optional.
+
+The sole library is `DATA_DIR/dynamics_library.yaml`. Saved experiments retain
+old pins when newer library versions are added, including after dashboard restart;
+loading uses their frozen canonical model rather than mutable library latest.
+Installed owner defaults and historical Runs are not edited.
+
+Mapped State-Space models can drive the live target without a six-state layout.
+The simulation integrates the complete declared state, initializes it from the
+model's initials, and evaluates world position and analytic total-derivative
+velocity at the same simulation time. Legacy Cartesian models retain their
+deployment position/velocity overrides and external acceleration response.
+
+For prescribed mapped motion, select **Experiment Lab → Target Dynamics →
+External acceleration / environment → No external acceleration**. This selects
+the existing resource mechanism's `environment_none` resource with an explicit
+empty acceleration-field list. Inherited active fields cause full experiment
+preflight to reject the draft; no field is silently ignored or projected into an
+arbitrary ODE. Selection freezes the full model and pin as before. Save the
+validated experiment and use the existing Run workflow; actuation remains an
+explicit opt-in. Mathematical validity and mapping capability do not guarantee
+all numerical domains: Preview checks the requested interval, and runtime checks
+every integration stage and physical output.
+
+Orientation/angular velocity output and arbitrary frame transformations are not
+implemented. Supported analytic mapping rules use the existing restricted D3 AST,
+unit compiler and resource bounds; unsupported derivatives fail explicitly.
+
+Preview Settings opens in a viewport-bounded panel with a Close button. Duration,
+step and fixed input assumptions remain available without resizing the editor.
+
+See [D4.1 live mapping verification](validation/generic_live_output_mapping_d41.md),
+[D4.3 verification](validation/dynamics_studio_redesign_d43.md),
+[D4 evidence](validation/dynamics_studio_d4.md) and
+[D4.0 evidence](validation/dynamics_library_composition_d40.md).
+
 ## Author an experiment
 
-1. Select a **Scenario** and condition. **Advanced · revision history** retains
-   saved revision selection and the backend's complete explanation. Human labels
-   come from Catalog metadata, with immutable recorded names for external Runs.
-2. Choose **Revise selected** or **Create new**. Creating needs a display name;
-   a deterministic available ID is proposed automatically and can be overridden
-   under **Advanced · identifier**. Click **Load configuration**. This explicitly
-   replaces any unsaved form edits. Revision editing starts from the latest saved
-   revision; use Create new to branch from history.
-3. Expand a component card. Choices come from live registries through the backend.
-   Library-only implementations are disabled. Availability alone does not prove
-   compatibility; full backend preflight remains mandatory.
-4. Switch **Override** on to edit a parameter. Numeric/boolean/string/enum controls
-   use owner schemas. Arrays and nested mathematical parameter objects use JSON
-   fields with their full schema available underneath. No Catalog YAML or resource
-   recipe editing is needed. Switching a model clears only that role's unsaved
-   parameter overrides; other edits remain.
-5. Set **Duration (simulation s)** and **Seeds** (a JSON integer array).
-   Values initially come from the Author-resolved base study, not a UI default.
-   For example, enter `60` and `[42, 43]` to author a 60-second scored window for
-   two seeds. Settling time remains inherited and is additional to this duration.
-   These fields use `experiment.execution` in the detached Author draft; the
-   Catalog stores its canonical compiled `experiment.duration` / `seeds`. They
-   are part of the immutable revision, never runtime launch overrides.
-6. **Preview** displays the complete effective configuration, implementation
-   identities and provenance. **Validate** runs authoritative Author/M07 preflight.
-   Read any field-specific errors and correct them. No experiment is launched.
-   Full effective-configuration JSON is under collapsed **Advanced Configuration**.
-7. **Create experiment** or **Save revision** persists explicitly through the
-   existing Author/Catalog. Edits invalidate prior validation. Saving revalidates
-   and uses optimistic revision checking. A conflict preserves the draft; inspect
-   the newer revision and reload deliberately before trying again. After creating
-   a scenario, select its saved entry before Play; saving does not automatically
-   change the selected launch scenario.
+1. Select a **Scenario**, optionally choosing a historical immutable revision under
+   **Advanced · revision history**, then **Load configuration**. To edit the latest
+   revision use **Revise selected**. **New** starts from the selected saved base;
+   **Duplicate** proposes a short collision-safe name for a copy. Enter a display
+   name, Load, then edit. Technical IDs remain stable and can be inspected in the
+   identifier disclosure. A historical revision can be a new Scenario's base.
+2. Robot estimator, target estimator, predictor, adaptation, fusion, controller and
+   target dynamics selectors are directly visible. Selectors stay outside optional parameter accordions. Expanded parameter
+   bodies grow naturally within the main editor scroll. Choices come from the owners' live registries;
+   availability alone does not prove compatibility. Full preflight is mandatory.
+3. Switch **Override** on to edit an owner-schema parameter. Units, bounds,
+   defaults and effective values remain visible. Arrays and nested mathematical
+   objects retain typed JSON controls. Changing a model clears only its local
+   overrides. Saved Dynamics models retain their exact revision/content pins.
+4. Set **Duration (simulation s)** and **Seeds** (a JSON integer array), inherited
+   from the resolved saved base. These author `experiment.execution`; Catalog
+   freezes the compiled duration/seeds. Settling time is additional and unchanged.
+5. **Preview** refreshes resolved model/provenance cards. **Validate** invokes the
+   existing Author/M07 checks. Neither launches simulation. Field-specific errors
+   appear beside the editor. Full developer inspection remains available through
+   `backend.preview_experiment(draft)` and the experiment CLI.
+6. **Save** creates the Scenario or appends an immutable revision with optimistic
+   revision checking. The newly saved identity is selected for Play automatically.
+   Edits invalidate validation; a stale form or a selection still loading cannot
+   save a different Scenario. Saving reports **Saving…**, **Saved** or **Save
+   failed**; conflicts preserve the draft and require deliberate reload/revalidation.
+
+Legacy multi-variant studies are shown as separate Scenarios. Selecting one lazily
+freezes that exact configuration through Catalog preflight with its source
+ID/revision/hash/variant. Original studies, Run metadata and historical references
+remain readable. No historical evidence is rewritten. Schema-2 sensor-assignment
+Scenarios are selectable, inspectable and runnable; editing those assignments
+remains supported through the existing CLI, rather than the schema-1 Lab editor.
 
 **Reset** discards experiment-local selections and parameters and
 restores the pinned base. When editing a saved experiment, that base includes the
@@ -99,8 +172,8 @@ the Catalog's lock and compare-and-swap protections.
 
 Cards identify the effective model. Selection provenance, defaults and bounds
 remain available in each card's details or tooltips. Owner defaults and resolved
-values are distinct. One parameter editor opens at a time; its secondary fields
-scroll internally while the primary controls stay visible. For example, setting target
+values are distinct. All seven primary component selectors remain visible outside their parameter
+accordions. Expanded parameter bodies grow naturally; the main Models & Parameters region scrolls as one editor. For example, setting target
 *damping* to `0.23` in a nominal-derived draft applies to the inherited
 `saturated_fight_flight` model; its owner default remains `0.5 s^-1`.
 Direct unsaved overrides are indicated by the switch, and the refreshed preview
@@ -112,65 +185,21 @@ origin unknown**, even when numerically equal to an owner default. The full
 preview retains available resource hashes and provenance. After edits, the
 previous resolved snapshot is visibly labeled stale until Preview/Validate.
 
-## Simulation Setup
+## Simulation configuration and developer inspection
 
-The panel reports the selected physical robot description, world source, physics,
-entity, deployment, gravity holding and requested runtime actuation settings.
-These are read-only resolved configuration details, not a live simulator status.
+Experiment Lab has no separate Simulation Setup or Open/Close preview controls.
+Opening the dashboard never launches a simulator. Physical description, world,
+physics, deployment, gravity holding, readiness and cleanup remain owned by the
+existing experiment/simulation backend. `ExperimentBackend` retains preview
+lifecycle APIs for developer clients; the removed Dash presentation introduces no
+new process owner. For full effective configuration, use `backend.prepare(...)`,
+`backend.preview_experiment(draft)` or `ros2 run robot_experiments experiment
+explain --help`. Existing comparison declarations can be authored through the CLI;
+loading and saving in Lab preserves them without a separate advanced policy form.
 
-Select a saved experiment/revision and variant, then **Open Simulation**. The
-backend revalidates and freezes that selection, uses the revision's first saved
-seed, and opens the existing ROS/Gazebo composition in a visible X11 window, initially
-**PAUSED** (`gazebo.start_running=false` in its frozen deployment).
-This is an **unscored preview with physical actuation and command publication OFF**,
-regardless of the saved actuation setting. It creates ownership/configuration
-artifacts, not a scientific Run or metrics. Unsaved Builder edits are not inputs.
-
-The preview panel reports Opening, Paused, Closing, Closed or Error. Paused means
-an owned mapped GUI with configured paused startup; an initial ROS clock sample
-may be absent while paused. It does **not** certify scene rendering, tracking
-performance or safety acceptance. Preview time must remain fixed; observed time
-advancement closes the preview with an error instructing use of dashboard Play.
-Do not use Gazebo's native Play to bypass scored execution. Current WSL verification
-opened the window but captured a blank viewport with Ogre rendering errors; see
-[D2.6 evidence](validation/dashboard_simulation.md) before treating visualization
-as verified.
-
-**Close** requests cooperative cleanup through the existing Jobs/launch owner.
-Opening the same selection twice reuses the current preview. Changing saved
-robot/world/revision/variant requires Close and confirmed cleanup before Open.
-**Play / Run** safely hands the preview to the existing Runner: it prevalidates
-the same saved revision, closes the exact paused owner, confirms cleanup, then
-opens a fresh scored GUI in a new isolated domain/partition. The original GUI is
-not reused because Runner readiness, recording and reproducibility require a fresh
-owned deployment. This handoff is reported explicitly. It never enables actuation
-without the separate checkbox. Failed validation preserves the preview; uncertain
-cleanup prevents a new owner. Changing selection still requires Close.
-
-The unscored preview has no duration timer because time is paused. The scored Run
-completes automatically after its saved duration, **following readiness and the
-saved settling time**. Play executes the immutable study's full seed/variant matrix;
-the selected preview is not silently substituted for the saved study. Preview and
-scored execution cannot overlap within the same backend workspace. Browser refresh observes the existing owner and never opens a new one. Closing
-the browser alone does not stop the preview; Close explicitly or stop the
-owning dashboard server. The preview watches the server's PID/create-time and
-closes when it exits. Closing the native GUI shuts down the owned composition.
-
-This facility requires a working X11 display (`DISPLAY`, including WSLg XWayland)
-and `libX11.so.6`. Native Wayland-only verification is unsupported and produces an
-explicit unavailable state. Display access is checked before launch; successful
-access cannot guarantee a functioning GPU/renderer. GUI jobs select Qt's `xcb`
-platform explicitly. No desktop-wide process search/kill or external simulation
-adoption occurs. Lost worker or unknown cleanup blocks restart; inspect ownership
-artifacts rather than blindly retrying. Separate backend workspaces remain
-independent and should not be used to evade this workspace's conflict guard.
-
-The Recorder's drain now returns immediately when current readiness is satisfied,
-so a later callback cannot consume the valid state before the Runner checks it.
-The Runner rechecks the unchanged freshness predicate and records the exact passed
-decision in `readiness.json`. The first verified GUI completion and recorded
-metrics are documented in [Runner readiness verification](validation/runner_readiness.md).
-Historical D2.6b failure evidence remains unchanged.
+Runner readiness uses the unchanged freshness predicate and records passed
+readiness decisions. See [Runner readiness verification](validation/runner_readiness.md)
+and historical [GUI lifecycle evidence](validation/dashboard_simulation.md).
 
 ## Run and monitor
 
@@ -184,12 +213,10 @@ Historical D2.6b failure evidence remains unchanged.
    frozen system configuration with GUI enabled; the explicit boolean is frozen
    in runtime provenance and the display environment is recorded in Run metadata.
    Unchecking it explicitly overrides a saved GUI-enabled definition. Seeds,
-   variants and duration belong to the saved experiment definition. Close any
-   unscored preview before ordinary headless Start, or use Play for the explicit
-   cleanup-gated GUI handoff. A paused preview makes Play request a visible scored
-   GUI even when the optional ordinary-Start GUI checkbox is unchecked; the UI
-   explains the restart. It does not alter the separate actuation checkbox.
-3. Click **Play / Run** once. The panel reports genuine execution status;
+   variants and duration belong to the saved experiment definition. A preview opened by a separate developer client still uses the existing
+   cleanup-gated GUI handoff; it cannot overlap a scored owner. Actuation remains
+   a separate explicit opt-in.
+3. Click **Play** once. The panel reports genuine execution status;
    **Execution / safety diagnostics** retains Job/Run UUIDs, seed/variant, errors
    and cleanup evidence.
    Repeated clicks are guarded in the local Dash process. Opening or refreshing
@@ -230,22 +257,29 @@ availability; missing values remain unavailable. Exactly four KPI cards show:
 The cards and primary charts retain recorded units, including radians. The
 comparison's angular RMSE converts declared radians to degrees for its degree
 column. Unknown units or missing RMSE remain unavailable, with no mean substitute.
-The table consumes authoritative backend Condition ranks: equal-weight mean across
-matched Seeds of each Run's saved radial RMSE in metres, lower is better. Ties
-share a rank. Sample count, sample standard deviation (unknown for one Seed),
-per-seed values and Run links remain in collapsed Comparison details. Physical
-safety/command gates, complete seed groups, frozen evidence and compatible
-scientific conditions are required. The browser never computes ranks or substitutes
-mean error for RMSE. Historical evidence without a frozen Condition/seed declaration
-remains descriptive. See [comparison policies and verification](validation/scientific_comparability.md).
+The **Experiment Comparison · RMSE** table displays actual per-Run RMSE:
+Scenario | R (m) | Angle (°) | Estimator (m) | Predictor (m) | Rank.
+R is error relative to the configured tracking radius, not the radius itself:
+`RMSE(||p_target - p_tracking|| - radius)`.
 
-In Experiment Lab, **Advanced Comparison Setup** declares one exact registered
-model or mathematical parameter leaf. Load a pinned baseline, declare the allowed
-model choices or parameter values, Validate and Save each configuration as an
-immutable revision with the same declaration and Seeds. Run the saved revisions
-and add their Runs to the same Session. Dynamics studies are labeled separately;
-other settings must remain protected and compatible. Existing sensor/multi-variable
-policies are preserved; the Author/CLI can author multiple exact variables.
+The metric selector defaults to **Range RMSE**; Angle, Estimator position and
+Predictor position RMSE are also supported. The backend ranks completed Runs
+within one explicitly selected compatible scope, lower first. Exact ties share
+competition rank; Run IDs determine stable tie ordering. At least two distinct
+Runs are required. Different dynamics, Seeds, scoring contracts, definitions,
+units, protected physical/sensing/safety settings or undeclared parameter changes
+are excluded. A declared target-dynamics variable is still insufficient to prove
+comparable driving difficulty. Scope differences and excluded-Run reasons remain
+inspectable in Comparison details; incompatible Runs remain visible as history.
+Reactive motion may differ despite the same dynamics and Seed, so these are
+**descriptive ranks**, never significance, controller superiority or safety claims.
+
+Recorded scientific acceptance and safety qualification are separate and never
+changed by descriptive ranking. Incomplete physical observation coverage can
+leave qualification unknown while actual error metrics remain describable. The
+existing stricter scientific ranking API and frozen study declarations are
+preserved for CLI/developer clients. See [D4.2 verification](validation/experiment_lab_simplification_d42.md)
+and [scientific comparison policy](validation/scientific_comparability.md).
 
 The 2×2 panels show radial error, pointing angle, independent raw trajectories
 and Session comparison. Charts use original markers without interpolation,
@@ -280,8 +314,8 @@ records remain inspectable. A completed execution does not imply good tracking
 or accepted safety outside the recorded window.
 
 Current Session stores references to original Runs. Its comparison shows recorded
-metrics alongside the backend's scientific comparability reasons, including
-failed or unavailable Runs. Incomparable Runs are never ranked. The launch Session
+metrics alongside explicit descriptive compatibility and scientific qualification,
+including failed or unavailable Runs. Incompatible Runs are never ranked together. The launch Session
 remains fixed even if another Session is selected during execution. Refresh the
 Session list/comparison after edits made by another client.
 
@@ -294,8 +328,7 @@ changes invalidate confirmation; active Jobs or unresolved cleanup block deletio
 New Jobs retain their launch Session before a Run exists. Terminal legacy Jobs
 require reliable cleanup evidence, including retained Run cleanup when available.
 
-The Scenario selector's **⋯** menu provides **Rename Scenario** and **Delete
-Scenario**. Rename persists a mutable Catalog display alias; original names,
+The Scenario selector provides **New**, **Duplicate**, **Rename** and **Delete**. Rename persists a mutable Catalog display alias; original names,
 definitions, revision hashes, Run metadata and identities remain unchanged.
 Deletion previews matching immutable Run identities and the number of Sessions
 to update. After explicit confirmation, it removes owned artifacts, prunes only
@@ -381,3 +414,8 @@ See [D1 verification](validation/dashboard_builder.md),
 [D2.8 usability and safe management](validation/dashboard_management.md), and
 [D2.8a deletion, rename and expanded viewer](validation/dashboard_cleanup.md) for measured checks,
 screenshots, limitations and exact task-relative changed-file lists.
+
+When registering historical result roots for viewing, incomplete ownership records
+can block the existing conservative deletion preview, even for a newly copied
+Scenario. Keep normal workspace scope for management; resolve incomplete archived
+metadata separately. The dashboard never bypasses ownership checks to delete.

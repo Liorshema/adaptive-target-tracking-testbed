@@ -8,15 +8,14 @@ from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
 from datetime import timezone
-import fcntl
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
 import tempfile
 
 from robot_configuration.yaml_loader import load_yaml
+from robot_configuration.yaml_store import atomic_write_yaml, locked_yaml
 import yaml
 
 from .configuration import load_experiment
@@ -69,12 +68,14 @@ class ExperimentCatalog:
         for identifier, entry in state['experiments'].items():
             self._identifier(identifier)
             required_entry = {'name', 'legacy_entry', 'deleted', 'revisions'}
-            if (not required_entry <= set(entry) or set(entry) - required_entry - {'display_name'}
+            if (not required_entry <= set(entry) or set(entry) - required_entry - {'display_name', 'scenario_origin'}
                     or not isinstance(entry['name'], str) or not entry['name'].strip()
                     or ('display_name' in entry and (
                         not isinstance(entry['display_name'], str)
                         or not entry['display_name'].strip()))):
                 raise ValueError(f'{identifier}: invalid catalog entry')
+            if 'scenario_origin' in entry:
+                self._scenario_origin(entry['scenario_origin'])
             if (type(entry['deleted']) is not bool
                     or not isinstance(entry['revisions'], list) or not entry['revisions']):
                 raise ValueError(f'{identifier}: invalid revision history')
@@ -96,35 +97,27 @@ class ExperimentCatalog:
             raise ValueError(
                 'experiment ID must be EXP- followed by a stable uppercase identifier')
 
+    @classmethod
+    def _scenario_origin(cls, origin):
+        """Validate additive migration provenance without altering revision hashes."""
+        if (not isinstance(origin, dict)
+                or set(origin) != {'id', 'revision', 'sha256', 'variant'}
+                or type(origin['revision']) is not int or origin['revision'] < 1
+                or not isinstance(origin['variant'], str)
+                or not isinstance(origin['sha256'], str)
+                or not re.fullmatch(r'[0-9a-f]{64}', origin['sha256'])):
+            raise ValueError('invalid Scenario origin')
+        cls._identifier(origin['id'])
+
     @contextmanager
     def _locked(self):
         if self.path == self.builtin.resolve():
             raise ValueError('installed catalog is read-only; initialize a writable catalog first')
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.with_suffix(self.path.suffix+'.lock').open('a') as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
+        with locked_yaml(self.path):
+            yield
 
     def _write(self, state):
-        encoded = yaml.safe_dump(state, sort_keys=False)
-        fd, name = tempfile.mkstemp(prefix='.'+self.path.name, dir=self.path.parent)
-        try:
-            with os.fdopen(fd, 'w') as stream:
-                stream.write(encoded)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(name, self.path)
-            directory = os.open(self.path.parent, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        finally:
-            if Path(name).exists():
-                Path(name).unlink()
+        atomic_write_yaml(self.path, state)
 
     def initialize(self):
         """Copy immutable shipped definitions without modifying package resources."""
@@ -259,10 +252,19 @@ class ExperimentCatalog:
         self._prepare(record)
         return {key: value for key, value in record.items() if key not in {'id', 'name'}}
 
-    def create(self, identifier, name, definition, overrides=None):
+    def create(self, identifier, name, definition, overrides=None, *, scenario_origin=None):
         self._identifier(identifier)
         if not isinstance(name, str) or not name.strip():
             raise ValueError('name must be nonempty')
+        if scenario_origin is not None:
+            self._scenario_origin(scenario_origin)
+            source = self.get(scenario_origin['id'], scenario_origin['revision'])
+            expected = deepcopy(source['definition'])
+            expected['experiment']['variants'] = [v for v in expected['experiment']['variants']
+                if v['name'] == scenario_origin['variant']]
+            if (source['sha256'] != scenario_origin['sha256'] or definition != expected
+                    or ({} if overrides is None else overrides) != source['overrides']):
+                raise ValueError('Scenario origin differs from the selected immutable source')
         revision = self._revision(
             identifier, name, 1, definition, {} if overrides is None else overrides)
         with self._locked():
@@ -271,6 +273,8 @@ class ExperimentCatalog:
                 raise CatalogConflict('experiment ID already exists or was permanently retired')
             state['experiments'][identifier] = {'name': name, 'legacy_entry': None,
                                                 'deleted': False, 'revisions': [revision]}
+            if scenario_origin is not None:
+                state['experiments'][identifier]['scenario_origin'] = deepcopy(scenario_origin)
             state['generation'] += 1
             self._write(state)
         return deepcopy({'id': identifier, 'name': name, **revision})

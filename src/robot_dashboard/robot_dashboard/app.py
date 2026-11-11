@@ -17,10 +17,12 @@ from dash import html
 from dash import no_update
 from dash.exceptions import PreventUpdate
 
+from .dynamics_forms import (restore_library_model, choose_target_model, hydrate_target_pin, target_options)
+from .dynamics_studio import register_studio, studio_layout
 from .execution import execution_layout
 from .execution import register_execution
 from .forms import INHERIT
-from .forms import apply_comparison, apply_execution
+from .forms import apply_execution
 from .forms import assemble_draft
 from .forms import begin_draft
 from .forms import fingerprint
@@ -29,8 +31,6 @@ from .management import management_state
 from .management import register_management
 from .management import scenario_menu
 from .results import register_trajectory
-from .simulation import register_simulation
-from .simulation import simulation_layout
 
 LOG = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def formatted(value):
 
 def experiment_options(backend):
     """List public Catalog labels without altering persisted experiment names."""
-    return [{'label': r['name'], 'value': r['id']} for r in backend.list_experiments()]
+    return [{'label': r['name'], 'value': r['id']} for r in backend.list_scenarios()]
 
 
 def _bounds(schema):
@@ -169,6 +169,7 @@ def component_cards(backend, state):
         detail = state['components'].get(role)
         if detail is None:
             continue
+        pin = ex.get('dynamics_source') if role == 'target_dynamics' else None
         inherited_detail = state['inherited_components'][role]
         inherited = inherited_detail['id']
         # Preview metadata can precede unsaved form edits. Redrawing a different
@@ -186,54 +187,124 @@ def component_cards(backend, state):
         detail['overrides'] = deepcopy(local)
         for key in local:
             detail.setdefault('parameter_sources', {})[key] = {'kind': 'experiment_override'}
-        choices = [{'label': f'Inherited · {readable(inherited)}', 'value': INHERIT}]
-        for option in backend.list_component_options(role):
-            unavailable = not option['deployable'] or option['compatible'] is False
-            suffix = ' · unavailable' if unavailable else ' · preflight required'
-            choices.append(
-                {
-                    'label': readable(option['id']) + suffix,
-                    'value': option['id'],
-                    'disabled': unavailable,
-                }
-            )
-        selection = ex.get('components', {}).get(role, INHERIT)
-        source = detail.get('selection_source', {})
-        origin = (
-            f"Inherited selection · {source.get('id', ex['base_case'])} "
-            f"r{source.get('revision', ex['base_revision'])}"
-            if selection == INHERIT
-            else 'Explicit component selection'
+        selection = (
+            f"library:{pin['library_id']}:{pin['revision']}"
+            if pin
+            else ex.get('components', {}).get(role, INHERIT)
         )
-        rows = parameter_rows(detail)
+        choices = [{'label': readable(inherited),
+                    'value': inherited if selection == inherited else INHERIT}]
+        if role == 'target_dynamics':
+            choices = target_options(backend, pin, inherited=inherited, selection=selection)
+        else:
+            for option in backend.list_component_options(role):
+                if option['id'] == inherited:
+                    continue
+                unavailable = not option['deployable'] or option['compatible'] is False
+                suffix = ' · unavailable' if unavailable else ''
+                choices.append(
+                    {
+                        'label': readable(option['id']) + suffix,
+                        'value': option['id'],
+                        'disabled': unavailable,
+                    }
+                )
+        rows = [] if pin else [r for r in parameter_rows(detail) if r['key'] != 'influences']
+        response = (backend.describe_robot_response(detail['effective']['model'],
+                    detail['effective'].get('influences'))
+                    if role == 'target_dynamics' and detail['id'] == 'equation_state_space'
+                    else {'available': False, 'enabled': False,
+                          'reason': 'Requires a compatible equation model with explicit acceleration bindings.'})
+        historical = []
+        if pin:
+            try:
+                historical = [
+                    {
+                        'label': f"Version {r['revision']} · {r['sha256'][:12]}",
+                        'value': f"library:{pin['library_id']}:{r['revision']}",
+                    }
+                    for r in reversed(backend.dynamics.revisions(pin['library_id']))
+                ]
+            except (ValueError, OSError):
+                pass
         result.append(
-            html.Details(
+            html.Div(
                 [
-                    html.Summary(
-                        [
-                            html.Span(readable(role), className='component-role'),
-                            html.Span(readable(detail['id']), className='component-id'),
-                            html.Span('⌄', className='component-count'),
-                        ]
-                    ),
                     html.Div(
                         [
-                            html.Label('Model selection'),
+                            html.Span(readable(role), className='component-role'),
+                        ], className='component-heading'
+                    ),
+                    html.Div([
                             dcc.Dropdown(
                                 id={'type': 'component', 'role': role},
                                 options=choices,
                                 value=selection,
                                 clearable=False,
                             ),
-                            html.Details(
-                                [
-                                    html.Summary('Selection provenance'),
-                                    html.P(origin),
-                                    html.P('Validate the complete draft before saving.'),
-                                ],
-                                className='selection-origin',
+                            html.Div([
+                                html.Span('External Influences', className='influence-heading'),
+                                dcc.Checklist(
+                                    id={'type': 'influence', 'role': 'robot_response'},
+                                    options=[{'label': 'Robot Response', 'value': 'enabled',
+                                              'disabled': not response['available']}],
+                                    value=['enabled'] if response['enabled'] else [],
+                                ),
+                                dcc.Checklist(
+                                    id='environmental-disturbance',
+                                    options=[{'label': 'Environmental Disturbance · unavailable',
+                                              'value': 'enabled', 'disabled': True}], value=[],
+                                ),
+                            ], className='external-influences',
+                               title=response.get('reason') or 'Frozen experiment influence; base model unchanged.')
+                            if role == 'target_dynamics' else None,
+                    ], className='component-selector'),
+                    html.Details([html.Summary('Parameters'),
+                    html.Div(
+                        [
+                            (
+                                html.Div([
+                                    html.Label('External acceleration / environment'),
+                                    dcc.Dropdown(
+                                        id={'type': 'resource', 'role': 'environment'},
+                                        options=[
+                                            {'label': 'Inherited environment (unchanged)',
+                                             'value': INHERIT},
+                                            *([{'label': 'Current explicit resource',
+                                                'value': '__current__'}]
+                                              if isinstance(ex.get('resources', {}).get(
+                                                  'environment'), dict) else []),
+                                            *[{'label': o['label'], 'value': o['id']}
+                                              for o in backend.list_environment_options()],
+                                        ],
+                                        value=(
+                                            ex.get('resources', {}).get('environment', INHERIT)
+                                            if not isinstance(ex.get('resources', {}).get(
+                                                'environment'), dict) else '__current__'),
+                                        clearable=False,
+                                    ),
+                                ]) if role == 'target_dynamics' else None
                             ),
-                            *[_parameter(role, row) for row in rows],
+                            *(
+                                [
+                                    html.P(
+                                        f"Frozen {pin['library_id']} · version {pin['revision']} · {pin['sha256'][:12]}",
+                                        className='hint',
+                                    ),
+                                    html.Details(
+                                        [
+                                            html.Summary('Advanced · earlier saved version'),
+                                            dcc.Dropdown(
+                                                id={'type': 'target-history', 'key': 'revision'},
+                                                options=historical,
+                                                placeholder='Select an exact saved version',
+                                            ),
+                                        ]
+                                    ),
+                                ]
+                                if pin
+                                else [_parameter(role, row) for row in rows]
+                            ),
                             (
                                 html.P(
                                     'This component has no editable parameters.',
@@ -244,10 +315,9 @@ def component_cards(backend, state):
                             ),
                         ],
                         className='component-body',
-                    ),
+                    )], className='component-parameters'),
                 ],
                 className='component-card',
-                open=role == 'target_dynamics',
                 **{'data-role': role},
             )
         )
@@ -262,9 +332,9 @@ def component_cards(backend, state):
     }
     visible, secondary = [], []
     for card in result:
-        (
-            visible if card.to_plotly_json()['props']['data-role'] in primary else secondary
-        ).append(card)
+        (visible if card.to_plotly_json()['props']['data-role'] in primary else secondary).append(
+            card
+        )
     if secondary:
         visible.append(
             html.Details(
@@ -274,90 +344,9 @@ def component_cards(backend, state):
     return visible
 
 
-def setup_view(effective, capabilities, *, fresh, identity):
-    """Report resolved deployment and the backend's explicit unsupported boundary."""
-    rows = []
-    for run in (effective or {}).get('runs', []):
-        robot, scenario = run['robot'], run['scenario']
-        resources = run.get('sources', {}).get('resources', {})
-        worlds = [
-            path
-            for path, meta in resources.items()
-            if meta.get('sha256') == scenario.get('world_sha256')
-        ]
-        rows.append(
-            html.Div(
-                [
-                    html.H4(f"{run['variant']} · seed {run['seed']}"),
-                    html.Dl(
-                        [
-                            html.Dt('Physical robot description'),
-                            html.Dd(robot['description_source'], className='path'),
-                            html.Dt('Entity'),
-                            html.Dd(robot['deployment'].get('entity_name', 'not declared')),
-                            html.Dt('World'),
-                            html.Dd(
-                                ', '.join(worlds) or 'See effective configuration',
-                                className='path',
-                            ),
-                            html.Dt('Physics'),
-                            html.Dd(formatted(scenario.get('physics', {}))),
-                            html.Dt('Saved actuation default (Run opt-in applies)'),
-                            html.Dd(
-                                str(
-                                    run['runtime']['settings'].get(
-                                        'enable_actuation', 'not declared'
-                                    )
-                                )
-                            ),
-                        ]
-                    ),
-                    html.Details(
-                        [
-                            html.Summary('Deployment and holding configuration'),
-                            html.Pre(
-                                json.dumps(
-                                    {
-                                        'deployment': robot['deployment'],
-                                        'holding': robot['holding'],
-                                        'runtime': run['runtime'],
-                                    },
-                                    indent=2,
-                                )
-                            ),
-                        ]
-                    ),
-                ],
-                className='deployment',
-            )
-        )
-    return [
-        html.H2('Simulation Setup'),
-        html.Span(
-            (
-                'Configuration validated'
-                if fresh
-                else (
-                    'Draft needs validation' if effective else 'Select a saved configuration'
-                )
-            ),
-            className='badge success' if fresh else 'badge neutral',
-        ),
-        html.Details(
-            [html.Summary('Advanced deployment'), html.P(identity), *rows],
-            className='deployment-details',
-        ),
-    ]
-
-
 def execution_fields(state=None, backend=None):
     """Render execution controls from the Author-resolved study, with no new defaults."""
     study = ((state or {}).get('preview') or {}).get('effective', {}).get('experiment', {})
-    policy = (state or {}).get('spec', {}).get('experiment', {}).get('comparison', study.get('comparison'))
-    options = backend.list_comparison_variables() if backend else []
-    variable = (policy or {}).get('variables', [{}])[0]
-    selected = (variable.get('path') if policy and policy.get('schema_version') == 2 and len(policy['variables']) == 1
-                else '__preserve__' if policy else '__strict__')
     return [
         html.Label(
             [
@@ -384,24 +373,7 @@ def execution_fields(state=None, backend=None):
                 ),
             ]
         ),
-        html.Details([
-            html.Summary('Advanced Comparison Setup'),
-            html.Div([
-            html.P('Save each configuration as an immutable revision with the same declaration and Seeds. Run each saved revision and add its Runs to the same Session. Comparability is checked from frozen evidence.', className='hint'),
-            dcc.Dropdown(id='comparison-variable', clearable=False, value=selected,
-                         options=[{'label': 'Strict comparison (no declared differences)', 'value': '__strict__'},
-                                  *([{'label': 'Preserve pinned comparison declaration', 'value': '__preserve__'}] if selected == '__preserve__' else []),
-                                  *[{'label': o['path'], 'value': o['path']} for o in options]],
-                         disabled=not state),
-            dcc.Dropdown(id='comparison-models', multi=True,
-                         value=variable.get('values', []) if selected.startswith('components.') else [],
-                         placeholder='Permitted registered models'),
-            dcc.Input(id='comparison-values', type='text',
-                      value=json.dumps(variable['values']) if selected.startswith('parameters.') and 'values' in variable else '',
-                      placeholder='Optional permitted parameter values (JSON array)'),
-            html.P('Only declared fields may differ. Dynamics studies are labeled separately. Incompatible tasks, physics, timing, sensing and safety remain protected.', className='hint'),
-            ], className='comparison-setup-popover'),
-        ], className='advanced-comparison'),
+
     ]
 
 
@@ -414,7 +386,6 @@ def create_app(backend):
         suppress_callback_exceptions=True,
         update_title='Working…',
     )
-    capabilities = backend.gazebo_setup_capabilities()
 
     def layout():
         options = experiment_options(backend)
@@ -422,6 +393,7 @@ def create_app(backend):
         return html.Div(
             [
                 dcc.Store(id='builder-state'),
+                dcc.Store(id='editor-busy', data=False),
                 dcc.Store(id='selected-snapshot'),
                 *execution['state'],
                 *management_state(),
@@ -448,6 +420,7 @@ def create_app(backend):
                     id='workspace-tab',
                     options=[
                         {'label': 'Experiment Lab', 'value': 'lab'},
+                        {'label': 'Dynamics Studio', 'value': 'dynamics'},
                         {'label': 'Results & History', 'value': 'results'},
                     ],
                     value='lab',
@@ -482,8 +455,6 @@ def create_app(backend):
                                             ],
                                             className='scenario-selector',
                                         ),
-                                        html.Label('Condition', htmlFor='source-variant'),
-                                        dcc.Dropdown(id='source-variant', clearable=False),
                                         html.Div(id='source-summary', className='hint'),
                                         dcc.RadioItems(
                                             id='draft-mode',
@@ -495,7 +466,7 @@ def create_app(backend):
                                                 {'label': 'Create new', 'value': 'create'},
                                             ],
                                             value='revise',
-                                            className='mode-switch',
+                                            className='mode-switch', style={'display': 'none'},
                                         ),
                                         html.Div(
                                             [
@@ -643,51 +614,11 @@ def create_app(backend):
                                             ],
                                             className='actions',
                                         ),
-                                        html.Details(
-                                            [
-                                                html.Summary(
-                                                    'Advanced Configuration / Diagnostics'
-                                                ),
-                                                html.P(id='preview-context', className='hint'),
-                                                html.P(
-                                                    'Inherited component selections and owner '
-                                                    'defaults are shown '
-                                                    'separately above. A resolved value is '
-                                                    'labeled unknown when '
-                                                    'the backend cannot prove its exact '
-                                                    'parameter ancestry.',
-                                                    className='hint',
-                                                ),
-                                                html.Pre(
-                                                    id='full-effective',
-                                                    className='json-preview',
-                                                ),
-                                            ],
-                                            id='effective-inspector',
-                                            className='effective-inspector',
-                                        ),
                                     ],
                                     className='panel builder-panel',
                                 ),
                                 html.Aside(
                                     [
-                                        html.Aside(
-                                            [
-                                                html.Div(
-                                                    setup_view(
-                                                        None,
-                                                        capabilities,
-                                                        fresh=False,
-                                                        identity=(
-                                                            'Select a saved configuration.'
-                                                        ),
-                                                    ),
-                                                    id='simulation-setup',
-                                                ),
-                                                simulation_layout(),
-                                            ],
-                                            className='panel setup-panel',
-                                        ),
                                         execution['monitor'],
                                     ],
                                     className='lab-rail',
@@ -696,6 +627,7 @@ def create_app(backend):
                             id='experiment-lab',
                             className='workspace-grid',
                         ),
+                        studio_layout(backend),
                         html.Div(
                             [
                                 execution['results'],
@@ -735,6 +667,7 @@ def create_app(backend):
         if not identifier:
             return [], None
         try:
+            backend.ensure_scenario(identifier)
             records = backend.list_revisions(identifier)
             return (
                 [
@@ -747,8 +680,6 @@ def create_app(backend):
             return [], None
 
     @app.callback(
-        Output('source-variant', 'options'),
-        Output('source-variant', 'value'),
         Output('source-summary', 'children'),
         Output('saved-preview', 'children'),
         Output('selected-snapshot', 'data'),
@@ -757,14 +688,11 @@ def create_app(backend):
     )
     def inspect_saved(identifier, revision):
         if not identifier or revision is None:
-            return [], None, '', '', None
+            return '', '', None
         try:
             effective = backend.explain_experiment(identifier, revision)
-            variants = list(dict.fromkeys(r['variant'] for r in effective['runs']))
             return (
-                [{'label': v, 'value': v} for v in variants],
-                variants[0],
-                f'{len(variants)} saved condition' + ('s' if len(variants) != 1 else ''),
+                f'Saved revision {revision}',
                 json.dumps(effective, indent=2, ensure_ascii=False),
                 {
                     'effective': effective,
@@ -781,11 +709,18 @@ def create_app(backend):
                 },
             )
         except (ValueError, TypeError, KeyError, OSError) as error:
-            return [], None, f'Cannot inspect revision: {error}', '', None
+            return f'Cannot inspect revision: {error}', '', None
 
     @app.callback(Output('create-fields', 'style'), Input('draft-mode', 'value'))
     def creation_fields(mode):
         return {'display': 'block' if mode == 'create' else 'none'}
+
+    app.clientside_callback(
+        "function(n) { return n ? 'Saving…' : window.dash_clientside.no_update; }",
+        Output('save-draft', 'children', allow_duplicate=True),
+        Input('save-draft', 'n_clicks'),
+        prevent_initial_call=True,
+    )
 
     app.clientside_callback(
         "function(v) { return !(v || []).includes('override'); }",
@@ -794,22 +729,12 @@ def create_app(backend):
     )
 
     @app.callback(
-        Output('comparison-models', 'options'),
-        Output('comparison-models', 'disabled'),
-        Output('comparison-values', 'disabled'),
-        Input('comparison-variable', 'value'),
-    )
-    def comparison_choices(path):
-        option = next((o for o in backend.list_comparison_variables() if o['path'] == path), {})
-        is_model = option.get('kind') == 'model'
-        return ([{'label': name, 'value': name} for name in option.get('model_values', [])],
-                not is_model, option.get('kind') != 'parameter')
-
-    @app.callback(
         Output('builder-state', 'data'),
         Output('component-cards', 'children'),
         Output('source-experiment', 'options'),
         Output('execution-fields', 'children'),
+        Output('source-experiment', 'value', allow_duplicate=True),
+        Output('draft-mode', 'value', allow_duplicate=True),
         Input('load-draft', 'n_clicks'),
         Input('reset-draft', 'n_clicks'),
         Input('preview-draft', 'n_clicks'),
@@ -820,19 +745,19 @@ def create_app(backend):
         Input({'type': 'override', 'role': ALL, 'key': ALL, 'kind': ALL}, 'value'),
         Input('execution-duration', 'value'),
         Input('execution-seeds', 'value'),
-        Input('comparison-variable', 'value'),
-        Input('comparison-models', 'value'),
-        Input('comparison-values', 'value'),
+        Input({'type':'target-history','key':ALL}, 'value'),
+        Input({'type': 'resource', 'role': 'environment'}, 'value', allow_optional=True),
+        Input({'type': 'influence', 'role': ALL}, 'value'),
         State({'type': 'component', 'role': ALL}, 'id'),
         State({'type': 'param', 'role': ALL, 'key': ALL, 'kind': ALL}, 'id'),
         State('source-experiment', 'value'),
         State('source-revision', 'value'),
-        State('source-variant', 'value'),
         State('draft-mode', 'value'),
         State('new-id', 'value'),
         State('new-name', 'value'),
         State('builder-state', 'data'),
         prevent_initial_call=True,
+        running=[(Output('editor-busy', 'data'), True, False)],
     )
     def operate(
         _load,
@@ -845,14 +770,13 @@ def create_app(backend):
         switches,
         duration,
         seeds,
-        comparison_path,
-        comparison_models,
-        comparison_values,
+        historical_selection,
+        environment_selection,
+        influences,
         component_ids,
         fields,
         source,
         revision,
-        variant,
         mode,
         identifier,
         name,
@@ -861,44 +785,124 @@ def create_app(backend):
         trigger = ctx.triggered_id
         cards, choices = no_update, no_update
         state = deepcopy(state) if state else None
+        save_started = False
         try:
             if trigger == 'load-draft':
-                state = begin_draft(backend, source, revision, variant, mode, identifier, name)
+                backend.ensure_scenario(source)
+                record = backend.catalog.get(source, revision)
+                if record['definition']['schema_version'] != 1:
+                    return ({'stage': 'Read-only', 'message':
+                             'This saved sensor-assignment Scenario is ready for Play. '
+                             'Edit its legacy assignments with the experiment CLI.'},
+                            [], no_update, execution_fields(), no_update, no_update)
+                variants = record['definition']['experiment']['variants']
+                state = begin_draft(backend, source, revision, variants[0]['name'], mode, identifier, name)
                 state['inherited_components'] = deepcopy(state['components'])
-                return (
-                    state,
-                    component_cards(backend, state),
-                    no_update,
-                    execution_fields(state, backend),
-                )
+                state = hydrate_target_pin(state, backend)
+                if 'dynamics_source' in state['spec']['experiment']:
+                    state['dynamics_model_text'] = json.dumps(
+                        state['spec']['experiment']['parameters']['target_dynamics']['model'],
+                        allow_nan=False,
+                    )
+                return (state, component_cards(backend, state), no_update, execution_fields(state, backend), no_update, no_update)
             if not state or 'spec' not in state:
                 raise PreventUpdate
+            if trigger in ('validate-draft', 'preview-draft', 'save-draft'):
+                intended = identifier if mode == 'create' else source
+                if state['spec']['experiment']['id'] != intended:
+                    raise ValueError('Load the selected Scenario before validating or saving.')
             if trigger == 'reset-draft':
-                state['spec'] = backend.reset_draft(state['spec'])
+                state['spec'] = backend.reset_draft(
+                    restore_library_model(state['spec'], state.get('dynamics_model_text'))
+                )
+                if 'dynamics_source' in state['spec']['experiment']:
+                    state['dynamics_model_text'] = json.dumps(
+                        state['spec']['experiment']['parameters']['target_dynamics']['model'],
+                        allow_nan=False,
+                    )
                 state['preview'] = backend.preview_experiment(state['spec'])
                 state['components'] = state['preview']['components']
+                state = hydrate_target_pin(state, backend)
                 state.update(
                     stage='Draft',
                     validated_digest=None,
                     message='Unsaved selections and overrides reset to the pinned base.',
                 )
                 state['form_digest'] = fingerprint(state['spec'])
-                return (
-                    state,
-                    component_cards(backend, state),
-                    no_update,
-                    execution_fields(state, backend),
-                )
+                return (state, component_cards(backend, state), no_update, execution_fields(state, backend), no_update, no_update)
             spec = assemble_draft(
-                state['spec'], selections, component_ids, values, fields, switches
+                state['spec'],
+                [v for v,i in zip(selections,component_ids) if i['role']!='target_dynamics'],
+                [i for i in component_ids if i['role']!='target_dynamics'], values, fields, switches
             )
+            spec = restore_library_model(spec, state.get('dynamics_model_text'))
             spec = apply_execution(spec, duration, seeds)
-            spec = apply_comparison(spec, comparison_path, comparison_models, comparison_values, backend.list_comparison_variables())
+            if isinstance(trigger, dict) and trigger.get('type') == 'influence':
+                if len(influences) != 1 or influences[0] not in ([], ['enabled']):
+                    raise ValueError('Robot Response requires explicit checkbox opt-in')
+                enabled = influences[0] == ['enabled']
+                previous = spec['experiment'].get('parameters', {}).get('target_dynamics', {}).get('influences', [])
+                if enabled == bool(previous and previous[0]['enabled']):
+                    raise PreventUpdate
+                spec = backend.draft_with_robot_response(spec, enabled)
+                checked = backend.validate_experiment(spec)
+                if not checked['valid']:
+                    raise ValueError('Cannot deploy: ' + '\n'.join(checked['errors']))
+                preview = backend.preview_experiment(spec)
+                state.update(spec=spec, preview=preview, components=preview['components'])
+                state = hydrate_target_pin(state, backend)
+                state.update(stage='Draft',
+                             validated_digest=None, form_digest=fingerprint(state['spec']),
+                             message='Unsaved influence change · validate, then save.')
+                return (state, component_cards(backend, state), no_update, no_update, no_update, no_update)
+            if isinstance(trigger, dict) and (trigger.get('type') in ('target-history','resource') or
+                    (trigger.get('type') == 'component' and trigger['role'] == 'target_dynamics')):
+                if trigger['type'] == 'resource':
+                    previous = spec['experiment'].get('resources', {}).get('environment', INHERIT)
+                    if (environment_selection in (None, '__current__')
+                            or environment_selection == previous):
+                        raise PreventUpdate
+                    if environment_selection == INHERIT:
+                        spec['experiment'].get('resources', {}).pop('environment', None)
+                    else:
+                        if environment_selection not in {
+                                o['id'] for o in backend.list_environment_options()}:
+                            raise ValueError('Select a registered environment resource')
+                        spec['experiment'].setdefault('resources', {})[
+                            'environment'] = environment_selection
+                    candidate = {**state, 'spec': spec}
+                else:
+                    selected = (next((v for v in historical_selection if v), None)
+                                if trigger['type'] == 'target-history' else
+                                next((v for v,i in zip(selections,component_ids) if i['role']=='target_dynamics'), None))
+                    current = spec['experiment'].get('dynamics_source')
+                    previous = (f"library:{current['library_id']}:{current['revision']}" if current else
+                                spec['experiment'].get('components',{}).get('target_dynamics',INHERIT))
+                    if not selected or selected == previous: raise PreventUpdate
+                    candidate = choose_target_model(backend, {**state, 'spec':spec}, selected)
+                spec = candidate['spec']
+                state = candidate
+                checked = backend.validate_experiment(spec)
+                if checked['valid']:
+                    state['preview'] = backend.preview_experiment(spec)
+                    state['components'] = state['preview']['components']
+                    state = hydrate_target_pin(state, backend)
+                    spec = state['spec']
+                else:
+                    state['preview'] = None
+                    if 'dynamics_source' in spec['experiment']:
+                        state['components']['target_dynamics'] = {
+                            **state['components']['target_dynamics'], 'id':'equation_state_space',
+                            'effective':spec['experiment']['parameters']['target_dynamics']}
+                state.update(spec=spec,stage='Draft' if checked['valid'] else 'Invalid',
+                    validated_digest=None, form_digest=fingerprint(spec),
+                    message=('Selection validated; exact model pin retained. Validate the complete experiment before saving.'
+                             if checked['valid'] else 'Selected configuration cannot deploy: '+ '\n'.join(checked['errors'])))
+                return (state, component_cards(backend, state), no_update, no_update, no_update, no_update)
             digest = fingerprint(spec)
             if isinstance(trigger, dict) or trigger in (
                 'execution-duration',
                 'execution-seeds',
-                'comparison-variable', 'comparison-models', 'comparison-values',
             ):
                 if digest == state['form_digest']:
                     raise PreventUpdate
@@ -930,13 +934,14 @@ def create_app(backend):
                             'selection_source': {'kind': 'experiment_selection'},
                         }
                     cards = component_cards(backend, state)
-                return state, cards, no_update, no_update
+                return (state, cards, no_update, no_update, no_update, no_update)
             state['spec'], state['form_digest'] = spec, digest
             if trigger == 'save-draft':
                 if state['stage'] != 'Validated' or state['validated_digest'] != digest:
                     raise ValueError(
                         'Validate the current form before saving; edits invalidate approval.'
                     )
+                save_started = True
                 record = backend.save_experiment(
                     spec, expected_revision=state['expected_revision']
                 )
@@ -945,7 +950,7 @@ def create_app(backend):
                     expected_revision=record['revision'],
                     saved_revision=record['revision'],
                     validated_digest=None,
-                    message='Configuration saved. Play uses the selected saved configuration.',
+                    message='Saved',
                 )
                 choices = experiment_options(backend)
             elif trigger in ('preview-draft', 'validate-draft'):
@@ -965,23 +970,30 @@ def create_app(backend):
                     ),
                 )
                 cards = component_cards(backend, state)
-            return state, cards, choices, no_update
+            return (state, cards, choices, no_update, spec['experiment']['id'] if trigger == 'save-draft' and state.get('stage') == 'Saved' else no_update, 'revise' if trigger == 'save-draft' and state.get('stage') == 'Saved' else no_update)
         except PreventUpdate:
             raise
         except (ValueError, TypeError, KeyError, OSError) as error:
             state = state or {}
-            state.update(stage='Invalid', validated_digest=None, message=str(error))
-            return state, no_update, no_update, no_update
+            state.update(stage='Save failed' if save_started else 'Invalid',
+                         validated_digest=None, message=str(error))
+            cards = (component_cards(backend, state)
+                     if isinstance(trigger, dict) and trigger.get('type') == 'influence'
+                     else no_update)
+            return (state, cards, no_update, no_update, no_update, no_update)
         except Exception:
             LOG.exception('Dashboard action failed')
             state = state or {}
             state.update(
-                stage='Invalid',
+                stage='Save failed' if save_started else 'Invalid',
                 validated_digest=None,
                 message='The action could not complete. Your draft was not saved. '
                 'Check the dashboard terminal for details, then retry explicitly.',
             )
-            return state, no_update, no_update, no_update
+            cards = (component_cards(backend, state)
+                     if isinstance(trigger, dict) and trigger.get('type') == 'influence'
+                     else no_update)
+            return (state, cards, no_update, no_update, no_update, no_update)
 
     @app.callback(
         Output('draft-identity', 'children'),
@@ -994,18 +1006,13 @@ def create_app(backend):
         Output('validate-draft', 'disabled'),
         Output('save-draft', 'disabled'),
         Output('save-draft', 'children'),
-        Output('full-effective', 'children'),
-        Output('preview-context', 'children'),
-        Output('simulation-setup', 'children'),
         Input('builder-state', 'data'),
         Input('selected-snapshot', 'data'),
+        Input('editor-busy', 'data'),
     )
-    def present(state, selected):
+    def present(state, selected, busy):
         state = state or {}
         spec, stage = state.get('spec'), state.get('stage', 'No draft')
-        preview = state.get('preview')
-        resolved = preview['effective'] if preview else (selected or {}).get('effective')
-        fresh = bool(spec and preview and stage in ('Previewed', 'Validated', 'Saved'))
         identity = (
             spec['experiment']['name']
             if spec
@@ -1014,64 +1021,32 @@ def create_app(backend):
         tone = (
             'success'
             if stage in ('Validated', 'Saved')
-            else 'error' if stage == 'Invalid' else 'neutral'
-        )
-        context = (
-            'Current form · configuration preflight only; no simulation launched.'
-            if fresh
-            else (
-                'Last resolved snapshot; edits are not reflected until Preview or Validate.'
-                if preview
-                else 'Saved revision snapshot; load a draft to configure it.'
-            )
-        )
-        effective_text = (
-            json.dumps(
-                (
-                    {
-                        'components': preview['components'],
-                        'provenance': preview['provenance'],
-                        'provenance_scope': preview['provenance_scope'],
-                        'effective': resolved,
-                    }
-                    if preview
-                    else resolved
-                ),
-                indent=2,
-                ensure_ascii=False,
-            )
-            if resolved
-            else ''
+            else 'error' if stage in ('Invalid', 'Save failed') else 'neutral'
         )
         feedback = {
             'Draft': 'Unsaved configuration · validate, then save.',
             'Previewed': 'Preview ready · validate before saving.',
             'Validated': 'Valid configuration · ready to save.',
-            'Saved': 'Saved · Play uses the selected saved configuration.',
+            'Saved': 'Saved',
         }.get(stage, state.get('message', 'Choose a scenario, then load it.'))
         return (
             identity,
-            'Unsaved' if stage == 'Draft' else stage,
+            {'Draft': 'Unsaved', 'Validated': 'Valid'}.get(stage, stage),
             'badge ' + tone,
             feedback,
             'notice ' + tone,
-            not spec,
-            not spec,
-            not spec,
-            stage != 'Validated',
-            'Create experiment' if state.get('expected_revision') is None else 'Save revision',
-            effective_text,
-            context,
-            setup_view(
-                resolved,
-                capabilities,
-                fresh=fresh or (not spec and bool(resolved)),
-                identity=identity + (' · last resolved' if spec and not fresh else ''),
+            not spec or bool(busy),
+            not spec or bool(busy),
+            not spec or bool(busy),
+            stage != 'Validated' or bool(busy),
+            no_update if busy else (
+                'Create experiment' if state.get('expected_revision') is None else 'Save revision'
             ),
+
         )
 
+    register_studio(app, backend)
     register_execution(app, backend)
-    register_simulation(app, backend)
     register_management(app, backend)
     register_trajectory(app, backend)
     return app

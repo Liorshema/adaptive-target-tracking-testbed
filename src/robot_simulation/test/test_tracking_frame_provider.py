@@ -163,3 +163,53 @@ def test_direct_tf_ahead_of_clock_waits_for_causal_integration_time():
     provider._receive_direct(TFMessage(transforms=[value]))
     assert provider.position_at(1.,refresh=False) is None
     np.testing.assert_equal(provider.position_at(1.01,refresh=False),[4.,0.,0.])
+
+
+def test_context_diagnostics_distinguish_insertion_rejection_and_causal_wait():
+    """A bounded snapshot explains loss without substituting or changing samples."""
+    from geometry_msgs.msg import TransformStamped
+    from tf2_msgs.msg import TFMessage
+    provider, _ = make_provider(max_age=.2, history_duration=2., history_capacity=100)
+    provider._clock.now.return_value.nanoseconds = 1_200_000_000
+    def sample(t, x=1., frame='world'):
+        v = TransformStamped()
+        v.header.frame_id = frame
+        v.child_frame_id = 'tracking_frame'
+        v.header.stamp.sec = int(t)
+        v.header.stamp.nanosec = round((t-int(t))*1e9)
+        v.transform.translation.x = x
+        return v
+    provider._receive_direct(TFMessage(transforms=[sample(1.), sample(1.1),
+        sample(1.1), sample(1.15, frame='odom'), sample(1.16, x=float('nan')), sample(1.5)]))
+    assert provider.position_at(1.32, refresh=False, valid_until=1.33) is None
+    d = provider.diagnostics()
+    assert d['last_received_source_time'] == 1.5
+    assert d['last_accepted_source_time'] == 1.1
+    assert d['receipt_clock'] == 1_200_000_000*1e-9
+    assert d['history_size'] == 2 and d['history_range'] == [1., 1.1]
+    assert d['insertions'] == {'accepted': 2, 'duplicate': 1, 'frame_mismatch': 1,
+                                'invalid': 1, 'ahead_of_clock': 1}
+    assert d['requested_time'] == 1.32 and d['valid_until'] == 1.33
+    assert d['preceding_time'] == 1.1 and d['following_time'] is None
+    assert d['wait_reason'] == 'expired' and d['consecutive_failed_selections'] == 1
+    provider._clock.now.return_value.nanoseconds = 1_400_000_000
+    provider.position_at(1.32, refresh=False, valid_until=1.33)
+    assert provider.diagnostics()['wait_duration'] == pytest.approx(.2)
+    provider._receive_direct(TFMessage(transforms=[sample(1.3)]))
+    np.testing.assert_equal(provider.position_at(1.32, refresh=False, valid_until=1.33), [1., 0., 0.])
+    assert provider.diagnostics()['consecutive_failed_selections'] == 0
+    provider.clear_history()
+    assert provider.diagnostics()['history_size'] == 0
+
+
+def test_context_subscription_uses_bounded_reliable_history_queue():
+    """Historical integration needs retained TF, not a five-message latest-data queue."""
+    from rclpy.qos import ReliabilityPolicy
+    node = Mock()
+    with patch('robot_simulation.gazebo.tracking_frame_provider.Buffer'), patch(
+            'robot_simulation.gazebo.tracking_frame_provider.TransformListener'):
+        TrackingFrameProvider(node, 'world', 'tracking_frame', max_age=.2,
+                              history_duration=2., history_capacity=130)
+    qos = node.create_subscription.call_args.args[3]
+    assert qos.depth == 130
+    assert qos.reliability == ReliabilityPolicy.RELIABLE

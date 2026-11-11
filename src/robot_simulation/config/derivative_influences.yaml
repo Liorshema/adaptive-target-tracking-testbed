@@ -1,0 +1,23 @@
+# Experiment snapshots freeze this complete profile; runtime never rereads it.
+schema_version: 1
+profiles:
+  robot_response:
+    schema_version: 1
+    id: robot_repulsion
+    enabled: false
+    frame: world
+    output: {shape: [3], unit: m/s^2}
+    inputs:
+      target_position: {source: outputs.position, shape: [3], unit: m, frame: world}
+    context:
+      tracking_position_world: {shape: [3], unit: m, frame: world}
+    parameters:
+      A_max: {value: 0.3, shape: [], unit: m/s^2, exclusiveMinimum: 0.0}
+      L: {value: 0.8, shape: [], unit: m, exclusiveMinimum: 0.0}
+      epsilon: {value: 0.05, shape: [], unit: m, exclusiveMinimum: 0.0}
+    intermediates:
+      relative: target_position-tracking_position_world
+      distance: norm(relative)
+    expression: A_max*exp(-distance/L)*relative/sqrt(dot(relative,relative)+epsilon**2)
+    # Explicit world acceleration components added to these velocity derivatives.
+    bindings: {vx: 0, vy: 1, vz: 2}

@@ -159,6 +159,26 @@ def test_target_dynamics_parameter_remains_a_dynamics_study(materialized):
     assert project(a, declaration)[2]['studied_variable']['path'].startswith('parameters.target_dynamics.')
 
 
+def test_descriptive_ranking_keeps_declared_different_driving_dynamics_separate(materialized):
+    from robot_experiments.benchmarking import rank_descriptive_runs
+    from robot_experiments.comparison import comparison_views
+    from test_descriptive_ranking import observed
+
+    a = materialized()
+    b = materialized(overrides={'target': {'target': {'dynamics': {'parameters': {'a_max': .3}}}}})
+    declaration = policy('target_dynamics', 'parameters.target_dynamics.a_max')
+    rows = [observed('a', .3), observed('b', .4)]
+    for row, prepared in zip(rows, [a, b]):
+        contract = {**prepared['comparison_contract'], 'duration': 2., 'settling_time': 1.}
+        row['comparison'] = comparison_views(contract, declaration,
+                                             prepared['scientific_conditions'])
+        row['metrics']['evaluation_window'] = {'start': 1., 'end': 3., 'unit': 's'}
+    assert rows[0]['comparison']['invariant_contract'] == rows[1]['comparison']['invariant_contract']
+    result = rank_descriptive_runs(rows)
+    assert len(result['scopes']) == 2, result
+    assert not result['eligible']
+
+
 def test_model_specific_dynamics_defaults_are_exact_and_shared_leaves_stay_protected(materialized):
     a = materialized()
     b = materialized(dynamics_model='fight_flight')

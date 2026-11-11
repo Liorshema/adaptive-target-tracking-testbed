@@ -146,6 +146,7 @@ class ExperimentAuthor:
                 'runtime',
                 'advanced',
                 'comparison',
+                'dynamics_source',
             },
             'experiment',
             {'id', 'name', 'base_case'},
@@ -543,6 +544,32 @@ class ExperimentAuthor:
                     'experiment.advanced.overrides',
                 ),
             )
+        if 'dynamics_source' in ex:
+            from .dynamics_library import validate_dynamics_source
+
+            try:
+                model = owners['target']['target']['dynamics']['parameters']['model']
+            except (KeyError, TypeError) as error:
+                raise ValueError('dynamics_source requires a complete equation model') from error
+            if selected['target_dynamics'] != 'equation_state_space' or model is None:
+                raise ValueError('dynamics_source requires a complete selected equation model')
+            provenance['dynamics_library'] = validate_dynamics_source(ex['dynamics_source'], model)
+        if 'dynamics_library' not in provenance and selected['target_dynamics'] == 'equation_state_space':
+            # Recover only internally consistent provenance from the pinned base record.
+            # Its complete canonical definition remains the authority, never library latest.
+            from .dynamics_library import validate_dynamics_source
+            model = owners.get('target', {}).get('target', {}).get('dynamics', {}).get('parameters', {}).get('model')
+            if model is not None:
+                descriptions = study.get('description', '').split('Authoring provenance: ')[1:]
+                for text in reversed(descriptions):
+                    try:
+                        prior, _ = json.JSONDecoder().raw_decode(text)
+                        pin = prior.get('dynamics_library')
+                        if pin:
+                            provenance['dynamics_library'] = validate_dynamics_source(pin, model)
+                            break
+                    except (ValueError, TypeError, KeyError):
+                        continue
         provenance['base'] = {key: base[key] for key in ('id', 'revision', 'sha256')}
         study['description'] = (
             study.get('description', '')

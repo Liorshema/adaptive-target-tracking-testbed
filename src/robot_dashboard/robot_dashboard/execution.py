@@ -259,10 +259,6 @@ def execution_layout(backend):
             [
                 html.H2('Run Experiment'),
                 html.P(id='run-selection', className='context-label'),
-                html.P(
-                    'Play uses the saved configuration, closing any paused preview first.',
-                    className='hint',
-                ),
                 dcc.Checklist(
                     id='actuation-opt-in',
                     options=[
@@ -287,7 +283,7 @@ def execution_layout(backend):
                 html.Div(
                     [
                         html.Button(
-                            '▶ Play / Run',
+                            '▶ Play',
                             id='start-experiment',
                             className='button primary',
                             disabled=True,
@@ -344,7 +340,7 @@ def execution_layout(backend):
             [
                 html.Div(
                     [
-                        html.H2('Previous Experiment Comparison'),
+                        html.H2('Experiment Comparison · RMSE'),
                     ],
                     className='panel-heading',
                 ),
@@ -465,7 +461,7 @@ def register_execution(app, backend):
     def sessions(_create, _refresh, _management, title, selected):
         try:
             if ctx.triggered_id == 'create-session':
-                created = backend.create_session({'title': title or 'Tracking Session'})
+                created = backend.create_session({'title': title.strip()} if title and title.strip() else None)
                 selected = created['session_id']
             rows = backend.list_sessions(limit=1000)
             options = [

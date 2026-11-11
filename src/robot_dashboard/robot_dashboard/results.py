@@ -211,6 +211,11 @@ def scenario_names(backend, runs=()):
         for item in backend.list_experiments(include_deleted=True)
         if isinstance(item.get('name'), str) and item['name'].strip()
     }
+    for item in backend.list_scenarios(include_deleted=True):
+        origin = item.get('origin') or {}
+        parent = item.get('source_id') or origin.get('id')
+        if parent:
+            names[parent, item['variant']] = item['name']
     for run in runs:
         identifier = run.get('experiment_id')
         if not isinstance(identifier, str) or identifier in names or not run.get('run_id'):
@@ -227,6 +232,8 @@ def scenario_names(backend, runs=()):
 def scenario_label(result, names=None):
     """Prefer authoritative display metadata; never invent model-specific scenario names."""
     identifier = result.get('experiment_id')
+    if names and names.get((identifier, result.get('variant'))):
+        return names[identifier, result['variant']]
     if names and names.get(identifier):
         return names[identifier]
     identity = result.get('experiment_identity') or {}
@@ -1130,117 +1137,57 @@ def _rmse(metric, *, angle=False):
 
 
 def comparison_view(comparison, *, selected_run=None, names=None):
-    """Show recorded RMSE and rank only backend-approved, fully evidenced comparisons."""
-    contract = comparison.get('comparability') or {}
-    runs = comparison.get('runs', [])
-    values = []
-    for run in runs:
+    """Show each Run's recorded RMSE in Session order without ranking presentation."""
+    rows = []
+    for run in comparison.get('runs', []):
         metrics = {row['metric']: row for row in metric_rows(run)}
-        values.append(
-            [
-                _rmse(metrics.get(name, {}), angle=name == 'pointing_error')
-                for name in (
-                    'tracking_distance',
-                    'pointing_error',
-                    'target_position_error',
-                    'prediction_rmse',
-                )
-            ]
+        recorded = [
+            _rmse(metrics.get(name, {}), angle=name == 'pointing_error')
+            for name in (
+                'tracking_distance',
+                'pointing_error',
+                'target_position_error',
+                'prediction_rmse',
+            )
+        ]
+        label = scenario_label(run, names)
+        if run.get('condition_id') and run.get('variant'):
+            label += ' · ' + str(run['variant'])
+        rows.append(
+            html.Tr(
+                [
+                    html.Td(
+                        html.Button(
+                            label,
+                            id={'type': 'session-run', 'run_id': run['run_id']},
+                            n_clicks=0,
+                            className='run-link',
+                            title='Inspect recorded Run.',
+                        )
+                    ),
+                    *[
+                        html.Td(f'{value:.3f}' if value is not None else 'Unavailable')
+                        for value in recorded
+                    ],
+                ],
+                **{'data-run-id': run['run_id']},
+                className='selected-run' if run['run_id'] == selected_run else '',
+            )
         )
-    ranking = comparison.get('ranking') or {}
-    rankable = contract.get('comparable') is True and ranking.get('eligible') is True
-    criterion = ('Rank by equal-weight mean across matched Seeds of recorded radial tracking '
-                 'RMSE (m), lower is better. Sample standard deviation across Seeds; '
-                 'equal scores share rank. No statistical significance is inferred.')
-    reasons = (comparison.get('ranking_diagnostics') or {}).get('reasons') or contract.get('reasons') or []
-    explanation = '; '.join(str(reason) for reason in reasons)
-    if not rankable:
-        explanation = 'Rank unavailable. ' + (explanation or 'An authoritative backend ranking with complete matched evidence is required.')
-    rows, seed_links = [], []
-    display = []
-    if rankable:
-        lookup = {run['run_id']: run for run in runs}
-        for condition in ranking.get('conditions', []):
-            ids = condition['run_ids']
-            run = lookup[selected_run] if selected_run in ids else lookup[ids[0]]
-            recorded = [_rmse({'rmse': condition['metrics'].get(name, {}).get('mean'),
-                               'unit': condition['metrics'].get(name, {}).get('unit'),
-                               'available': name in condition['metrics']}, angle=name == 'pointing_error')
-                        for name in ('tracking_distance', 'pointing_error', 'target_position_error', 'prediction_rmse')]
-            variable = ', '.join(f"{v['path']}={v['value']}" for v in condition.get('variables', {}).values())
-            label = scenario_label(run, names) + ' · ' + (variable or str(condition.get('variant', '')))
-            spread = condition['metrics']['tracking_distance'].get('std')
-            evidence = f"n={condition['seed_count']}; sample std=" + (f'{spread:.4f} m' if spread is not None else 'unavailable (one Seed)')
-            display.append((run, recorded, condition.get('rank'), label, evidence))
-            seed_links.append(html.Div([
-                html.Strong(label), html.Span(' · ' + evidence + ' · '),
-                *[html.Span(f"Seed {r['seed']}: {r['rmse']:.4f} m · ") if r['run_id'] == run['run_id'] else
-                  html.Button(f"Seed {r['seed']}: {r['rmse']:.4f} m", id={'type': 'session-run', 'run_id': r['run_id']},
-                              n_clicks=0, className='run-link') for r in condition['per_seed']],
-            ]))
-    else:
-        display = [(run, recorded, None, scenario_label(run, names)
-                    + (' · ' + str(run['variant']) if run.get('condition_id') and run.get('variant') else ''), '')
-                   for run, recorded in zip(runs, values)]
-    for run, recorded, rank, label, evidence in display:
-        rank_class = ('rank-good' if rank == 1 else 'rank-mid' if rank is not None and rank < len(display)
-                      else 'rank-low' if rank is not None else 'rank-unavailable')
-        rows.append(html.Tr([
-            html.Td(html.Button(label, id={'type': 'session-run', 'run_id': run['run_id']},
-                                n_clicks=0, className='run-link', title='Inspect recorded Run. ' + evidence)),
-            *[html.Td(f'{value:.3f}' if value is not None else 'Unavailable', title=evidence) for value in recorded],
-            html.Td(str(rank) if rank is not None else 'Unavailable', className=rank_class,
-                    title=criterion + ' ' + evidence if rankable else explanation),
-        ], **{'data-run-id': run['run_id']}, className='selected-run' if run['run_id'] == selected_run else ''))
-    headers = [
-        'Scenario',
-        'R RMSE (m)',
-        'Angle RMSE (°)',
-        'Estimator RMSE (m)',
-        'Predictor RMSE (m)',
-        'Rank',
-    ]
+    headers = ['Scenario', 'R (m)', 'Angle (°)', 'Estimator (m)', 'Predictor (m)']
     return html.Div(
         [
-            (
-                html.Div(
-                    html.Table(
-                        [
-                            html.Thead(
-                                html.Tr(
-                                    [
-                                        html.Th(
-                                            text,
-                                            title=criterion if text == 'Rank' else text,
-                                        )
-                                        for text in headers
-                                    ]
-                                )
-                            ),
-                            html.Tbody(rows),
-                        ]
-                    ),
-                    className='evidence-table session-table',
-                )
-                if rows
-                else html.P('No recorded Runs in this Session.', className='empty-state')
-            ),
-            html.Details(
-                [
-                    html.Summary('Comparison details'),
-                    html.Div(
-                        [
-                            html.P(criterion),
-                            html.P(explanation) if explanation else None,
-                            html.P(ranking.get('scope', 'Recorded Run comparison')),
-                            *seed_links,
-                            html.Pre(json.dumps(contract, indent=2), className='json-preview'),
-                        ],
-                        className='comparison-popover',
-                    ),
-                ],
-                className='comparison-details',
-            ),
+            html.Div(
+                html.Table(
+                    [
+                        html.Thead(html.Tr([html.Th(text, title=text) for text in headers])),
+                        html.Tbody(rows),
+                    ]
+                ),
+                className='evidence-table session-table',
+            )
+            if rows
+            else html.P('No recorded Runs in this Session.', className='empty-state')
         ],
         className='comparison-view',
     )

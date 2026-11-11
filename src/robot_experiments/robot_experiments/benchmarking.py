@@ -1,9 +1,117 @@
 """Matched-seed aggregation without unsafe or statistically unsupported winners."""
-from collections import defaultdict
+from collections import Counter, defaultdict
 import math
 import statistics
 
 from .comparison import comparison_reasons, metric_comparison_reasons, _metric_evidence, metric_document
+
+
+DESCRIPTIVE_METRICS = {
+    'tracking_distance': {'label': 'Range RMSE', 'unit': 'm'},
+    'pointing_error': {'label': 'Angle RMSE', 'unit': 'rad'},
+    'target_position_error': {'label': 'Estimator position RMSE', 'unit': 'm'},
+    'prediction_rmse': {'label': 'Predictor position RMSE', 'unit': 'm'},
+}
+
+
+def rank_descriptive_runs(runs, metric='tracking_distance', *, scope=None):
+    """Rank recorded Runs within an explicit matched scope, without qualification.
+
+    The old scientific/physical acceptance path is unchanged. Exact ties share
+    competition rank; ordering within a tie uses immutable Run ID. No aggregation,
+    composite score, statistical significance or safety verdict is inferred.
+    """
+    from copy import deepcopy
+    from .comparison import comparison_views, contract_hash
+    if metric not in DESCRIPTIVE_METRICS:
+        raise ValueError('Select a supported recorded RMSE metric')
+    runs = list(runs)
+    counts = Counter(run['run_id'] for run in runs)
+    excluded, groups, differences, signatures = {}, {}, [], {}
+    for run in runs:
+        identifier = run['run_id']
+        if counts[identifier] != 1:
+            excluded[identifier] = ['duplicate immutable Run identity']
+            continue
+        failures = []
+        try:
+            if run['execution_status'] != 'completed':
+                failures.append('Run execution is not completed')
+            if not run.get('frozen_consistent'):
+                failures.append('independent frozen comparison evidence unavailable or inconsistent')
+            view = run['comparison']
+            expected = comparison_views(view['original_contract'], view.get('policy'),
+                                        view['protected_conditions'])
+            if expected != view:
+                failures.append('comparison metadata differs from original frozen evidence')
+            failures.extend(_metric_evidence(run, view, require_physical_coverage=False))
+            observations = metric_document(run).get('metrics') or {}
+            item = observations.get(metric) or {}
+            score = item.get('rmse')
+            if (item.get('available') is not True or item.get('unit') != DESCRIPTIVE_METRICS[metric]['unit']
+                    or type(score) not in (int, float) or not math.isfinite(score) or score < 0
+                    or type(item.get('sample_count')) is not int or item['sample_count'] <= 0):
+                failures.append('selected RMSE has no valid finite recorded observations/units')
+            protected = deepcopy(view.get('invariant_conditions', view['protected_conditions']))
+            # A study name is a display/namespace value, not an experimental variable.
+            protected.get('experiment_setup', {}).pop('name', None)
+            signature = {'contract': view['invariant_contract'], 'conditions': protected,
+                         # Declaring dynamics as a study variable does not establish
+                         # equivalent driving difficulty for a descriptive winner.
+                         'target_dynamics': view['original_contract'].get('target_dynamics'),
+                         'policy': view.get('policy'), 'seed': run['seed'],
+                         'metric_contract': metric_document(run).get('contract'),
+                         'units': {k: v.get('unit') for k, v in observations.items()}}
+            key = contract_hash(signature)
+            if failures:
+                excluded[identifier] = list(dict.fromkeys(failures))
+                continue
+            groups.setdefault(key, []).append({'run_id': identifier, 'score': score,
+                                               'unit': item['unit'], 'rank': None,
+                                               'acceptance': run.get('acceptance')})
+            signatures[key] = signature
+            differences.append({'run_id': identifier, 'scope': key,
+                                'declared_variables': deepcopy(view['variables'])})
+        except (ValueError, KeyError, TypeError, AttributeError) as error:
+            excluded[identifier] = [f'invalid comparison evidence: {error}']
+    scopes = [{'id': key, 'run_ids': sorted(r['run_id'] for r in group),
+               'label': f'Matched scope {i + 1} · {len(group)} Runs'}
+              for i, (key, group) in enumerate(sorted(groups.items()))]
+    selected = scope if scope in groups else next(iter(groups)) if len(groups) == 1 else None
+    reasons = []
+    if selected is None:
+        reasons.append('Choose one compatible comparison scope' if groups else
+                       'No completed Runs have valid frozen metric evidence')
+    elif scope is not None and scope != selected:
+        reasons.append('The selected comparison scope is no longer available')
+        selected = None
+    group = groups.get(selected, [])
+    if len(group) < 2:
+        reasons.append('At least two eligible comparable Runs are required; one result is not a winner')
+    for key, other in groups.items():
+        if key != selected:
+            excluded.update({r['run_id']: ['different or unselected frozen comparison scope'] for r in other})
+    if not reasons:
+        scores = [r['score'] for r in group]
+        for row in group:
+            row['rank'] = 1 + sum(value < row['score'] for value in scores)
+    from .comparison import different_paths
+    reference = next(iter(signatures), None)
+    scope_differences = [
+        {'first_scope': reference, 'second_scope': key,
+         'paths': different_paths(signatures[reference], value)}
+        for key, value in signatures.items() if key != reference]
+    return {'kind': 'descriptive', 'metric': metric, 'eligible': not reasons,
+            'scope': selected, 'scopes': scopes, 'excluded': excluded, 'reasons': reasons,
+            'runs': sorted(group, key=lambda r: (r['score'], r['run_id'])),
+            'differences': differences,
+            'scope_differences': scope_differences,
+            'criterion': DESCRIPTIVE_METRICS[metric]['label'] + '; lower is better. Exact ties share rank.',
+            'definition': ('R is the RMSE of ||p_target-p_tracking|| minus configured radius, '
+                           'not the radius itself. Each rank describes one recorded Run.'),
+            'limitations': ('Matched frozen dynamics, physical/evaluation/sensing/safety settings and Seed; '
+                           'only explicitly declared non-dynamics variable differences are allowed. Reactive trajectories '
+                           'are not guaranteed identical. No significance, scientific acceptance or safety qualification.')}
 
 
 def rank_conditions(runs, variants, seeds, policy=None, *, reasons=()):

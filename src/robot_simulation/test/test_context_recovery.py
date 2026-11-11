@@ -39,10 +39,11 @@ def node():
     n._tracking_provider = SimpleNamespace(position_at=camera_at,clear_history=camera.clear)
     for t in [0.,.02,.04]: n._physical_history.add(np.zeros(3),t,'world')
     camera.add(np.zeros(3),0.,'world')
+    n._engine = SimulationEngine(ConstantVelocity(),RK4Integrator())
     n._state = n._make_initial_state(0.,np.zeros(3))
     n._last_clock = 0.; n._epoch = 0; n._pending = False; n._pending_since = None
     n._last_measurement_time = None; n._dt = .01; n._context_history_duration = .1
-    n._stepper = TimeStepper(SimulationEngine(ConstantVelocity(),RK4Integrator()),.01,10)
+    n._stepper = TimeStepper(n._engine,.01,10)
     n._adapter = GazeboTargetAdapter(); n.requests = []
     def send(pose):
         future = Future(); n.requests.append((pose,future)); return future
@@ -175,3 +176,19 @@ def test_ahead_of_clock_receipt_does_not_evict_needed_past_context():
     assert history.at(10.21).timestamp == 10.2
     history.add(np.ones(3),20.,'world',receipt_time=10.)
     assert history._samples[-1].timestamp == 10.2
+
+
+def test_derivative_response_uses_causal_tracking_history_without_base_sensor(node):
+    node._physical_history = None
+    node._requires_tracking_history = True
+    clock(node,.05)
+    # Camera sample expires at .025; valid only through the .02 step end.
+    np.testing.assert_allclose(node.requests[-1][0].position,[.02,0,0])
+    acknowledge(node)
+    assert node._state.time == pytest.approx(.02)
+    node.camera_history.clear()
+    clock(node,.06)
+    assert node._state.time == pytest.approx(.02)
+    assert len(node.requests)==1
+    clock(node,0.)
+    assert node._state is None and not node.camera_history.at(0.)
