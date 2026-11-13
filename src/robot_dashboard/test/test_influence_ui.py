@@ -40,6 +40,72 @@ def walk(node):
         yield node
         yield from walk(getattr(node,'children',None))
 
+
+def test_scaled_three_state_switch_hydrate_validate_save_reload_preserves_history(state_backend):
+    """Actual Lab callbacks preserve an OFF incompatible frozen profile and its pin."""
+    import yaml
+    from robot_dashboard.app import create_app
+    from robot_dashboard.dynamics_forms import choose_target_model
+    from robot_dashboard.forms import begin_draft
+
+    state, backend = state_backend
+    state = hydrate_target_pin(state, backend)
+    disabled = deepcopy(state['spec']['experiment']['parameters']['target_dynamics']['influences'])
+    fixture = Path(__file__).parents[2] / 'robot_simulation/test/model_fixtures/halvorsen.yaml'
+    model = yaml.safe_load(fixture.read_text())
+    library = backend.dynamics.create('DYN-HALVORSEN', 'Halvorsen', model)
+    old_library = deepcopy(backend.dynamics.get('DYN-ATTRACTOR', 1))
+    source = deepcopy(backend.catalog.get('EXP-PHYSICAL', 1))
+    state = choose_target_model(backend, state, 'library:DYN-HALVORSEN:1')
+    # Reproduce the existing saved disabled snapshot, rather than removing it.
+    state['spec']['experiment']['parameters']['target_dynamics']['influences'] = disabled
+    state['preview'] = backend.preview_experiment(state['spec'])
+    state['components'] = state['preview']['components']
+    state = hydrate_target_pin(state, backend)
+    state['expected_revision'] = None
+    assert not state['robot_response']['available']
+    assert not state['robot_response']['enabled']
+    assert 'position' in state['robot_response']['reason'].lower()
+    assert state['spec']['experiment']['parameters']['target_dynamics']['influences'] == disabled
+    checkbox = next(c for c in walk(component_cards(backend, state))
+                    if getattr(c, 'id', None) == {'type': 'influence', 'role': 'robot_response'})
+    assert checkbox.value == [] and checkbox.options[0]['disabled']
+    app = create_app(backend)
+    key, callback = next((k, v) for k, v in app.callback_map.items()
+                         if k.startswith('..builder-state.data'))
+
+    def action(state, trigger):
+        ex = state['spec']['experiment']
+        inputs = [None] * 5 + [[], [], [], .4, '[42]', [], None, [[]]]
+        states = [[], [], ex['base_case'], ex['base_revision'], 'create', ex['id'], ex['name'], state]
+        response = app.server.test_client().post('/_dash-update-component', json={
+            'output': key,
+            'outputs': [{'id': o.component_id, 'property': o.component_property}
+                        for o in callback['output']],
+            'inputs': [{**m, 'value': v} for m, v in zip(callback['inputs'], inputs)],
+            'state': [{**m, 'value': v} for m, v in zip(callback['state'], states)],
+            'changedPropIds': [trigger + '.n_clicks']})
+        assert response.status_code == 200, response.get_data(as_text=True)
+        return response.get_json()['response']['builder-state']['data']
+
+    state = action(state, 'validate-draft')
+    assert state['stage'] == 'Validated', state['message']
+    state = action(state, 'save-draft')
+    assert state['stage'] == 'Saved', state['message']
+    saved = deepcopy(backend.catalog.get('EXP-UI', 1))
+    variant = saved['definition']['experiment']['variants'][0]['name']
+    reloaded = hydrate_target_pin(begin_draft(backend, 'EXP-UI', 1, variant, 'revise'), backend)
+    actual = reloaded['components']['target_dynamics']['effective']
+    assert actual['model'] == model and actual['influences'] == disabled
+    assert not reloaded['robot_response']['available']
+    assert backend.dynamics.get('DYN-HALVORSEN', 1) == library
+    assert backend.dynamics.get('DYN-ATTRACTOR', 1) == old_library
+    assert backend.catalog.get('EXP-PHYSICAL', 1) == source
+    with pytest.raises(ValueError, match='Unsupported influence projection'):
+        backend.draft_with_robot_response(reloaded['spec'], True)
+    assert backend.catalog.get('EXP-UI', 1) == saved
+    assert len(backend.list_revisions('EXP-UI')) == 1
+
 def test_initial_off_two_checkboxes_without_math_forms(state_backend):
     state,b=state_backend
     state=hydrate_target_pin(state,b)

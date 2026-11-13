@@ -1,0 +1,21 @@
+# Frozen reproduction of the saved model's mathematics; not a production template.
+id: halvorsen
+type: equation_state_space
+schema_version: 1
+frame: world
+state:
+  - {name: x, shape: [], unit: '1', initial: -6.4}
+  - {name: y, shape: [], unit: '1', initial: 0}
+  - {name: z, shape: [], unit: '1', initial: 0}
+parameters:
+  rate: {shape: [], unit: 1/s, value: 1.0}
+  alpha: {shape: [], unit: '1', value: 1.4}
+  scale: {shape: [], unit: m, value: 0.1}
+equations:
+  x: rate*(-alpha*x-4*y-4*z-y**2)
+  y: rate*(-alpha*y-4*z-4*x-z**2)
+  z: rate*(-alpha*z-4*x-4*y-x**2)
+outputs:
+  schema_version: 1
+  frame: world
+  position: scale*[x,y,z]

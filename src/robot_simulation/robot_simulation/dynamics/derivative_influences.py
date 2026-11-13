@@ -79,7 +79,8 @@ def compose_influences(model, influences):
         identifiers.add(identifier)
         if p['output']!={'shape':[3],'unit':'m/s^2'}:
             raise ValueError('Influence output must be world acceleration [3] in m/s^2')
-        position=_binding(base,p)
+        if p['frame'] != 'world':
+            raise ValueError('Derivative influences require explicit world frame')
         if not isinstance(p['inputs'],dict) or len(p['inputs'])!=1:
             raise ValueError('Influence requires one explicit physical position input')
         input_name,input_spec=next(iter(p['inputs'].items()));_name(input_name)
@@ -92,6 +93,37 @@ def compose_influences(model, influences):
         names=[*p['parameters'],*p['intermediates'],*p['context'],input_name]
         if len(names)!=len(set(names)):raise ValueError('Duplicate influence symbols')
         for name in names:_name(name)
+        if not p['enabled']:
+            # Validate the frozen profile's own contract without binding it to a
+            # target it cannot affect. D3 checks its AST, bounds, units and shape.
+            bindings = p['bindings']
+            if not isinstance(bindings, dict) or not bindings:
+                raise ValueError('Influence bindings must be a nonempty mapping')
+            for name in bindings: _name(name)
+            projections = list(bindings.values())
+            vector = (len(projections) == 1 and projections[0] == [0, 1, 2]
+                      and all(type(i) is int for i in projections[0]))
+            scalars = (len(projections) == 3 and all(type(i) is int for i in projections)
+                       and set(projections) == {0, 1, 2})
+            if not (vector or scalars):
+                raise ValueError('Influence bindings must project three acceleration components')
+            referenced = {node.id for text in [p['expression'], *p['intermediates'].values()]
+                          for node in ast.walk(parse_expression(text))
+                          if isinstance(node, ast.Name)}
+            velocity = 'influenceValidationVelocity'
+            while velocity in names or velocity in referenced: velocity += 'x'
+            EquationDynamics(model={
+                'id': identifier, 'schema_version': 1, 'type': 'equation_state_space',
+                'frame': p['frame'],
+                'state': [{'name': velocity, 'shape': [3], 'unit': 'm/s',
+                           'initial': [0., 0., 0.]}],
+                'parameters': p['parameters'], 'intermediates': p['intermediates'],
+                'context': {**p['context'], input_name: {
+                    key: value for key, value in input_spec.items() if key != 'source'}},
+                'equations': {velocity: p['expression']},
+            })
+            continue
+        position=_binding(base,p)
         used=set(result.get('parameters',{}))|set(result.get('intermediates',{}))|set(result.get('context',{}))|{s['name'] for s in result['state']}|{'t','pi'}
         def allocate(stem):
             while stem in used:stem+='x'
