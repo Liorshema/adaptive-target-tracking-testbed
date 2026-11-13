@@ -1,0 +1,5 @@
+# Other Python dependencies come from the dated, signed apt snapshots in Dockerfile.
+# Pure-Python wheels; install with --no-deps --require-hashes.
+dash==3.4.0 --hash=sha256:62b1c2eca3cfbe05f5e6ed8666e2c9a204aa08e2ceef89f01ce9bcccb3c18e95
+plotly==7.1.0 --hash=sha256:dbb7fa18afce40d0a8e80d1bf162eceb3faa0ce5a77fe741ad09a74cf78f53f3
+narwhals==2.28.0 --hash=sha256:1f69d6385ec30e2fa6e1fdeb37c562ecabd0f713f6f3e3b58a668c5c9df9567f

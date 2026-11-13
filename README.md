@@ -10,6 +10,19 @@ Pure numerical components are separated from ROS deployment. Supported component
 can be selected through a validated system manifest and extended through their
 domain interfaces. The deployed robot family remains the planar mobile manipulator.
 
+## Docker deployment
+
+With Docker and Compose v2 installed, a normal clone can use the headless deployment:
+
+```bash
+docker compose up --build -d
+```
+
+Open http://localhost:8050. Catalog, Sessions and Runs persist in a named volume;
+actuation stays explicitly opt-in. See [deployment and rollback](docs/docker.md)
+and [verification status](docs/validation/docker.md). Container end-to-end acceptance
+is currently unverified because Docker was unavailable on the implementation host.
+
 ## Main Components
 
 - `robot_description` — robot geometry and physical configuration

@@ -1,0 +1,37 @@
+# Never send local Runs, installations, credentials or generated binaries to Docker.
+build/
+install/
+log/
+results/
+data/
+.env
+.env.*
+.aws/
+.ssh/
+.codex/
+.agents/
+.vscode/
+**/__pycache__/
+**/.pytest_cache/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+**/.venv/
+**/*.bak
+**/rosbag2_*/
+src/robot_simulation/robot_simulation/gazebo/_actuator*.so
+src/robot_simulation/robot_simulation/gazebo/_dartsim_recovery*.so
+
+# Retain real Git provenance without local remotes/credentials/hooks/reflogs.
+# A normal clone (including a shallow clone) is supported; linked worktrees are not.
+.git/**
+!.git/HEAD
+!.git/index
+!.git/shallow
+!.git/packed-refs
+!.git/refs/
+!.git/refs/**
+!.git/objects/
+!.git/objects/**
+.git/objects/info/alternates
+.git/objects/info/http-alternates

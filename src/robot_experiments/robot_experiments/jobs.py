@@ -197,6 +197,46 @@ class ExperimentJobs:
             'worker did not finish cleanup; inspect job artifacts '
             '(no unsafe force-kill performed)')
 
+    def stop_all(self, *, timeout=25.):
+        """Request cooperative stops together, then await one shared shutdown budget.
+
+        Intended for an exclusive deployment owner of this Jobs directory. Never
+        signal a PID, rewrite a terminal status, or turn missing cleanup into success.
+        """
+        import math
+        if isinstance(timeout, bool) or not math.isfinite(timeout) or timeout < 0:
+            raise ValueError('timeout must be finite and nonnegative')
+        deadline = time.monotonic() + timeout
+        report = {'jobs': [], 'errors': []}
+        pending = []
+        for request in sorted(self.directory.glob('*/request.json')):
+            identifier = request.parent.name
+            try:
+                status = self.status(identifier)
+                if status['state'] == 'worker_lost':
+                    report['jobs'].append(status)
+                    report['errors'].append({'job_id': identifier,
+                                            'error': 'worker_lost; cleanup unverified'})
+                elif status['state'] in {'queued', 'opening', 'paused', 'running', 'closing'}:
+                    (request.parent / 'stop.request').touch(exist_ok=True)
+                    pending.append(identifier)
+            except (OSError, ValueError, KeyError, psutil.Error) as error:
+                report['errors'].append({'job_id': identifier, 'error': str(error)})
+        for identifier in pending:
+            try:
+                status = self.stop(identifier, timeout=max(0., deadline - time.monotonic()))
+                report['jobs'].append(status)
+                if status['state'] == 'worker_lost':
+                    report['errors'].append({'job_id': identifier,
+                                            'error': 'worker_lost; cleanup unverified'})
+            except (OSError, ValueError, KeyError, psutil.Error, TimeoutError) as error:
+                report['errors'].append({'job_id': identifier, 'error': str(error)})
+                try:
+                    report['jobs'].append(self.status(identifier))
+                except (OSError, ValueError, KeyError, psutil.Error):
+                    pass  # The original error remains recorded; no status is fabricated.
+        return report
+
 
 def history(directory, identifier=None):
     """Expose recorded identities/status/artifact references without recomputing metrics."""

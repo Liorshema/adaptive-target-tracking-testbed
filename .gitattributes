@@ -1,0 +1,2 @@
+# Docker directly executes this script; keep its shebang valid on Windows checkouts.
+tools/docker/*.sh text eol=lf

@@ -12,6 +12,10 @@ def main(argv=None):
         '--host', default='127.0.0.1', help='Bind address (default: localhost only)'
     )
     parser.add_argument('--port', type=int, default=8050)
+    parser.add_argument(
+        '--stop-jobs-on-exit', action='store_true',
+        help='Exclusive deployment owner: cooperatively stop Jobs on server shutdown',
+    )
     data = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
     parser.add_argument(
         '--data-dir',
@@ -73,5 +77,36 @@ def main(argv=None):
                 'catalog': str(catalog.path.resolve())}
 
     print(f'Catalog: {catalog.path}', flush=True)
-    app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
-    return 0
+    options = dict(host=args.host, port=args.port, debug=False, use_reloader=False)
+    if not args.stop_jobs_on_exit:
+        app.run(**options)
+        return 0
+
+    import json
+    import signal
+    from datetime import datetime, timezone
+    from robot_experiments.reporting import write_json
+
+    def interrupted(signum, frame):
+        raise KeyboardInterrupt
+
+    previous = signal.signal(signal.SIGTERM, interrupted)
+    report = None
+    try:
+        app.run(**options)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # A repeated Docker stop must not interrupt the owner's cleanup path.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        try:
+            report = backend.jobs.stop_all()
+            report['ended_utc'] = datetime.now(timezone.utc).isoformat()
+            path = args.data_dir / 'shutdown' / (
+                datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ') + '.json')
+            path.parent.mkdir(parents=True, exist_ok=True)
+            write_json(path, report)
+            print('Job shutdown: ' + json.dumps(report), flush=True)
+        finally:
+            signal.signal(signal.SIGTERM, previous)
+    return 1 if report['errors'] else 0

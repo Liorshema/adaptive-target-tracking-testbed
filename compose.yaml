@@ -1,0 +1,22 @@
+services:
+  testbed:
+    build:
+      context: .
+    image: adaptive-target-tracking:local
+    platform: linux/amd64
+    init: true
+    user: "10001:10001"
+    ports:
+      - "127.0.0.1:8050:8050"
+    volumes:
+      - testbed-data:/data
+    shm_size: 512mb
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+volumes:
+  testbed-data:
+    name: ${TESTBED_DATA_VOLUME:-adaptive-target-tracking-data}
