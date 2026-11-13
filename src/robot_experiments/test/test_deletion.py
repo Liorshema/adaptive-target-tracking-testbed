@@ -53,6 +53,16 @@ def execute(api, kind, identifier):
     return impact
 
 
+def test_scenario_purge_prunes_only_matching_pinned_experiment_references(api):
+    """Explicit purge cannot leave surviving Sessions with dangling Catalog pins."""
+    sid = api.create_session()['session_id']
+    for name in ['EXP-NOMINAL', 'EXP-PREDICTION']:
+        selected = api.get_session(sid)
+        api.add_experiment_to_session(sid, name, 1, expected_token=selected['token'])
+    execute(api, 'scenario', 'EXP-NOMINAL')
+    assert [r['experiment_id'] for r in api.list_session_experiments(sid)] == ['EXP-PREDICTION']
+
+
 def test_exclusive_session_removes_real_owned_run(api):
     """Successful deletion actually removes artifacts and its Session JSON."""
     rid, directory = owned(api)

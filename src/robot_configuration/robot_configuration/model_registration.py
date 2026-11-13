@@ -143,7 +143,7 @@ def register_models(registry, declarations, owner_groups):
         )
 
 
-def discover_models(registry, namespace, owner_groups):
+def discover_models(registry, namespace, owner_groups, *, configured_only=False):
     """Load sorted trusted owner modules; experiment YAML never supplies import paths."""
     package = import_module(namespace)
     if not hasattr(package, '__path__'):
@@ -153,4 +153,9 @@ def discover_models(registry, namespace, owner_groups):
     ):
         selected = import_module(module.name)
         if hasattr(selected, 'COMPONENTS'):
-            register_models(registry, selected.COMPONENTS, owner_groups)
+            declarations = selected.COMPONENTS
+            if configured_only:
+                # Frozen owner snapshots need not configure algorithms added
+                # after the Run. Present declarations still validate strictly.
+                declarations = tuple(d for d in declarations if d.identifier in owner_groups)
+            register_models(registry, declarations, owner_groups)

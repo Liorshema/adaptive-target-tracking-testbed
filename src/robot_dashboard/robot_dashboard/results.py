@@ -1139,7 +1139,13 @@ def _rmse(metric, *, angle=False):
 def comparison_view(comparison, *, selected_run=None, names=None):
     """Show each Run's recorded RMSE in Session order without ranking presentation."""
     rows = []
+    visible = [r for r in comparison.get('runs', [])
+               if r.get('execution_status', r.get('status', {}).get('execution_status')) != 'failed']
+    variants = {}
     for run in comparison.get('runs', []):
+        if run.get('variant'):
+            variants.setdefault(run.get('experiment_id'), set()).add(run['variant'])
+    for run in visible:
         metrics = {row['metric']: row for row in metric_rows(run)}
         recorded = [
             _rmse(metrics.get(name, {}), angle=name == 'pointing_error')
@@ -1151,8 +1157,11 @@ def comparison_view(comparison, *, selected_run=None, names=None):
             )
         ]
         label = scenario_label(run, names)
-        if run.get('condition_id') and run.get('variant'):
-            label += ' · ' + str(run['variant'])
+        named_variant = names and (run.get('experiment_id'), run.get('variant')) in names
+        if len(variants.get(run.get('experiment_id'), ())) > 1 and not named_variant:
+            suffix = ' · ' + str(run['variant'])
+            if not label.casefold().endswith(suffix.casefold()):
+                label += suffix
         rows.append(
             html.Tr(
                 [
@@ -1187,7 +1196,7 @@ def comparison_view(comparison, *, selected_run=None, names=None):
                 className='evidence-table session-table',
             )
             if rows
-            else html.P('No recorded Runs in this Session.', className='empty-state')
+            else html.P('No eligible recorded Runs to display.', className='empty-state')
         ],
         className='comparison-view',
     )

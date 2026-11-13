@@ -407,13 +407,13 @@ class ExperimentBackend:
 
     def reset_draft(self, specification):
         """
-        Discard local choices/overrides; retain the draft's base and identity.
+        Discard local choices/overrides; retain base, identity and comparison scope.
 
         Restoring an earlier unsaved edit uses the client's detached draft value;
         neither operation revises the Catalog or changes any package default.
         """
         experiment, _ = self.author._read(specification)
-        keys = ('id', 'name', 'base_case', 'base_revision', 'base_variant')
+        keys = ('id', 'name', 'base_case', 'base_revision', 'base_variant', 'comparison')
         return {'schema_version': 1,
                 'experiment': {k: deepcopy(experiment[k]) for k in keys if k in experiment}}
 
@@ -832,7 +832,8 @@ class ExperimentBackend:
         if session is None:
             raise KeyError(f'unknown Session ID: {session_id}')
         expected = {'schema_version', 'session_id', 'created_utc', 'metadata', 'runs'}
-        if (not isinstance(session, dict) or set(session) != expected
+        if (not isinstance(session, dict) or not expected <= set(session)
+                or set(session) - expected - {'experiments'}
                 or type(session['schema_version']) is not int or session['schema_version'] != 1
                 or session['session_id'] != session_id or not isinstance(session['runs'], list)
                 or not isinstance(session['created_utc'], str)
@@ -852,7 +853,50 @@ class ExperimentBackend:
             if reference['run_id'] in seen:
                 raise ValueError('duplicate Session Run reference')
             seen.add(reference['run_id'])
+        references = session.get('experiments', [])
+        if not isinstance(references, list):
+            raise ValueError('invalid Session Experiment references')
+        seen = set()
+        for reference in references:
+            if (not isinstance(reference, dict)
+                    or set(reference) != {'experiment_id', 'revision', 'sha256'}
+                    or type(reference['revision']) is not int or reference['revision'] < 1):
+                raise ValueError('invalid Session Experiment reference')
+            key = (reference['experiment_id'], reference['revision'])
+            try:
+                record = self.catalog.get(*key)
+            except (KeyError, ValueError, TypeError) as error:
+                raise ValueError('Session references an unknown Experiment revision') from error
+            if key in seen or record['sha256'] != reference['sha256']:
+                raise ValueError('Duplicate or mismatched Session Experiment revision')
+            seen.add(key)
         return session
+
+    def add_experiment_to_session(self, session_id, experiment_id, revision, *, expected_token):
+        """Append an immutable Catalog reference, without executing or copying a Run."""
+        from .reporting import write_json
+        if type(revision) is not int or revision < 1:
+            raise ValueError('An explicit positive Experiment revision is required')
+        path = self._session_path(session_id)
+        with self._management_lock(), self._metadata_lock(path.with_suffix('.lock')):
+            session = self._session(session_id)
+            self._check_session_token(session, expected_token)
+            record = self.catalog.get(experiment_id, revision)
+            reference = {'experiment_id': experiment_id, 'revision': record['revision'],
+                         'sha256': record['sha256']}
+            references = session.setdefault('experiments', [])
+            if reference not in references:
+                references.append(reference)
+                write_json(path, session)
+            return {'session': session, 'token': self._session_token(session)}
+
+    def list_session_experiments(self, session_id):
+        """Resolve pinned names from the Catalog; configurations remain in that owner."""
+        result = []
+        for reference in self._session(session_id).get('experiments', []):
+            record = self.catalog.get(reference['experiment_id'], reference['revision'])
+            result.append({**reference, 'name': record['name']})
+        return result
 
     def create_session(self, metadata=None):
         """Persist one small UUID record; no Run evidence or metric copies."""

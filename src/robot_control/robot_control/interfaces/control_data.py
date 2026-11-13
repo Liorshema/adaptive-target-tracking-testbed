@@ -171,6 +171,34 @@ class PredictedTargetTrajectory:
         object.__setattr__(self, "states", states)
         object.__setattr__(self, "timestamps", timestamps)
 
+    def sample(self, query_times: Array) -> Array:
+        """Interpolate position/velocity, permitting one initial forecast interval.
+
+        Forecasts begin after their reference epoch. Only that initial interval
+        may be backprojected using supplied velocity; never extrapolate the end.
+        Reference-epoch freshness remains the transport InputValidator's job.
+        """
+        times = _vector(self.timestamps, 'prediction timestamps')
+        states = _matrix(self.states, 'prediction states')
+        queries = _vector(query_times, 'prediction query times')
+        if (states.shape[0] != len(times) or states.shape[1] not in (3, 6)
+                or len(times) < 2 or np.any(np.diff(times) <= 0)):
+            raise ValueError('Prediction requires ordered position[/velocity] samples')
+        if queries.max() > times[-1] + 1e-9:
+            raise ValueError('Insufficient prediction horizon')
+        early = queries < times[0]
+        if np.any(early) and (
+                states.shape[1] != 6
+                or times[0] - queries.min() > times[1] - times[0] + 1e-9):
+            raise ValueError('Query precedes the supported prediction interval')
+        result = np.column_stack([np.interp(queries, times, states[:, i])
+                                  for i in range(states.shape[1])])
+        if states.shape[1] == 3:
+            result = np.column_stack([result, np.zeros((len(queries), 3))])
+        if np.any(early):
+            result[early, :3] += (queries[early] - times[0])[:, None] * states[0, 3:]
+        return result
+
 
 class ControlMode(str, Enum):
     """Physical interpretation of the commanded quantities."""
@@ -191,6 +219,7 @@ class ControlInput:
     target_state: Optional[Array] = None
     dt: Optional[float] = None
     previous_velocity: Optional[Array] = None
+    evaluation_time: Optional[float] = None
 
 
 @dataclass(frozen=True)

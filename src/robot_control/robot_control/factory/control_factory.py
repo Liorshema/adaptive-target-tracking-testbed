@@ -304,6 +304,10 @@ class ControlFactory:
         controller_parameters["task"] = task
         if controller_config.get('uses_safety_bounds', False):
             controller_parameters['safety'] = safety
+        dependencies = self._registries['controller'].describe(
+            controller_config['type'])['dependencies']
+        if 'reference_builder' in dependencies:
+            controller_parameters['reference_builder'] = reference_builder
 
         controller = self._registries["controller"].create(
             controller_config["type"],

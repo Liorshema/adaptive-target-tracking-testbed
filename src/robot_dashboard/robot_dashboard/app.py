@@ -50,6 +50,24 @@ def experiment_options(backend):
     return [{'label': r['name'], 'value': r['id']} for r in backend.list_scenarios()]
 
 
+def component_choices(role, options, inherited, selection):
+    """Hide unavailable prediction choices, retaining explicit historical references."""
+    filtered = role in {'predictor', 'adaptation', 'fusion'}
+    result = []
+    for option in sorted(options, key=lambda value: value['id'] != inherited):
+        identifier = option['id']
+        unavailable = not option['deployable'] or option['compatible'] is False
+        selected = identifier == selection or (selection == INHERIT and identifier == inherited)
+        if filtered and unavailable and not selected:
+            continue
+        label = option.get('capabilities', {}).get('display_name', readable(identifier))
+        result.append({'label': label + (' · unavailable (saved selection)' if unavailable and selected
+                                         else ' · unavailable' if unavailable else ''),
+                       'value': INHERIT if identifier == inherited and selection != inherited
+                       else identifier, 'disabled': unavailable})
+    return result
+
+
 def _bounds(schema):
     bounds = []
     for key, sign in [
@@ -192,23 +210,10 @@ def component_cards(backend, state):
             if pin
             else ex.get('components', {}).get(role, INHERIT)
         )
-        choices = [{'label': readable(inherited),
-                    'value': inherited if selection == inherited else INHERIT}]
+        options = backend.list_component_options(role)
+        choices = component_choices(role, options, inherited, selection)
         if role == 'target_dynamics':
             choices = target_options(backend, pin, inherited=inherited, selection=selection)
-        else:
-            for option in backend.list_component_options(role):
-                if option['id'] == inherited:
-                    continue
-                unavailable = not option['deployable'] or option['compatible'] is False
-                suffix = ' · unavailable' if unavailable else ''
-                choices.append(
-                    {
-                        'label': readable(option['id']) + suffix,
-                        'value': option['id'],
-                        'disabled': unavailable,
-                    }
-                )
         rows = [] if pin else [r for r in parameter_rows(detail) if r['key'] != 'influences']
         response = (backend.describe_robot_response(detail['effective']['model'],
                     detail['effective'].get('influences'))
@@ -252,7 +257,7 @@ def component_cards(backend, state):
                                 ),
                                 dcc.Checklist(
                                     id='environmental-disturbance',
-                                    options=[{'label': 'Environmental Disturbance · unavailable',
+                                    options=[{'label': 'Environmental Disturbance',
                                               'value': 'enabled', 'disabled': True}], value=[],
                                 ),
                             ], className='external-influences',

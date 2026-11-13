@@ -290,6 +290,7 @@ class PredictionNode(Node):
         message.state_dimension = state_dimension
         message.timestamps = timestamps.tolist()
         message.states = states.ravel(order="C").tolist()
+        message.model_name = prediction.model_name or ''
 
         self._trajectory_full_publisher.publish(message)
 

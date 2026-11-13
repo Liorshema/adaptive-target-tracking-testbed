@@ -171,13 +171,34 @@ assert capabilities['interactive_setup_supported'] is True
     subprocess.run([sys.executable, '-c', script], check=True)
 
 
-def _action(app, state, trigger, value=0.23, *, duration=6.0, seeds='[42]'):
+def _action(
+    app,
+    state,
+    trigger,
+    value=0.23,
+    *,
+    duration=6.0,
+    seeds='[42]',
+    source='EXP-NOMINAL',
+    revision=3,
+    selections=None,
+    component_ids=None
+):
     key, callback = next(
         (k, v) for k, v in app.callback_map.items() if k.startswith('..builder-state.data')
     )
     field = {'role': 'target_dynamics', 'key': 'damping', 'kind': 'number'}
-    inputs = [None] * 5 + [[], [value], [['override']], duration, seeds, [], None, []]
-    states = [[], [field], 'EXP-NOMINAL', 3, 'create', 'EXP-HTTP', 'HTTP', state]
+    inputs = [None] * 5 + [
+        selections or [],
+        [value],
+        [['override']],
+        duration,
+        seeds,
+        [],
+        None,
+        [],
+    ]
+    states = [component_ids or [], [field], source, revision, 'create', 'EXP-HTTP', 'HTTP', state]
     response = app.server.test_client().post(
         '/_dash-update-component',
         json={
@@ -195,6 +216,107 @@ def _action(app, state, trigger, value=0.23, *, duration=6.0, seeds='[42]'):
     )
     assert response.status_code == 200, response.get_data(as_text=True)
     return response.get_json()['response']['builder-state']['data']
+
+
+def test_new_independent_none_from_comparison_validates_saves_and_reloads(backend):
+    """The actual Validate/Create callbacks detach policy, not physical defaults."""
+    from robot_dashboard.app import create_app
+    from robot_dashboard.forms import begin_draft
+
+    draft = backend.new_draft(
+        'EXP-RESTRICTED', 'Restricted IMM', 'EXP-NOMINAL', base_variant='imm'
+    )
+    policy = {
+        'schema_version': 2,
+        'domain': 'component_models',
+        'variables': [
+            {
+                'name': 'predictor',
+                'path': 'components.predictor',
+                'values': ['imm', 'gaussian_process', 'koopman_edmd'],
+            }
+        ],
+    }
+    draft['experiment']['comparison'] = policy
+    draft['experiment']['components'] = {
+        'predictor': 'imm',
+        'adaptation': 'none',
+        'fusion': 'none',
+    }
+    source = backend.save_experiment(draft)
+    session = backend.create_session({'title': 'Existing comparison'})
+    sessions_before = backend.list_sessions()
+    variant = source['definition']['experiment']['variants'][0]['name']
+
+    # Revising an explicitly restricted comparison must keep enforcing it.
+    revised = begin_draft(backend, source['id'], 1, variant, 'revise')['spec']
+    revised['experiment'].setdefault('components', {}).update(
+        predictor='none', adaptation='none', fusion='none'
+    )
+    with pytest.raises(ValueError, match='effective model not permitted'):
+        backend.preview_experiment(revised)
+
+    app = create_app(backend)
+    # New keeps the selected Scenario as a settings template, using create mode.
+    key, callback = next(
+        (k, v)
+        for k, v in app.callback_map.items()
+        if any(i['id'] == 'new-scenario' for i in v['inputs'])
+    )
+    response = app.server.test_client().post(
+        '/_dash-update-component',
+        json={
+            'output': key,
+            'outputs': [
+                {'id': o.component_id, 'property': o.component_property}
+                for o in callback['output']
+            ],
+            'inputs': [
+                {**i, 'value': 1 if i['id'] == 'new-scenario' else None}
+                for i in callback['inputs']
+            ],
+            'state': [{**i, 'value': source['id']} for i in callback['state']],
+            'changedPropIds': ['new-scenario.n_clicks'],
+        },
+    )
+    assert response.status_code == 200
+    new = response.get_json()['response']
+    assert new['draft-mode']['value'] == 'create'
+    assert new['source-experiment']['value'] == source['id']
+    state = _action(app, None, 'load-draft', source=source['id'], revision=1)
+    assert state['stage'] == 'Draft', state
+    roles = ['predictor', 'adaptation', 'fusion']
+    selected = dict(
+        source=source['id'],
+        revision=1,
+        selections=['none'] * 3,
+        component_ids=[{'role': r} for r in roles],
+    )
+    state = _action(app, state, 'validate-draft', **selected)
+    assert state['stage'] == 'Validated', state['message']
+    assert state['spec']['experiment']['comparison'] is None
+    inherited_controller = state['components']['controller']['id']
+    state = _action(app, state, 'save-draft', **selected)
+    assert state['stage'] == 'Saved', state['message']
+    saved = backend.catalog.get('EXP-HTTP', 1)
+    assert 'comparison' not in saved['definition']['experiment']
+    reloaded = begin_draft(
+        backend, 'EXP-HTTP', 1, saved['definition']['experiment']['variants'][0]['name'], 'revise'
+    )
+    assert all(reloaded['components'][role]['id'] == 'none' for role in roles)
+    assert reloaded['components']['controller']['id'] == inherited_controller
+    assert backend.catalog.get(source['id'], 1) == source
+    assert backend.list_sessions() == sessions_before
+    assert backend.get_session(session['session_id'])['session']['runs'] == []
+
+    # Reset must not silently restore the inherited comparison restriction.
+    reset = backend.reset_draft(state['spec'])
+    reset['experiment']['components'] = dict.fromkeys(roles, 'none')
+    assert backend.preview_experiment(reset)['components']['predictor']['id'] == 'none'
+    # An explicit declaration still takes precedence on an independent draft.
+    reset['experiment']['comparison'] = policy
+    with pytest.raises(ValueError, match='effective model not permitted'):
+        backend.preview_experiment(reset)
 
 
 def test_load_uses_selected_revision_schema_instead_of_latest(backend, monkeypatch):
@@ -488,3 +610,54 @@ def test_primary_selection_labels_are_unique_without_inheritance_jargon(backend)
     assert not any(getattr(n,'className',None) in ['component-id','selection-origin'] for n in nodes)
     assert not any(getattr(n,'children',None)=='Model selection' for n in nodes)
     assert state['spec']==before
+
+
+def test_mpc_selection_schema_save_load_and_immutable_revision(backend):
+    """Registered MPC reaches the real owner factory and saved Scenario UI."""
+    from robot_dashboard.app import component_cards
+    from robot_dashboard.forms import begin_draft
+    from robot_experiments.configuration import materialize_run
+
+    options = backend.list_component_options('controller')
+    option = next(o for o in options if o['id'] == 'mpc')
+    assert option['capabilities']['display_name'] == 'Model Predictive Control'
+    assert option['defaults']['horizon'] == 8
+    assert option['schema']['properties']['step_duration']['unit'] == 's'
+    spec = backend.new_draft('EXP-MPC', 'MPC test', 'EXP-NOMINAL')
+    spec['experiment']['components'] = {'controller': 'mpc', 'task': 'distance_pointing'}
+    spec['experiment']['parameters'] = {'controller': {'horizon': 4}}
+    preview = backend.preview_experiment(spec)
+    assert preview['identities']['controller'].endswith('.ModelPredictiveController')
+    record = backend.save_experiment(spec)
+    state = begin_draft(backend, 'EXP-MPC', record['revision'], 'imm', 'revise')
+    state['inherited_components'] = deepcopy(state['components'])
+    nodes = list(_tree(component_cards(backend, state)))
+    selector = next(n for n in nodes if getattr(n, 'id', None) ==
+                    {'type': 'component', 'role': 'controller'})
+    assert any(o['label'] == 'Model Predictive Control' for o in selector.options)
+    environment = next(n for n in nodes if getattr(n, 'id', None) == 'environmental-disturbance')
+    assert environment.options[0]['label'] == 'Environmental Disturbance'
+    assert environment.options[0]['disabled']
+    before = deepcopy(backend.catalog.get('EXP-MPC', 1))
+    spec['experiment']['parameters']['controller']['horizon'] = 6
+    assert backend.save_experiment(spec, expected_revision=1)['revision'] == 2
+    assert backend.catalog.get('EXP-MPC', 1) == before
+    plan = backend.catalog.prepare('EXP-MPC', 1)
+    directory = backend.directory / 'materialized'; directory.mkdir(parents=True)
+    prepared = materialize_run(plan['variants'][0], 42, directory,
+                               backend.catalog.share, plan['runtime'])
+    assert prepared['plan']['identities']['controller'].endswith('.ModelPredictiveController')
+    invalid = deepcopy(spec); invalid['experiment']['parameters']['controller']['horizon'] = True
+    assert not backend.validate_experiment(invalid)['valid']
+
+
+def test_prediction_choices_hide_unavailable_but_retain_explicit_historical_selection():
+    """Filtering affects presentation only; selected unsupported references stay explicit."""
+    from robot_dashboard.app import component_choices
+    options=[{'id':'good','deployable':True,'compatible':None,'capabilities':{}},
+             {'id':'library','deployable':False,'compatible':None,'capabilities':{}}]
+    choices=component_choices('predictor',options,'good','good')
+    assert [o['value'] for o in choices]==['good']
+    choices=component_choices('predictor',options,'library','library')
+    selected=next(o for o in choices if o['value']=='library')
+    assert selected['disabled'] and 'unavailable' in selected['label']

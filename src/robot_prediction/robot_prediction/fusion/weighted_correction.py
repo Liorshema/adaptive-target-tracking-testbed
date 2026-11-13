@@ -65,5 +65,6 @@ class WeightedCorrection:
             timestamps=baseline.timestamps.copy(),
             covariance=baseline.covariance,
             confidence=baseline.confidence,
-            model_name='weighted_correction',
+            model_name=(baseline.model_name + '+weighted_correction'
+                        if baseline.model_name else 'weighted_correction'),
         )

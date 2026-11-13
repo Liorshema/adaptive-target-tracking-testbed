@@ -188,6 +188,11 @@ class SafeControlPipeline:
         return self._velocity_limits
 
     @property
+    def acceleration_limits(self):
+        """Expose the authoritative command-rate envelope to horizon controllers."""
+        return self._acceleration_limits
+
+    @property
     def joint_limits(self):
         """Return the optional physical position contract."""
         return self._joint_limits

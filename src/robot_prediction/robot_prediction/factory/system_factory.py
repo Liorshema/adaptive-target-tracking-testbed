@@ -40,6 +40,8 @@ class PredictionSystemFactory:
             'spatial_dimension': 3,
             'deployment': 'trajectory_system',
             **(context or {}),
+            'adaptation_type': adaptation_type,
+            'fusion_type': fusion_type,
         }
         parameters = parameters or {}
         if set(parameters) - set(self._registries):

@@ -195,6 +195,19 @@ class ExecutionActions:
         return self._observe(state, job)
 
 
+def session_experiments_view(backend, session_id):
+    """Present pinned Catalog identities; Session membership never implies execution."""
+    if not session_id:
+        return ''
+    records = backend.list_session_experiments(session_id)
+    if not records:
+        return ''
+    return html.Small(
+        'Experiments: ' + ' · '.join(r['name'] for r in records),
+        title='; '.join(f"{r['experiment_id']} · revision {r['revision']}" for r in records),
+    )
+
+
 def execution_layout(backend):
     """Return named, mounted workspace sections using the existing callback IDs."""
     return {
@@ -217,6 +230,8 @@ def execution_layout(backend):
                     persistence_type='local',
                     clearable=False,
                 ),
+                html.Div(id='session-experiments', className='context-label',
+                         style={'maxWidth': '340px', 'fontSize': '11px'}),
                 html.Details(
                     [
                         html.Summary('⋯'),
@@ -447,6 +462,17 @@ def _job_view(state):
 def register_execution(app, backend):
     """Register bounded polling and explicit UI actions; no startup launches."""
     actions = ExecutionActions(backend)
+
+    @app.callback(
+        Output('session-experiments', 'children'),
+        Input('current-session', 'value'),
+        Input('management-events', 'data'),
+    )
+    def session_experiments(selected, _events):
+        try:
+            return session_experiments_view(backend, selected)
+        except (KeyError, ValueError, OSError) as error:
+            return html.Small(str(error), className='notice error')
 
     @app.callback(
         Output('current-session', 'options'),

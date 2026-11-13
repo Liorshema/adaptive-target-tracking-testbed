@@ -298,6 +298,9 @@ class ResourceDeletion:
         for key, session in sessions.items():
             updated = deepcopy(session)
             updated['runs'] = [r for r in session['runs'] if r['run_id'] not in target_ids]
+            if kind == 'scenario' and 'experiments' in updated:
+                updated['experiments'] = [r for r in updated['experiments']
+                                          if r['experiment_id'] != identifier]
             if kind == 'session' and key == identifier:
                 updated = None
             if updated != session:

@@ -246,7 +246,10 @@ def test_production_inventory_has_no_test_models():
         'constant_acceleration',
         'constant_velocity',
         'coordinated_turn',
+        'gaussian_process',
         'imm',
+        'koopman_edmd',
+        'none',
     )
 
 

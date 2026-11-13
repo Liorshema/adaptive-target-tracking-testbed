@@ -39,7 +39,13 @@ def test_canonical_defaults_and_legacy_saved_inputs_resolve_identically(tmp_path
     legacy = write_config(tmp_path, LEGACY)
     assert set(current.data) == {
         'prediction', 'monitoring', 'predictors', 'adaptations', 'fusions'}
-    assert current.data == legacy.data
+    # Frozen historical documents retain only the algorithms they declared;
+    # introducing EDMD must not change any existing numerical default.
+    existing = current.data
+    del existing['predictors']['koopman_edmd']
+    del existing['predictors']['gaussian_process']
+    del existing['predictors']['none']
+    assert existing == legacy.data
     for section, expected in LEGACY.items():
         assert current.get(section) == expected
     detached = current.data

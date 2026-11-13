@@ -154,8 +154,8 @@ def test_trajectory_samples_are_original_and_frame_mismatch_is_rejected(recorded
     assert trajectory_figure({})[0] is None
 
 
-def test_current_session_row_selects_original_run_through_callback(recorded):
-    """A row click selects the immutable Run ID, including failed Runs."""
+def test_historical_failed_selection_remains_inspectable_but_hidden_in_comparison(recorded):
+    """A stale historical row event retains diagnostic access without displaying failure."""
     from robot_dashboard.app import create_app
 
     api, ((_, good), (_, bad)) = recorded
@@ -191,7 +191,9 @@ def test_current_session_row_selects_original_run_through_callback(recorded):
     assert response.status_code == 200, response.get_data(as_text=True)
     body = response.get_json()['response']
     assert body['results-run']['value'] == bad
-    assert 'selected-run' in str(body['session-comparison']['children'])
+    assert bad not in str(body['session-comparison']['children'])
+    assert good in str(body['session-comparison']['children'])
+    assert 'selected-run' not in str(body['session-comparison']['children'])
     assert api.get_session_comparison(session)['ranking'] is None
 
 
@@ -450,3 +452,53 @@ def test_comparison_shows_each_recorded_run_instead_of_condition_seed_aggregates
     assert [row.to_plotly_json()['props']['data-run-id'] for row in rows] == ['run-a', 'run-b']
     assert rows[1].className == 'selected-run'
     assert all(len(row.children) == 5 for row in rows)
+
+
+def test_comparison_hides_failed_execution_without_mutating_recorded_results():
+    """Failure diagnostics remain recorded while failed rows leave the RMSE table."""
+    from copy import deepcopy
+    from robot_dashboard.results import comparison_view
+    good = _presentation_result('ok')
+    bad = _presentation_result('failed')
+    bad['status'] = {'execution_status': 'failed', 'failure': {'reason': 'readiness_timeout'}}
+    comparison = {'runs': [bad, good]}
+    before = deepcopy(comparison)
+    _, rows = _table_rows(comparison_view(comparison))
+    assert [r.to_plotly_json()['props']['data-run-id'] for r in rows] == ['ok']
+    assert comparison == before
+
+
+def test_comparison_variant_labels_only_distinguish_real_scenario_variants():
+    """Single-variant legacy bookkeeping is hidden; meaningful distinctions remain."""
+    from robot_dashboard.results import comparison_view
+    run = _presentation_result('a')
+    run.update(variant='imm', condition_id='condition')
+    _, rows = _table_rows(comparison_view({'runs': [run]}, names={'EXP-A':'Gaussian Process'}))
+    assert rows[0].children[0].children.children == 'Gaussian Process'
+    other = _presentation_result('b')
+    other.update(variant='cv', condition_id='other')
+    _, rows = _table_rows(comparison_view({'runs':[run,other]}, names={'EXP-A':'Motion study'}))
+    assert [r.children[0].children.children for r in rows] == ['Motion study · imm', 'Motion study · cv']
+
+
+def test_failed_rows_do_not_erase_meaningful_variant_context():
+    """A study still has distinct variants when one variant's execution failed."""
+    from robot_dashboard.results import comparison_view
+    good = _presentation_result('good')
+    good.update(variant='imm', condition_id='a')
+    bad = _presentation_result('bad')
+    bad.update(variant='cv', condition_id='b')
+    bad['status']['execution_status'] = 'failed'
+    _, rows = _table_rows(comparison_view({'runs':[good,bad]}, names={'EXP-A':'Study'}))
+    assert rows[0].children[0].children.children == 'Study · imm'
+
+
+def test_comparison_preserves_authoritative_variant_names_without_double_suffix():
+    """Projected labels and custom variant names already distinguish the Scenario."""
+    from robot_dashboard.results import comparison_view
+    runs = [_presentation_result('a'), _presentation_result('b')]
+    runs[0].update(variant='imm', condition_id='a')
+    runs[1].update(variant='cv', condition_id='b')
+    names = {('EXP-A','imm'): 'Motion study · IMM', ('EXP-A','cv'): 'Custom CV scenario'}
+    _, rows = _table_rows(comparison_view({'runs':runs}, names=names))
+    assert [r.children[0].children.children for r in rows] == ['Motion study · IMM', 'Custom CV scenario']

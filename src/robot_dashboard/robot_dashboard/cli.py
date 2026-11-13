@@ -65,6 +65,13 @@ def main(argv=None):
         managed_result_roots=args.managed_result_root,
     )
     app = create_app(backend)
+
+    @app.server.get('/dashboard-health')
+    def dashboard_health():
+        """Expose local server identity for the Windows/WSL launcher readiness check."""
+        return {'service': 'robot_dashboard', 'pid': os.getpid(),
+                'catalog': str(catalog.path.resolve())}
+
     print(f'Catalog: {catalog.path}', flush=True)
     app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
     return 0

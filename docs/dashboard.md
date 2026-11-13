@@ -313,10 +313,19 @@ reading, not streaming JSON. Original artifact references and safety/coverage
 records remain inspectable. A completed execution does not imply good tracking
 or accepted safety outside the recorded window.
 
-Current Session stores references to original Runs. Its comparison shows recorded
-metrics alongside explicit descriptive compatibility and scientific qualification,
-including failed or unavailable Runs. Incompatible Runs are never ranked together. The launch Session
-remains fixed even if another Session is selected during execution. Refresh the
+Current Session can also pin saved Experiments before execution. The backend's
+`add_experiment_to_session(session_id, experiment_id, revision, expected_token=...)`
+stores the explicit immutable Catalog revision and its SHA256; it does not start a
+Run. `list_session_experiments` resolves the saved names, and the Dashboard shows
+them beside the selected Session. Older Sessions without Experiment pins remain
+readable. Archiving an Experiment preserves its pins; explicit Scenario purge
+removes matching pins through the existing deletion transaction.
+
+Current Session stores references to original Runs. The RMSE comparison table
+hides failed executions; their Results, diagnostics and Session references remain
+available. Backend comparison data still includes failed or unavailable Runs, and
+incompatible Runs are never ranked together. The launch Session remains fixed even
+if another Session is selected during execution. Refresh the
 Session list/comparison after edits made by another client.
 
 The Session selector's **⋯** menu opens compact rename or deletion dialogs.
@@ -419,3 +428,43 @@ When registering historical result roots for viewing, incomplete ownership recor
 can block the existing conservative deletion preview, even for a newly copied
 Scenario. Keep normal workspace scope for management; resolve incomplete archived
 metadata separately. The dashboard never bypasses ownership checks to delete.
+
+## Windows one-click launcher (WSL installation)
+
+Open `tools/dashboard/Start Dashboard.cmd` in Windows Explorer, or create a Windows
+shortcut to that file. It detects the WSL distribution from the repository's UNC
+path, starts the existing WSL/ROS environment and Dashboard virtual environment,
+uses the default Catalog, and opens `http://localhost:8060`. Keep the adjacent
+PowerShell and shell files together; no Docker installation is used.
+
+`Stop Dashboard.cmd` closes only the launcher's owned Dashboard process group.
+Experiment workers retain the existing Runner ownership. Repeated Start clicks
+reuse one server. An unrelated server occupying port 8060 is reported explicitly;
+it is not adopted or killed. Startup errors remain visible in the Windows console.
+Logs and PID/birth/port metadata are under
+`~/.cache/adaptive_tracking/dashboard-8060/` (or `$XDG_CACHE_HOME`).
+
+Prerequisites are the existing built workspace, `install/setup.bash`, and
+`build/dashboard_venv/bin/python` with Dashboard dependencies. The equivalent WSL
+commands are `bash tools/dashboard/dashboard.sh start` and `... stop`. The default
+WSL user must be the user who owns the existing installation/Catalog.
+
+Predictor **None** (`none`) holds the latest estimated position and publishes zero
+future velocity at the usual forecast timestamps. Select **None** for Adaptation
+and Fusion as well; full validation rejects residual correction of this hold.
+Unavailable Predictor, Adaptation and Fusion entries are hidden from normal choices.
+A selected unsupported historical model remains explicitly labelled and disabled;
+backend validation still rejects invalid deployment. Completed execution with failed
+safety acceptance remains visible in the comparison table. Failed executions are
+hidden there, while their original Results, logs and diagnostic access remain.
+
+A saved comparison may explicitly restrict its permitted model IDs. The preserved
+Predictors Comparison permits its original three models; editing a saved member
+does not silently expand that scientific declaration. **New** creates an independent
+experiment from the selected Scenario's configuration, without inheriting its
+comparison restrictions. Choose None for Predictor, Adaptation and Fusion, then
+Validate and Create experiment. Reset retains this independent scope. New copies
+(including Duplicate) are independent; revisions preserve their saved policy.
+Explicit comparisons authored through the existing Author/YAML API still enforce
+their permitted models. No existing revision needs to be rewritten.
+See [independent draft regression evidence](validation/dashboard_independent_creation.md).

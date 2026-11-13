@@ -16,3 +16,7 @@ float64[] timestamps
 # Shape: (horizon, state_dimension)
 # Expected length: horizon * state_dimension.
 float64[] states
+
+# Actual producer/model state, including explicitly labeled warm-up/fallback.
+# Scientific model selection remains frozen in the experiment configuration.
+string model_name

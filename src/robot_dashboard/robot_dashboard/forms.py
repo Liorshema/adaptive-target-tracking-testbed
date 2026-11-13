@@ -33,6 +33,10 @@ def begin_draft(backend, source, revision, variant, mode, identifier=None, name=
     spec = backend.new_draft(
         identifier, name, source, base_revision=revision, base_variant=variant
     )
+    if mode == 'create':
+        # Copy the selected configuration, not its scientific comparison contract.
+        # Explicit null tells Author to remove the policy inherited from the base.
+        spec['experiment']['comparison'] = None
     preview = backend.preview_experiment(spec)
     return {
         'spec': spec,

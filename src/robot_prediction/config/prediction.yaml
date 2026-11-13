@@ -10,9 +10,42 @@ monitoring:
     # Residuals combine position and velocity; this is a numerical scale, not metres.
     residual_scale: 0.5
 predictors:
+  none:
+    parameters: {}  # latest estimated position held; future velocity zero
   # Deployable with estimator state [px, py, pz, vx, vy, vz].
   constant_velocity:
     parameters: {}
+  gaussian_process:
+    parameters:
+      kernel: rbf
+      length_scale: 2.0  # in normalized input coordinates
+      signal_variance: 1.0  # acceleration variance, m^2/s^4
+      observation_noise: 1.0  # finite-difference acceleration observation variance, m^2/s^4
+      jitter: 1.0e-08  # numerical covariance diagonal nugget, m^2/s^4
+      history_capacity: 64  # completed consecutive estimate transitions
+      min_training_samples: 16
+      refit_interval: 5  # new completed transitions between fits
+      normalize_features: true  # window-local state mean/std; zero acceleration prior
+      minimum_scale: 0.1  # per-coordinate std floor in that coordinate's physical units
+      max_condition: 1.0e+10
+      max_observation_gap: 0.5  # s; longer gaps discard history
+      max_state_dimension: 64  # reject excessive inputs before kernel allocation
+      max_horizon: 200  # bound recursive forecast work per callback
+  koopman_edmd:
+    parameters:
+      basis: polynomial  # linear or polynomial; always includes constant + original coordinates
+      polynomial_degree: 2  # total degree 1..3; linear basis uses degree 1
+      regularization: 0.0001  # ridge lambda in normalized observable coordinates
+      training_interval: 0.1  # s; causal interpolation of received state estimates
+      history_capacity: 200  # transition pairs, oldest evicted
+      min_training_samples: 30  # completed transition pairs before first fit
+      refit_interval: 5  # new transition pairs per refit
+      max_condition: 1.0e+10  # condition ceiling for regularized feature Gram matrix
+      minimum_scale: 0.001  # normalization std floor in each physical state's units
+      max_observation_gap: 0.5  # s; longer gaps reset learning instead of interpolating
+      max_features: 256  # reject excessive dictionaries before allocation
+      max_transition_steps: 1000  # cap both causal resampling work and lifted forecast propagation
+      max_spectral_radius: 1.05  # reject excessive learned exponential growth; never clip eigenvalues
   # Library only as a direct predictor: requires [position, velocity, acceleration].
   constant_acceleration:
     parameters: {}

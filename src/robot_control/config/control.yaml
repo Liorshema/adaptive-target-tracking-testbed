@@ -1,5 +1,5 @@
 # Controller/task selection belongs to the manifest; these are numerical defaults.
-# Both controllers output [v_B, omega_B, dq_base_yaw, dq_shoulder, dq_elbow, dq_wrist].
+# Deployed robot command order: [v_B, omega_B, dq_base_yaw, dq_shoulder, dq_elbow, dq_wrist].
 # Command units: [m/s, rad/s, rad/s, rad/s, rad/s, rad/s]; joint order is robot.yaml order.
 controllers:
   jacobian:
@@ -23,6 +23,18 @@ controllers:
       posture_gain: 0.3  # s^-1; preferred joint rate = gain*(midpoint - position)
       smoothness_weight: 0.005  # dimensionless; cost of normalized change from previous u
       limit_avoidance_weight: 0.002  # dimensionless; inflates joint motion cost near bounds
+  mpc:
+    parameters:
+      horizon: 8  # future held commands; recomputed every control cycle
+      step_duration: 0.1  # s; first hold uses actual control dt instead
+      task_weights: [4.0, 12.0, 12.0]  # selected task row order
+      task_scales: [1.0, 1.0, 1.0]  # m/rad by task row
+      motion_weight: 0.02  # penalty on u / authoritative velocity scale
+      smoothness_weight: 0.01  # penalty on normalized command differences
+      terminal_weight: 1.0  # additional multiple of final tracking cost
+      max_iterations: 60
+      solver_tolerance: 1.0e-8  # optimizer convergence tolerance
+      feasibility_tolerance: 1.0e-7  # normalized velocity / physical linear constraints
 tasks:
   cartesian:
     parameters:

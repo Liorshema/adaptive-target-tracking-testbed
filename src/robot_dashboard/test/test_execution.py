@@ -7,6 +7,22 @@ from copy import deepcopy
 import pytest
 
 
+def test_session_experiment_view_shows_pinned_names_without_starting_runs():
+    """The thin client presents owner-resolved pins, including the legacy empty state."""
+    from robot_dashboard.execution import session_experiments_view
+
+    class Backend:
+        def list_session_experiments(self, sid):
+            assert sid == 'chosen'
+            return [{'name': name, 'experiment_id': name, 'revision': 1}
+                    for name in ['IMM', 'Gaussian Process', 'Koopman EDMD']]
+
+    assert session_experiments_view(Backend(), None) == ''
+    rendered = session_experiments_view(Backend(), 'chosen')
+    assert rendered.children == 'Experiments: IMM · Gaussian Process · Koopman EDMD'
+    assert 'revision 1' in rendered.title
+
+
 class ControlledBackend:
     """Fake only action/status transport; no numerical samples or scientific results."""
 

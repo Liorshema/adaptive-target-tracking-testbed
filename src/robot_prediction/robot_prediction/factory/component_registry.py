@@ -168,5 +168,6 @@ def create_prediction_registries(config=None, configuration_path=None):
             requirements=requirements,
             capabilities={'deployable': True, 'correction_representation': 'none'},
         )
-    discover_models(result['predictor'], PREDICTOR_MODEL_NAMESPACE, data['predictors'])
+    discover_models(result['predictor'], PREDICTOR_MODEL_NAMESPACE, data['predictors'],
+                    configured_only=True)
     return result

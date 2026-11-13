@@ -27,6 +27,66 @@ def files(root):
     return {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}
 
 
+def test_session_pins_experiment_revision_without_runs_or_catalog_writes(api):
+    """Preserve legacy Sessions and append immutable, deduplicated revision references."""
+    created = api.create_session({'title': 'Predictors Comparison'})
+    sid = created['session_id']
+    assert 'experiments' not in created
+    before = api.catalog.path.read_bytes()
+    selected = api.get_session(sid)
+    record = api.catalog.get('EXP-NOMINAL', 1)
+    updated = api.add_experiment_to_session(
+        sid, 'EXP-NOMINAL', 1, expected_token=selected['token'])
+    assert updated['session']['experiments'] == [{
+        'experiment_id': 'EXP-NOMINAL', 'revision': 1, 'sha256': record['sha256']}]
+    assert updated['session']['runs'] == []
+    assert api.catalog.path.read_bytes() == before
+    assert api.list_session_experiments(sid)[0]['name'] == record['name']
+    duplicate = api.add_experiment_to_session(
+        sid, 'EXP-NOMINAL', 1, expected_token=updated['token'])
+    assert duplicate == updated
+    with pytest.raises(CatalogConflict):
+        api.add_experiment_to_session(sid, 'EXP-NOMINAL', 1,
+                                      expected_token=selected['token'])
+    with pytest.raises((ValueError, KeyError)):
+        api.add_experiment_to_session(sid, 'EXP-MISSING', 1,
+                                      expected_token=updated['token'])
+    assert api.get_session(sid) == updated
+    api.archive_experiment('EXP-NOMINAL',
+                           expected_revision=api.catalog.get('EXP-NOMINAL')['revision'])
+    assert api.list_session_experiments(sid)[0]['sha256'] == record['sha256']
+
+
+@pytest.mark.parametrize('change', ['hash', 'revision', 'duplicate', 'keys'])
+def test_session_rejects_invalid_experiment_pins(api, change):
+    """Reject forged pins without silently following a mutable latest revision."""
+    created = api.create_session()
+    sid = created['session_id']
+    selected = api.get_session(sid)
+    data = api.add_experiment_to_session(
+        sid, 'EXP-NOMINAL', 1, expected_token=selected['token'])['session']
+    if change == 'hash':
+        data['experiments'][0]['sha256'] = '0' * 64
+    elif change == 'revision':
+        data['experiments'][0]['revision'] = True
+    elif change == 'duplicate':
+        data['experiments'].append(data['experiments'][0].copy())
+    else:
+        data['experiments'][0]['unused'] = True
+    write_json(api._session_path(sid), data)
+    with pytest.raises(ValueError):
+        api.get_session(sid)
+
+
+def test_session_experiment_association_requires_explicit_revision(api):
+    """A mutable latest revision is never accepted as an association argument."""
+    sid = api.create_session()['session_id']
+    selected = api.get_session(sid)
+    with pytest.raises(ValueError):
+        api.add_experiment_to_session(sid, 'EXP-NOMINAL', None,
+                                      expected_token=selected['token'])
+
+
 def test_rename_only_changes_session_title_and_delete_preserves_all_runs(api, tmp_path):
     """Change only the title and delete only the owned reference document."""
     run_id, run = recorded_run(tmp_path / 'results')

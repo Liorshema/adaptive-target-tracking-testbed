@@ -72,3 +72,33 @@ def test_future_target_does_not_block_new_prediction(node):
     node._state_callback(state_message(10.0))
     assert len(node.messages) == 1
     assert node._last_timestamp == 10.0
+
+
+@pytest.mark.parametrize('model', ['constant_velocity', 'none'])
+def test_full_forecast_preserves_explicit_model_identity(node, model):
+    """ROS observers must distinguish the actual model, including warm-up labels."""
+    node._system = PredictionSystemFactory(config=node._config).create(
+        predictor_type=model, adaptation_type='none', fusion_type='none')
+    node._state_callback(state_message(10.0))
+    assert node.messages[-1].model_name == model
+    assert node.messages[-1].header.frame_id == 'world'
+    if model == 'none':
+        assert np.all(np.asarray(node.messages[-1].states).reshape(-1, 6)[:, 3:] == 0.)
+
+
+@pytest.mark.parametrize('name', ['koopman_edmd', 'gaussian_process'])
+def test_online_reset_restarts_visible_warmup_without_learning_leak(node, name):
+    """A new clock epoch reconstructs the selected model with no old training."""
+    node._selection = dict(predictor_type=name, adaptation_type='none', fusion_type='none')
+    node._system = PredictionSystemFactory(config=node._config).create(**node._selection)
+    for k in range(41):
+        timestamp=5.+k*.1
+        node.test_now=timestamp+.01
+        node._state_callback(state_message(timestamp))
+    assert node.messages[0].model_name == name + '/cv_warmup'
+    assert node.messages[-1].model_name == name
+    node._on_time_jump(None)
+    node.test_now=1.01
+    node._state_callback(state_message(1.))
+    assert node.messages[-1].model_name == name + '/cv_warmup'
+    assert node._system._predictor.diagnostics['training_pairs'] == 0

@@ -6,7 +6,7 @@ It generates control commands but never executes or publishes them.
 """
 
 from typing import Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from numpy.typing import NDArray
@@ -153,16 +153,8 @@ class TrackingControlOrchestrator:
             np.column_stack([states[:, :3], np.zeros((len(states), 3))]))
         if self._prediction_sampling == 'first_future' or query_time == times[index]:
             result = states[index].copy()
-        elif index == 0:
-            # Forecasts begin one sample after their reference time. Recover the
-            # short initial interval using its supplied position and velocity.
-            if len(times) < 2 or times[0] - query_time > times[1] - times[0] + 1e-9:
-                raise ValueError('Query precedes the supported prediction interval')
-            result = states[0].copy()
-            result[:3] += (query_time - times[0]) * result[3:]
         else:
-            fraction = (query_time - times[index - 1]) / (times[index] - times[index - 1])
-            result = (1 - fraction) * states[index - 1] + fraction * states[index]
+            result = replace(prediction, states=states).sample(np.array([query_time]))[0]
         if not self._target_velocity_feedforward:
             result[3:] = 0.
         return result
@@ -242,6 +234,7 @@ class TrackingControlOrchestrator:
             target_state=target_state,
             dt=dt,
             previous_velocity=previous_velocity,
+            evaluation_time=float(now),
         )
 
         # 4. Compute control with the same tracking-frame geometry.
