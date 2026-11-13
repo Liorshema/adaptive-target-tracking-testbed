@@ -19,6 +19,54 @@ def profile(enabled=True):
     p['enabled']=enabled
     return p
 
+
+def halvorsen():
+    return yaml.safe_load((Path(__file__).parent / 'model_fixtures/halvorsen.yaml').read_text())
+
+
+def test_disabled_incompatible_profile_preserves_mapped_three_state_dynamics_exactly():
+    original = halvorsen()
+    before = deepcopy(original)
+    frozen = profile(False)
+    baseline = EquationDynamics(model=original, influences=[])
+    baseline.validate_deployment('world')
+    disabled = EquationDynamics(model=original, influences=[frozen])
+    disabled.validate_deployment('world')
+    assert disabled.definition == baseline.definition
+    assert disabled.base_definition == original == before
+    assert disabled.influences == [frozen] and not disabled.requires_tracking_context
+    left, right = baseline.initial_state, disabled.initial_state
+    rk = RK4Integrator()
+    for step in range(200):
+        t = step * .002
+        np.testing.assert_array_equal(baseline.derivative(left, [], t, {}),
+                                      disabled.derivative(right, [], t, {}))
+        left = rk.step(baseline, left, [], t, .002, {})
+        right = rk.step(disabled, right, [], t, .002, {})
+        np.testing.assert_array_equal(left, right)
+        for a, b in zip(baseline.physical_output(left, [], t + .002, {}),
+                        disabled.physical_output(right, [], t + .002, {})):
+            np.testing.assert_array_equal(a, b)
+    with pytest.raises(ValueError, match='Unsupported influence projection'):
+        EquationDynamics(model=original, influences=[profile(True)])
+
+
+@pytest.mark.parametrize('change', ['version', 'enabled', 'frame', 'units',
+                                  'expression', 'parameter', 'bindings', 'symbol'])
+def test_disabled_profiles_still_validate_their_own_contract(change):
+    frozen = profile(False)
+    if change == 'version': frozen['schema_version'] = True
+    elif change == 'enabled': frozen['enabled'] = 'off'
+    elif change == 'frame': frozen['frame'] = 'map'
+    elif change == 'units': frozen['parameters']['L']['unit'] = 's'
+    elif change == 'expression': frozen['expression'] = "__import__('os')"
+    elif change == 'parameter': frozen['parameters']['A_max']['value'] = -1.
+    elif change == 'symbol': frozen['expression'] = (
+        'A_max*influenceValidationVelocity/norm(influenceValidationVelocity)')
+    else: frozen['bindings'] = {'vx': True}
+    with pytest.raises(ValueError):
+        EquationDynamics(model=halvorsen(), influences=[frozen])
+
 def response(delta):
     distance=np.linalg.norm(delta)
     return .3*np.exp(-distance/.8)*delta/np.sqrt(distance**2+.05**2)

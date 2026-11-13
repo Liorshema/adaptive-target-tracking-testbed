@@ -214,8 +214,14 @@ class ExperimentBackend:
         from .dynamics_library import content_hash
         try:
             profiles = prepare_robot_response(model, influences)
-            return {'available': True, 'enabled': profiles[0]['enabled'],
-                    'influences': profiles, 'sha256': content_hash(profiles), 'reason': ''}
+            detail = {'available': True, 'enabled': profiles[0]['enabled'],
+                      'influences': profiles, 'sha256': content_hash(profiles), 'reason': ''}
+            try:
+                # An admissible OFF snapshot does not imply that ON can bind.
+                prepare_robot_response(model, profiles, enabled=True)
+            except (ValueError, TypeError, KeyError) as error:
+                detail.update(available=False, reason=str(error))
+            return detail
         except (ValueError, TypeError, KeyError) as error:
             return {'available': False, 'enabled': False, 'reason': str(error)}
 
